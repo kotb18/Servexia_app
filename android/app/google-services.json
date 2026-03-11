@@ -1,0 +1,63 @@
+{
+  "project_info": {
+    "project_number": "840926699694",
+    "project_id": "maintenance-b7282",
+    "storage_bucket": "maintenance-b7282.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:840926699694:android:d94b4af2bcaf2145314d3f",
+        "android_client_info": {
+          "package_name": "com.masry.maintenance"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "840926699694-7v3iftptcscr4amvsggt63kkqt8ltgto.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.masry.maintenance",
+            "certificate_hash": "fed5399d97ed301c8b1338a296a7147c6474d368"
+          }
+        },
+        {
+          "client_id": "840926699694-fg67kdaq9h43mib33ll5nebdpa4v60pn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.masry.maintenance",
+            "certificate_hash": "7393ae3ef6c43135d406b17665828a6cd31ee79f"
+          }
+        },
+        {
+          "client_id": "840926699694-vq4e95gv45opvktkfe54ault5q7jcmuk.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.masry.maintenance",
+            "certificate_hash": "cb5157e72b1435d853fd5ed91ab4480abb4ec3bd"
+          }
+        },
+        {
+          "client_id": "840926699694-qslfjros665j55vtofid6rghqe4qsiii.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-l6i06vfoBsz9C6BuLDMoqGY6h7AXmIQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "840926699694-qslfjros665j55vtofid6rghqe4qsiii.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
