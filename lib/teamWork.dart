@@ -216,7 +216,7 @@ class _TeamScreenState extends State<TeamScreen> {
                           ),
                         ),
                         isAdmin && !admins.contains(member['id'])
-                            ? TextButton.icon(
+                            ? IconButton(
                                 onPressed: () async {
                                   showDialog(
                                     context: context,
@@ -250,6 +250,7 @@ class _TeamScreenState extends State<TeamScreen> {
                                                         member['id'],
                                                       ]),
                                                 });
+                                            await getAdmins();
                                             setState(() {});
                                             Navigator.pop(context);
                                             setState(() {});
@@ -260,11 +261,11 @@ class _TeamScreenState extends State<TeamScreen> {
                                     ),
                                   );
                                 },
-                                icon: const Icon(
-                                  Icons.admin_panel_settings,
-                                  size: 18,
+                                icon: Icon(
+                                  Icons.star_border_outlined,
+                                  // color: const Color.fromARGB(255, 164, 172, 12),
                                 ),
-                                label: const Text('اضافته كمسؤول'),
+                                // label: const Text('اضافته كمسؤول'),
                               )
                             : (admins.isNotEmpty &&
                                   admins.contains(member['id']))

@@ -29,6 +29,13 @@
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
 	<key>UISupportedInterfaceOrientations</key>
+	<key>SKAdNetworkItems</key>
+    <array>
+       <dict>
+        <key>SKAdNetworkIdentifier</key>
+        <string>...</string>
+       </dict>
+    </array>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>

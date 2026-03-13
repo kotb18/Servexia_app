@@ -1,0 +1,25 @@
+# ios/Podfile
+
+platform :ios, '13.0'
+
+# استخدم use_frameworks! و use_modular_headers! للـ MLKit و Firebase
+use_frameworks!
+use_modular_headers!
+
+target 'Runner' do
+  # تفعيل Flutter pods
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  # Plugins محددة لمشروعك
+  pod 'Firebase/Core', '11.15.0'
+  pod 'FirebaseAppCheck', '11.15.0'
+  pod 'GoogleMLKit/FaceDetection', '6.0.0'
+
+  # إضافة أي Pods إضافية هنا لو مشروعك يحتاجها
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+  end
+end
