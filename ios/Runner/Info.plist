@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+ "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+
+	<!-- ================= APP INFO ================= -->
 
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
@@ -27,11 +30,11 @@
 	<key>CFBundleShortVersionString</key>
 	<string>$(FLUTTER_BUILD_NAME)</string>
 
-	<key>CFBundleSignature</key>
-	<string>????</string>
-
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+
+	<key>CFBundleSignature</key>
+	<string>????</string>
 
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
@@ -42,7 +45,9 @@
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
 
-	<!-- اتجاهات الشاشة -->
+
+	<!-- ================= SCREEN ORIENTATION ================= -->
+
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -58,14 +63,64 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 
-	<!-- SKAdNetwork -->
+
+	<!-- ================= PERMISSIONS ================= -->
+
+	<!-- Camera -->
+	<key>NSCameraUsageDescription</key>
+	<string>يحتاج التطبيق إلى استخدام الكاميرا لالتقاط الصور والتحقق من الهوية.</string>
+
+	<!-- Microphone -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>يحتاج التطبيق إلى استخدام الميكروفون لتسجيل الصوت داخل التطبيق.</string>
+
+	<!-- Photo Library Read -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>يحتاج التطبيق للوصول إلى الصور لاختيار صور من المعرض.</string>
+
+	<!-- Photo Library Save -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>يحتاج التطبيق لحفظ الصور داخل معرض الهاتف.</string>
+
+	<!-- Contacts -->
+	<key>NSContactsUsageDescription</key>
+	<string>يحتاج التطبيق للوصول إلى جهات الاتصال لتسهيل إجراء المكالمات.</string>
+
+
+	<!-- ================= LOCATION ================= -->
+
+	<!-- أثناء استخدام التطبيق -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>يستخدم التطبيق موقعك لعرض موقعك على الخريطة وتحديد الخدمات القريبة.</string>
+
+	<!-- بالخلفية (اختياري) -->
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>يستخدم التطبيق موقعك لتحسين تجربة الاستخدام حتى عند العمل بالخلفية.</string>
+
+
+	<!-- ================= OPEN EXTERNAL LINKS ================= -->
+
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>https</string>
+		<string>http</string>
+		<string>tel</string>
+		<string>mailto</string>
+	</array>
+
+
+	<!-- ================= SKAdNetwork (Ads Support) ================= -->
+
 	<key>SKAdNetworkItems</key>
 	<array>
 		<dict>
 			<key>SKAdNetworkIdentifier</key>
-			<string>...</string>
+			<string>cstr6suwn9.skadnetwork</string>
 		</dict>
 	</array>
+
+
+	<!-- ================= PERFORMANCE ================= -->
 
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
