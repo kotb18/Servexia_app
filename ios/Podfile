@@ -1,21 +1,35 @@
-# ios/Podfile
-
 platform :ios, '13.0'
 
-# استخدم use_frameworks! و use_modular_headers! للـ MLKit و Firebase
-use_frameworks!
-use_modular_headers!
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist."
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found"
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_ios_podfile_setup
 
 target 'Runner' do
-  # تفعيل Flutter pods
+  use_frameworks!
+  use_modular_headers!
+
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-
-  # Plugins محددة لمشروعك
-  pod 'Firebase/Core', '11.15.0'
-  pod 'FirebaseAppCheck', '11.15.0'
-  pod 'GoogleMLKit/FaceDetection', '6.0.0'
-
-  # إضافة أي Pods إضافية هنا لو مشروعك يحتاجها
 end
 
 post_install do |installer|
