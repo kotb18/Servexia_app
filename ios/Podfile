@@ -21,7 +21,10 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 flutter_ios_podfile_setup
 
 target 'Runner' do
-  use_frameworks!
+  # --- التعديل الجديد هنا لضمان ربط مكتبات Firebase ---
+  use_frameworks! :linkage => :static
+  # --------------------------------------------------
+  
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
@@ -31,12 +34,10 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
 
-    # --- بداية التعديل الجديد لحل مشكلة المحاكي ---
+    # حل مشكلة المحاكي والمعمارية
     target.build_configurations.each do |config|
-      # استبعاد معمارية arm64 عند البناء للمحاكي فقط لتجنب تعارض مكتبات MLKit
       config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
     end
-    # --- نهاية التعديل الجديد ---
 
     if target.name == 'MLKitVision'
       target.build_configurations.each do |config|
