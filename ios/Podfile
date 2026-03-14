@@ -21,9 +21,8 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 flutter_ios_podfile_setup
 
 target 'Runner' do
-  # --- التعديل الجديد هنا لضمان ربط مكتبات Firebase ---
+  # هذا السطر هو الأهم لحل مشكلة FirebaseCore تماماً
   use_frameworks! :linkage => :static
-  # --------------------------------------------------
   
   use_modular_headers!
 
@@ -34,8 +33,8 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
 
-    # حل مشكلة المحاكي والمعمارية
     target.build_configurations.each do |config|
+      # حل مشكلة المحاكي والمعمارية
       config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
     end
 
