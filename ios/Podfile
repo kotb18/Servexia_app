@@ -31,6 +31,13 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
 
+    # --- بداية التعديل الجديد لحل مشكلة المحاكي ---
+    target.build_configurations.each do |config|
+      # استبعاد معمارية arm64 عند البناء للمحاكي فقط لتجنب تعارض مكتبات MLKit
+      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
+    end
+    # --- نهاية التعديل الجديد ---
+
     if target.name == 'MLKitVision'
       target.build_configurations.each do |config|
         config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5'
