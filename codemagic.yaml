@@ -1,0 +1,42 @@
+workflows:
+  ios-simulator-build:
+    name: iOS Simulator Build
+    environment:
+      flutter: stable # أو الإصدار الذي تستخدمه، مثل 3.16.0
+      xcode: latest # أو إصدار Xcode محدد، مثل 15.0
+      # إذا كان مشروعك يتطلب متغيرات بيئة إضافية (مثل مفاتيح Firebase)، أضفها هنا
+      # EXAMPLE_API_KEY: ENCRYPTED[YOUR_ENCRYPTED_KEY]
+    
+    scripts:
+      - name: Get Flutter packages
+        script: |
+          flutter pub get
+
+      - name: Install CocoaPods
+        script: |
+          cd ios
+          pod install --repo-update
+
+      - name: Build iOS Simulator App
+        script: |
+          # تأكد من استبدال 'Runner' باسم مشروع Xcode الخاص بك (عادةً 'Runner')
+          # واستبدال 'your_scheme_name' باسم الـ scheme الخاص بك (عادةً 'Runner')
+          xcodebuild build \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
+            -derivedDataPath Build
+
+    artifacts:
+      - Build/Products/Debug-iphonesimulator/*.app
+      # يمكنك أيضًا تضمين ملفات dSYM إذا كنت بحاجة إليها لتصحيح الأخطاء
+      # - Build/Products/Debug-iphonesimulator/*.app.dSYM
+
+    # لا يتطلب بناء المحاكي توقيع الكود (code signing)
+    # publishing:
+    #   email:
+    #     recipients:
+    #       - your.email@example.com
+    #     # ... إعدادات النشر الأخرى إذا كنت ترغب في إرسال الـ .app بالبريد الإلكتروني
