@@ -1,8 +1,6 @@
 platform :ios, '15.5'
 
-# تحسين أداء وتوافق البناء في Codemagic
-install! 'cocoapods', :generate_multiple_pod_projects => true, :incremental_installation => true
-
+# تعطيل الإحصائيات لسرعة البناء
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
 project 'Runner', {
@@ -35,8 +33,13 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     
     target.build_configurations.each do |config|
+      # توحيد إصدار المنصة لجميع المكتبات (يحل مشكلة MLKit)
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5'
-      # هذا السطر يحل مشكلة FirebaseCore في المحاكي بشكل نهائي
+      
+      # حذف أي إعدادات مسبقة لـ EXCLUDED_ARCHS قد تسبب تعارضاً
+      config.build_settings.delete 'EXCLUDED_ARCHS[sdk=iphonesimulator*]'
+      
+      # تفعيل البناء للمعمارية النشطة فقط لسرعة البناء في المحاكي
       config.build_settings['ONLY_ACTIVE_ARCH'] = 'YES'
     end
   end

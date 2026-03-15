@@ -30,13 +30,17 @@ workflows:
 
       - name: Build iOS Simulator App
         script: |
-          # تنظيف شامل قبل البناء
+          # تنظيف شامل
           flutter clean
           flutter pub get
-          cd ios && rm -rf Pods Podfile.lock && pod install --repo-update && cd ..
+          cd ios
+          rm -rf Pods Podfile.lock
+          pod install --repo-update
+          cd ..
           
-          # البناء باستخدام أمر Flutter للمحاكي
+          # البناء للمحاكي بدون قيود معمارية يدوية
           flutter build ios --simulator --debug --no-codesign
+
 
 
 
