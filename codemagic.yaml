@@ -30,7 +30,6 @@ workflows:
 
       - name: Build iOS Simulator App
         script: |
-          # بناء التطبيق للمحاكي مع التأكد من استخدام الوجهة الصحيحة
           xcodebuild build \
             -workspace ios/$XCODE_WORKSPACE \
             -scheme $XCODE_SCHEME \
@@ -38,10 +37,10 @@ workflows:
             -configuration Debug \
             -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
             -derivedDataPath Build \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            COMPILER_INDEX_STORE_ENABLE=NO
+            ARCHS=x86_64 \
+            VALID_ARCHS=x86_64 \
+            CODE_SIGNING_ALLOWED=NO
+
 
     artifacts:
       - Build/Products/Debug-iphonesimulator/*.app
