@@ -30,21 +30,21 @@ workflows:
 
       - name: Build iOS Simulator App
         script: |
-          # تنظيف عميق للمشروع
+          # تنظيف شامل للمشروع
           flutter clean
           flutter pub get
           
           cd ios
-          # مسح شامل للمجلدات المؤقتة
-          rm -rf Pods Podfile.lock DerivedData
+          # مسح ملفات Pods القديمة تماماً لضمان تطبيق تعديلات الـ Podfile الجديدة
+          rm -rf Pods Podfile.lock
           
-          # تحديث الـ Repos لضمان الحصول على أحدث إصدارات Firebase المتوافقة
-          pod repo update
-          pod install
+          # تحديث المستودعات لضمان تحميل أحدث النسخ المتوافقة من Firebase
+          pod install --repo-update
           cd ..
           
-          # البناء مع تحديد المعمارية x86_64 للمحاكي إذا لزم الأمر
-          flutter build ios --simulator --debug --no-codesign --dart-define=ext.flutter.hermetic=true
+          # بناء التطبيق للمحاكي
+          # ملاحظة: سيقوم الـ Podfile الآن بمعالجة مشكلة المعمارية تلقائياً
+          flutter build ios --simulator --debug --no-codesign
 
 
 

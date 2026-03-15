@@ -33,16 +33,16 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     
     target.build_configurations.each do |config|
-      # توحيد إصدار المنصة لجميع المكتبات لضمان التوافق [cite: 1, 4]
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5'
+      # توحيد إصدار المنصة لجميع المكتبات [cite: 4]
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5' [cite: 1, 4]
       
-      # إعدادات حاسمة لحل مشكلة Apple Silicon Simulator
-      config.build_settings['ONLY_ACTIVE_ARCH'] = 'YES'
-      
-      # استبعاد arm64 للمحاكي فقط لتجنب تعارض الملفات الثنائية
+      # حل مشكلة التعارض في المحاكي (Apple Silicon)
       if config.build_settings['SDKROOT'] =~ /iphonesimulator/
-         config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
+        config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
       end
+
+      # تفعيل البناء للمعمارية النشطة فقط لسرعة البناء [cite: 4]
+      config.build_settings['ONLY_ACTIVE_ARCH'] = 'YES' [cite: 4]
     end
   end
 end
