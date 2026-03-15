@@ -32,16 +32,19 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     
     target.build_configurations.each do |config|
-      # توحيد إصدار النظام لجميع المكتبات 
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5' [cite: 4]
+      # 1. إزالة أي قيم مسبقة لـ EXCLUDED_ARCHS لتجنب خطأ الـ Merge
+      config.build_settings.delete 'EXCLUDED_ARCHS[sdk=iphonesimulator*]'
       
-      # استبعاد معمارية arm64 للمحاكي فقط لحل مشكلة MLKit/Firebase 
+      # 2. توحيد نسخة النظام لضمان توافق MLKit
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5' [cite: 1, 4]
+      
+      # 3. حل مشكلة المعمارية للمحاكي بشكل صريح
       if config.build_settings['SDKROOT'] =~ /iphonesimulator/
         config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
       end
-      
-      # تسريع البناء للمحاكي
-      config.build_settings['ONLY_ACTIVE_ARCH'] = 'YES'
+
+      # 4. تفعيل البناء للمعمارية النشطة فقط
+      config.build_settings['ONLY_ACTIVE_ARCH'] = 'YES' [cite: 4]
     end
   end
 end
