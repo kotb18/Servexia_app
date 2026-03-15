@@ -33,14 +33,16 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     
     target.build_configurations.each do |config|
-      # توحيد إصدار المنصة لجميع المكتبات (يحل مشكلة MLKit)
+      # توحيد إصدار المنصة لجميع المكتبات لضمان التوافق [cite: 1, 4]
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5'
       
-      # حذف أي إعدادات مسبقة لـ EXCLUDED_ARCHS قد تسبب تعارضاً
-      config.build_settings.delete 'EXCLUDED_ARCHS[sdk=iphonesimulator*]'
-      
-      # تفعيل البناء للمعمارية النشطة فقط لسرعة البناء في المحاكي
+      # إعدادات حاسمة لحل مشكلة Apple Silicon Simulator
       config.build_settings['ONLY_ACTIVE_ARCH'] = 'YES'
+      
+      # استبعاد arm64 للمحاكي فقط لتجنب تعارض الملفات الثنائية
+      if config.build_settings['SDKROOT'] =~ /iphonesimulator/
+         config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
+      end
     end
   end
 end
