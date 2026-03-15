@@ -21,7 +21,7 @@ workflows:
           # تحديث مستودع CocoaPods لضمان جلب نسخ MLKit المتوافقة مع M2
           pod install --repo-update
           cd ..
-
+      
       - name: Build iOS Simulator
         script: |
           # البناء للمحاكي بدون توقيع (No Codesign)
