@@ -8,10 +8,10 @@ import FirebaseCore
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    // تهيئة Firebase أولاً
+    // 1. تهيئة Firebase أولاً
     FirebaseApp.configure()
     
-    // تسجيل إضافات Flutter (هذا السطر هو الذي يربط FirebaseCore بالمشروع)
+    // 2. تسجيل إضافات Flutter (هذا السطر جوهري لربط FirebaseCore بـ Xcode)
     GeneratedPluginRegistrant.register(with: self)
     
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
