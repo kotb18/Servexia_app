@@ -1,42 +1,48 @@
 workflows:
   ios-simulator-build:
     name: iOS Simulator Build
+    max_build_duration: 60
+    instance_type: mac_mini_m2
     environment:
-      flutter: stable # أو الإصدار الذي تستخدمه، مثل 3.16.0
-      xcode: latest # أو إصدار Xcode محدد، مثل 15.0
-      # إذا كان مشروعك يتطلب متغيرات بيئة إضافية (مثل مفاتيح Firebase)، أضفها هنا
-      # EXAMPLE_API_KEY: ENCRYPTED[YOUR_ENCRYPTED_KEY]
-    
+      flutter: stable
+      xcode: latest
+      groups:
+        - firebase_credentials # إذا كنت تستخدم مجموعات متغيرات بيئة
+      vars:
+        XCODE_SCHEME: "Runner"
+        XCODE_WORKSPACE: "Runner.xcworkspace"
+
     scripts:
-      - name: Get Flutter packages
+      - name: Install Flutter dependencies
         script: |
           flutter pub get
+          # تحديث ملفات القفل لضمان التوافق مع Simulator
+          flutter pub upgrade
 
-      - name: Install CocoaPods
+      - name: Install CocoaPods and update Firebase
         script: |
           cd ios
+          # تنظيف أي ملفات سابقة قد تسبب تعارضاً
+          rm -rf Pods Podfile.lock
+          # تثبيت الـ Pods مع تحديث المستودعات لضمان وجود FirebaseCore
           pod install --repo-update
+          cd ..
 
       - name: Build iOS Simulator App
         script: |
-          # تأكد من استبدال 'Runner' باسم مشروع Xcode الخاص بك (عادةً 'Runner')
-          # واستبدال 'your_scheme_name' باسم الـ scheme الخاص بك (عادةً 'Runner')
+          # بناء التطبيق للمحاكي مع التأكد من استخدام الوجهة الصحيحة
           xcodebuild build \
-            -workspace ios/Runner.xcworkspace \
-            -scheme Runner \
+            -workspace ios/$XCODE_WORKSPACE \
+            -scheme $XCODE_SCHEME \
             -sdk iphonesimulator \
             -configuration Debug \
             -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
-            -derivedDataPath Build
+            -derivedDataPath Build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            COMPILER_INDEX_STORE_ENABLE=NO
 
     artifacts:
       - Build/Products/Debug-iphonesimulator/*.app
-      # يمكنك أيضًا تضمين ملفات dSYM إذا كنت بحاجة إليها لتصحيح الأخطاء
-      # - Build/Products/Debug-iphonesimulator/*.app.dSYM
-
-    # لا يتطلب بناء المحاكي توقيع الكود (code signing)
-    # publishing:
-    #   email:
-    #     recipients:
-    #       - your.email@example.com
-    #     # ... إعدادات النشر الأخرى إذا كنت ترغب في إرسال الـ .app بالبريد الإلكتروني
+      - build/ios/iphoneos/*.app
