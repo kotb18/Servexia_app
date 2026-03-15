@@ -30,16 +30,14 @@ workflows:
 
       - name: Build iOS Simulator App
         script: |
-          xcodebuild build \
-            -workspace ios/$XCODE_WORKSPACE \
-            -scheme $XCODE_SCHEME \
-            -sdk iphonesimulator \
-            -configuration Debug \
-            -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
-            -derivedDataPath Build \
-            ARCHS=x86_64 \
-            VALID_ARCHS=x86_64 \
-            CODE_SIGNING_ALLOWED=NO
+          # تنظيف شامل قبل البناء
+          flutter clean
+          flutter pub get
+          cd ios && rm -rf Pods Podfile.lock && pod install --repo-update && cd ..
+          
+          # البناء باستخدام أمر Flutter للمحاكي
+          flutter build ios --simulator --debug --no-codesign
+
 
 
     artifacts:
