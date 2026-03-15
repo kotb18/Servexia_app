@@ -1,6 +1,6 @@
 import UIKit
 import Flutter
-import FirebaseCore // تأكد من وجود هذا السطر
+import FirebaseCore
 
 @UIApplicationMain
 @objc class AppDelegate: FlutterAppDelegate {
@@ -8,10 +8,10 @@ import FirebaseCore // تأكد من وجود هذا السطر
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    // 1. تهيئة Firebase قبل تسجيل أي شيء آخر
+    // تهيئة Firebase أولاً
     FirebaseApp.configure()
     
-    // 2. تسجيل إضافات Flutter (هذا السطر جوهري لربط FirebaseCore بـ Xcode)
+    // تسجيل إضافات Flutter (هذا السطر هو الذي يربط FirebaseCore بالمشروع)
     GeneratedPluginRegistrant.register(with: self)
     
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
