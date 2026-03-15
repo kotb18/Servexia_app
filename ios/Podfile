@@ -32,14 +32,15 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     
     target.build_configurations.each do |config|
-      # توحيد إصدار المنصة لجميع المكتبات
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5'
+      # توحيد إصدار النظام لجميع المكتبات 
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5' [cite: 4]
       
-      # حل مشكلة التعارض في المحاكي على معالجات M1/M2
+      # استبعاد معمارية arm64 للمحاكي فقط لحل مشكلة MLKit/Firebase 
       if config.build_settings['SDKROOT'] =~ /iphonesimulator/
         config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
       end
-
+      
+      # تسريع البناء للمحاكي
       config.build_settings['ONLY_ACTIVE_ARCH'] = 'YES'
     end
   end

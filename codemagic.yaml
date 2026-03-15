@@ -11,25 +11,24 @@ workflows:
         XCODE_WORKSPACE: "Runner.xcworkspace"
 
     scripts:
-      - name: Prepare Dependencies
+      - name: Install dependencies & Pods
         script: |
-          # 1. تحميل حزم فلاتر وتحديثها لضمان توافق المكتبات
+          # تنظيف وتحميل حزم فلاتر
+          flutter clean
           flutter pub get
           flutter pub upgrade
           
-          # 2. تنظيف ملفات iOS تماماً لضمان تطبيق تعديلات Podfile الجديدة
+          # إعداد CocoaPods للمحاكي
           cd ios
-          rm -rf Pods Podfile.lock DerivedData
-          
-          # 3. تحديث المستودعات وتثبيت المكتبات
+          rm -rf Pods Podfile.lock
           pod install --repo-update
           cd ..
 
       - name: Build iOS Simulator App
         script: |
-          # بناء نسخة المحاكي بدون توقيع إلكتروني
+          # البناء للمحاكي (بدون توقيع كود)
           flutter build ios --simulator --debug --no-codesign
 
     artifacts:
-      # هذا هو المسار الصحيح والوحيد الذي تحتاجه لنسخة المحاكي
+      # المسار الصحيح لملف التطبيق الخاص بالمحاكي
       - build/ios/iphonesimulator/*.app
