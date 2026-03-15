@@ -6,49 +6,30 @@ workflows:
     environment:
       flutter: stable
       xcode: latest
-      groups:
-        - firebase_credentials # إذا كنت تستخدم مجموعات متغيرات بيئة
       vars:
         XCODE_SCHEME: "Runner"
         XCODE_WORKSPACE: "Runner.xcworkspace"
 
     scripts:
-      - name: Install Flutter dependencies
+      - name: Prepare Dependencies
         script: |
+          # 1. تحميل حزم فلاتر وتحديثها لضمان توافق المكتبات
           flutter pub get
-          # تحديث ملفات القفل لضمان التوافق مع Simulator
           flutter pub upgrade
-
-      - name: Install CocoaPods and update Firebase
-        script: |
+          
+          # 2. تنظيف ملفات iOS تماماً لضمان تطبيق تعديلات Podfile الجديدة
           cd ios
-          # تنظيف أي ملفات سابقة قد تسبب تعارضاً
-          rm -rf Pods Podfile.lock
-          # تثبيت الـ Pods مع تحديث المستودعات لضمان وجود FirebaseCore
+          rm -rf Pods Podfile.lock DerivedData
+          
+          # 3. تحديث المستودعات وتثبيت المكتبات
           pod install --repo-update
           cd ..
 
       - name: Build iOS Simulator App
         script: |
-          # تنظيف شامل للمشروع
-          flutter clean
-          flutter pub get
-          
-          cd ios
-          # مسح ملفات Pods القديمة تماماً لضمان تطبيق تعديلات الـ Podfile الجديدة
-          rm -rf Pods Podfile.lock
-          
-          # تحديث المستودعات لضمان تحميل أحدث النسخ المتوافقة من Firebase
-          pod install --repo-update
-          cd ..
-          
-          # بناء التطبيق للمحاكي
-          # ملاحظة: سيقوم الـ Podfile الآن بمعالجة مشكلة المعمارية تلقائياً
+          # بناء نسخة المحاكي بدون توقيع إلكتروني
           flutter build ios --simulator --debug --no-codesign
 
-
-
-
     artifacts:
-      - Build/Products/Debug-iphonesimulator/*.app
-      - build/ios/iphoneos/*.app
+      # هذا هو المسار الصحيح والوحيد الذي تحتاجه لنسخة المحاكي
+      - build/ios/iphonesimulator/*.app
