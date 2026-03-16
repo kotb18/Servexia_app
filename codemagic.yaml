@@ -7,9 +7,6 @@ workflows:
     environment:
       flutter: stable
       xcode: latest
-      vars:
-        XCODE_SCHEME: "Runner"
-        XCODE_WORKSPACE: "Runner.xcworkspace"
 
     scripts:
       - name: Flutter Clean
@@ -23,8 +20,9 @@ workflows:
       - name: Install CocoaPods
         script: |
           cd ios
-          rm -rf Pods Podfile.lock .symlinks DerivedData
-          pod install --repo-update
+          rm -rf Pods Podfile.lock
+          pod repo update
+          pod install
           cd ..
 
       - name: Build iOS Simulator
@@ -32,10 +30,9 @@ workflows:
           flutter build ios \
             --simulator \
             --debug \
-            --no-codesign \
-            --no-tree-shake-icons
+            --no-codesign
 
-      - name: Zip Simulator App
+      - name: Zip App
         script: |
           cd build/ios/iphonesimulator
           zip -r Runner.zip Runner.app
