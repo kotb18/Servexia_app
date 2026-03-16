@@ -3,6 +3,7 @@ workflows:
     name: iOS Simulator Build
     max_build_duration: 60
     instance_type: mac_mini_m2
+
     environment:
       flutter: stable
       xcode: latest
@@ -11,25 +12,33 @@ workflows:
         XCODE_WORKSPACE: "Runner.xcworkspace"
 
     scripts:
-      - name: Full Clean & Install
+      - name: Flutter Clean
         script: |
           flutter clean
+
+      - name: Get Packages
+        script: |
           flutter pub get
+
+      - name: Install CocoaPods
+        script: |
           cd ios
-          # حذف المجلدات التي تخزن الإعدادات القديمة والمتعارضة
           rm -rf Pods Podfile.lock .symlinks DerivedData
-          # تحديث مستودع CocoaPods لضمان جلب نسخ MLKit المتوافقة مع M2
           pod install --repo-update
           cd ..
-      
+
       - name: Build iOS Simulator
         script: |
-         flutter build ios \
-         --simulator \
-         --debug \
-         --no-codesign \
-         --no-tree-shake-icons
+          flutter build ios \
+            --simulator \
+            --debug \
+            --no-codesign \
+            --no-tree-shake-icons
+
+      - name: Zip Simulator App
+        script: |
+          cd build/ios/iphonesimulator
+          zip -r Runner.zip Runner.app
 
     artifacts:
-      # المسار الصحيح لملف التطبيق الخاص بالمحاكي
-      - build/ios/iphonesimulator/*.app
+      - build/ios/iphonesimulator/*.zip
