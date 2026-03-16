@@ -17,7 +17,12 @@ workflows:
         script: |
           flutter pub get
 
-      - name: Install CocoaPods
+      # هذه الخطوة مهمة جداً لتجهيز مشروع iOS
+      - name: Prepare iOS
+        script: |
+          flutter build ios --debug --no-codesign
+
+      - name: Reinstall Pods
         script: |
           cd ios
           rm -rf Pods Podfile.lock
@@ -25,17 +30,19 @@ workflows:
           pod install
           cd ..
 
-      - name: Build iOS Simulator
+      - name: Build Simulator
         script: |
-          flutter build ios \
-            --simulator \
-            --debug \
-            --no-codesign
+          xcodebuild \
+          -workspace ios/Runner.xcworkspace \
+          -scheme Runner \
+          -sdk iphonesimulator \
+          -configuration Debug \
+          -derivedDataPath build
 
       - name: Zip App
         script: |
-          cd build/ios/iphonesimulator
+          cd build/Build/Products/Debug-iphonesimulator
           zip -r Runner.zip Runner.app
 
     artifacts:
-      - build/ios/iphonesimulator/*.zip
+      - build/Build/Products/Debug-iphonesimulator/*.zip
