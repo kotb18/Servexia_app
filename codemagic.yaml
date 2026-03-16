@@ -10,39 +10,32 @@ workflows:
 
     scripts:
       - name: Flutter Clean
-        script: |
-          flutter clean
+        script: flutter clean
 
       - name: Get Packages
-        script: |
-          flutter pub get
+        script: flutter pub get
 
-      # هذه الخطوة مهمة جداً لتجهيز مشروع iOS
-      - name: Prepare iOS
-        script: |
-          flutter build ios --debug --no-codesign
+      - name: Precache iOS
+        script: flutter precache --ios
 
-      - name: Reinstall Pods
+      - name: Install Pods
         script: |
           cd ios
-          rm -rf Pods Podfile.lock
           pod repo update
           pod install
           cd ..
 
       - name: Build Simulator
         script: |
-          xcodebuild \
-          -workspace ios/Runner.xcworkspace \
-          -scheme Runner \
-          -sdk iphonesimulator \
-          -configuration Debug \
-          -derivedDataPath build
+          flutter build ios \
+            --simulator \
+            --debug \
+            --no-codesign
 
       - name: Zip App
         script: |
-          cd build/Build/Products/Debug-iphonesimulator
+          cd build/ios/iphonesimulator
           zip -r Runner.zip Runner.app
 
     artifacts:
-      - build/Build/Products/Debug-iphonesimulator/*.zip
+      - build/ios/iphonesimulator/*.zip
