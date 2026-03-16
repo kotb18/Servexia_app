@@ -24,8 +24,11 @@ workflows:
       
       - name: Build iOS Simulator
         script: |
-          # البناء للمحاكي بدون توقيع (No Codesign)
-          flutter build ios --simulator --debug --no-codesign
+         flutter build ios \
+         --simulator \
+         --debug \
+         --no-codesign \
+         --no-tree-shake-icons
 
     artifacts:
       # المسار الصحيح لملف التطبيق الخاص بالمحاكي
