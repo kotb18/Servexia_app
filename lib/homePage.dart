@@ -422,6 +422,9 @@ class _HomepageState extends State<Homepage>
               sharePositionOrigin: Rect.fromLTWH(0, 0, 100, 100),
             );
           }),
+          _buildDrawerItem(Icons.help_outline, 'شرح طريقة عمل التطبيق', () {
+            launchUrl(Uri.parse('https://youtu.be/F-NiFb6uWQ0'));
+          }),
           _buildDrawerItem(Icons.privacy_tip_outlined, "سياسة الخصوصية", () {
             launchUrl(
               Uri.parse('https://sites.google.com/view/servexia-policy'),
@@ -727,6 +730,7 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
 
     await Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
+        settings: const RouteSettings(name: WorkspaceHomeScreen.screenroute),
         builder: (_) => WorkspaceHomeScreen(workspaceId: group['docId']),
       ),
       (route) => route.isFirst,

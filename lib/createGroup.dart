@@ -13,6 +13,7 @@ import 'package:maintenance/workSpace.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 List faceEmbeddingAdmin = [];
+String? intPhone;
 
 final BillingService billingService = BillingService();
 String? _completePhoneNumber;
@@ -249,28 +250,42 @@ class _CreategroupState extends State<Creategroup> {
 
   /// 🔹 الكود الفعلي لإنشاء المجموعة في قاعدة البيانات (تم توحيده لمنع التكرار)
   Future<void> _executeCreationLogic() async {
-    final docRef = FirebaseFirestore.instance.collection('groups').doc();
+    final firestore = FirebaseFirestore.instance;
+
+    // إنشاء Doc ID
+    final docRef = firestore.collection('groups').doc();
     final String groupId = docRef.id;
+
     final String adminName = _adminController.text.trim().isNotEmpty
         ? _adminController.text.trim()
         : 'admin';
+
+    // عمليات خارج الباتش
     final String? token = await FirebaseMessaging.instance.getToken();
     final prefs = await SharedPreferences.getInstance();
+
     await prefs.setString(
       _localKey('$groupId $uid'),
       jsonEncode(faceEmbeddingAdmin),
     );
-    FirebaseFirestore.instance
+
+    // إنشاء Batch
+    final batch = firestore.batch();
+
+    // faceEmbedding
+    final faceRef = firestore
         .collection('faceEmbedding')
         .doc(groupId)
         .collection('users')
-        .doc(uid)
-        .set({
-          'faceEmbedding': faceEmbeddingAdmin,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-    // إنشاء وثيقة المجموعة
-    await docRef.set({
+        .doc(uid);
+
+    batch.set(faceRef, {
+      'faceEmbedding': faceEmbeddingAdmin,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    // groups
+    batch.set(docRef, {
       'docId': groupId,
       'name': _groupNameController.text.trim(),
       'adminId': uid,
@@ -284,47 +299,46 @@ class _CreategroupState extends State<Creategroup> {
       'willDeleteAt': DateTime.now().add(const Duration(days: 100)),
     });
 
-    // إنشاء وثيقة الفريق
-    await FirebaseFirestore.instance.collection('teams').doc(groupId).set({
+    // teams
+    final teamRef = firestore.collection('teams').doc(groupId);
+
+    batch.set(teamRef, {
       'groupId': groupId,
       'admins': [uid],
       'adminToken': token,
-      /*  'members': [
-        {
-          'name': adminName,
-          'id': uid,
-          'phone': _completePhoneNumber!,
-          'job': 'مدير المجموعة',
-          'joinedAt': DateTime.now(),
-          'confirm': true,
-          'photoURL': FirebaseAuth.instance.currentUser?.photoURL ?? '',
-        },
-      ], */
     });
-    await FirebaseFirestore.instance
+
+    // team members
+    final memberRef = firestore
         .collection('teams')
         .doc(groupId)
         .collection('members')
-        .doc(uid)
-        .set({
-          'name': adminName,
-          'id': uid,
-          'phone': _completePhoneNumber!,
-          'job': 'مدير المجموعة',
-          'joinedAt': DateTime.now(),
-          'confirm': true,
-          'photoURL': FirebaseAuth.instance.currentUser?.photoURL ?? '',
-        });
-    await FirebaseFirestore.instance.collection('attendance').doc(groupId).set({
-      'groupId': groupId,
+        .doc(uid);
+
+    batch.set(memberRef, {
+      'name': adminName,
+      'id': uid,
+      'phone': _completePhoneNumber!,
+      'job': 'مدير المجموعة',
+      'joinedAt': DateTime.now(),
+      'confirm': true,
+      'photoURL': FirebaseAuth.instance.currentUser?.photoURL ?? '',
     });
 
-    // الاشتراك في التنبيهات
+    // attendance
+    final attendanceRef = firestore.collection('attendance').doc(groupId);
+
+    batch.set(attendanceRef, {'groupId': groupId});
+
+    // تنفيذ كل العمليات مرة واحدة
+    await batch.commit();
+
+    // الاشتراك في التوبيك (خارج الباتش)
     await FirebaseMessaging.instance.subscribeToTopic('${groupId}admin');
+    await FirebaseMessaging.instance.subscribeToTopic(groupId);
 
     if (!mounted) return;
 
-    // الانتقال لصفحة مساحة العمل
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
         builder: (_) => WorkspaceHomeScreen(workspaceId: groupId),
@@ -448,20 +462,29 @@ class _CreategroupState extends State<Creategroup> {
                                 'رقم الهاتف',
                                 Icons.phone_android,
                               ),
-                              initialCountryCode:
-                                  'EG', // تقدر تحطه null لو مش عايز افتراضي
+                              initialCountryCode: 'EG',
+
                               onChanged: (phone) {
+                                intPhone = phone.number;
                                 _completePhoneNumber = phone.completeNumber;
-                                // +201234567890
-                                // _selectedCountryCode = phone.countryCode; // +20
+                                // مثال: +201012345678
                               },
+
                               validator: (phone) {
                                 if (phone == null || phone.number.isEmpty) {
                                   return 'رقم الهاتف مطلوب';
                                 }
+
+                                // ❌ منع البداية بـ 0
+                                if (phone.number.startsWith('0')) {
+                                  return 'لا تبدأ الرقم بـ 0 بعد كود الدولة';
+                                }
+
+                                // validation الخاص بالمكتبة
                                 if (!phone.isValidNumber()) {
                                   return 'رقم غير صحيح';
                                 }
+
                                 return null;
                               },
                             ),
@@ -533,6 +556,7 @@ class _CreategroupState extends State<Creategroup> {
                               onPressed: _loading
                                   ? null
                                   : () {
+                                      // faceEmbeddingAdmin = ['kkkk'];
                                       if (!_formKey.currentState!.validate()) {
                                         return;
                                       }
@@ -545,11 +569,19 @@ class _CreategroupState extends State<Creategroup> {
                                         ).show();
                                         return;
                                       }
+                                      if (intPhone != null &&
+                                          intPhone!.startsWith('0')) {
+                                        _showError(
+                                          'لا تبدأ الرقم بـ 0 بعد كود الدولة',
+                                        );
+                                        return;
+                                      }
                                       if (faceEmbeddingAdmin.isEmpty) {
                                         _showError("بصمة الوجه مطلوبة");
                                         return;
                                       }
                                       if (_formKey.currentState!.validate()) {
+                                        intPhone = null;
                                         _showPreview();
                                       }
                                     },

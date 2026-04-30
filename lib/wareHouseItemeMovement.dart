@@ -1,9 +1,10 @@
-// item_details_refactored.dart
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 // -----------------------------------------------------------------------------
 // 1. Data Model (لتمثيل بيانات الحركة بشكل نظيف)
@@ -99,6 +100,74 @@ class MovementHistoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          // 1. إظهار مؤشر تحميل (Loading)
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
+          );
+
+          try {
+            // 2. جلب بيانات الصنف الحالية (للهيدر الخاص بالتقرير)
+            final itemDoc = await FirebaseFirestore.instance
+                .collection('inventory')
+                .doc(service.groupId)
+                .collection('items')
+                .doc(service.itemId)
+                .get();
+
+            if (!itemDoc.exists) {
+              throw Exception('الصنف غير موجود');
+            }
+
+            final itemData = itemDoc.data() as Map<String, dynamic>;
+
+            // 3. جلب جميع الحركات من الـ Sub-collection (بدون تكرار)
+            final movementsSnap = await FirebaseFirestore.instance
+                .collection('inventory')
+                .doc(service.groupId)
+                .collection('items')
+                .doc(service.itemId)
+                .collection('movements')
+                .orderBy('createdAt', descending: true)
+                .get();
+
+            final List<Map<String, dynamic>> movementsList = movementsSnap.docs
+                .map((doc) => doc.data())
+                .toList();
+
+            // 4. إغلاق مؤشر التحميل
+            Navigator.pop(context);
+
+            if (movementsList.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('لا توجد حركات مسجلة لتصديرها')),
+              );
+              return;
+            }
+
+            // 5. استدعاء دالة توليد الـ PDF التي صممناها سابقاً
+            await generateItemMovementPdf(
+              itemData: itemData,
+              movementsList: movementsList,
+            );
+          } catch (e) {
+            // إغلاق مؤشر التحميل في حالة الخطأ
+            if (Navigator.canPop(context)) Navigator.pop(context);
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('حدث خطأ أثناء إعداد التقرير: $e')),
+            );
+          }
+        },
+        label: const Text('تقرير PDF'),
+        icon: const Icon(Icons.picture_as_pdf),
+        // backgroundColor: Colors.blue.shade800,
+      ),
       appBar: AppBar(title: const Text('سجل الحركات')),
       body: StreamBuilder<QuerySnapshot>(
         stream: service.movementsStream(),
@@ -469,6 +538,33 @@ class _InventoryItemDetailsScreenRefactoredState
                                   ],
                                 ),
                                 const Divider(height: 20),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _buildDetailRow(
+                                        context,
+                                        'سعر الوحدة',
+                                        '${item['price'] ?? 0.0}',
+                                        Icons.attach_money,
+                                        item['price'] != null &&
+                                                item['price'] > 0
+                                            ? Colors.blueAccent
+                                            : Colors.red,
+                                      ),
+                                    ),
+
+                                    //  const SizedBox(width: 20),
+                                    IconButton(
+                                      onPressed: () {
+                                        _buildPriceDialog(item);
+                                      },
+                                      icon: Icon(
+                                        Icons.edit,
+                                        color: Colors.blueGrey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                                 _buildDetailRow(
                                   context,
                                   'الكمية الحالية',
@@ -486,7 +582,7 @@ class _InventoryItemDetailsScreenRefactoredState
                                 ),
                                 _buildDetailRow(
                                   context,
-                                  'الموقع',
+                                  'المخزن',
                                   item['location'] ?? 'غير محدد',
                                   Icons.location_on_outlined,
                                 ),
@@ -563,6 +659,73 @@ class _InventoryItemDetailsScreenRefactoredState
           );
   }
 
+  _buildPriceDialog(Map<String, dynamic> item) {
+    final priceController = TextEditingController(
+      text: item['price'] != null ? item['price'].toString() : '',
+    );
+
+    showDialog(
+      context: context,
+      builder: (BuildContext ctx) => AlertDialog(
+        title: const Text('تعديل سعر الوحدة'),
+        content: TextField(
+          controller: priceController,
+          onTap: () {
+            priceController.selection = TextSelection(
+              baseOffset: 0,
+              extentOffset: priceController.text.length,
+            );
+          },
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'سعر الوحدة',
+            prefixIcon: Icon(Icons.attach_money),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newPrice = double.tryParse(priceController.text) ?? 0.0;
+              if (newPrice < 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('السعر لا يمكن أن يكون سالبًا.'),
+                  ),
+                );
+                return;
+              }
+              try {
+                await FirebaseFirestore.instance
+                    .collection('inventory')
+                    .doc(widget.groupId)
+                    .collection('items')
+                    .doc(widget.itemId)
+                    .update({'price': newPrice});
+                if (mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('تم تحديث السعر بنجاح.')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('خطأ في تحديث السعر: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDetailRow(
     BuildContext context,
     String title,
@@ -604,4 +767,190 @@ class _InventoryItemDetailsScreenRefactoredState
       ),
     );
   }
+}
+
+Future<void> generateItemMovementPdf({
+  required Map<String, dynamic> itemData,
+  required List<Map<String, dynamic>> movementsList,
+}) async {
+  final pdf = pw.Document();
+
+  // تحميل الخطوط العربية (Cairo يدعم الـ Ligatures بشكل ممتاز)
+  final arabicFont = await PdfGoogleFonts.cairoRegular();
+  final arabicFontBold = await PdfGoogleFonts.cairoBold();
+
+  String todayDate = DateFormat('dd-MM-yyyy').format(DateTime.now());
+
+  pdf.addPage(
+    pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      // الحل الجذري 1: ضبط الثيم العام للـ PDF ليدعم العربية
+      theme: pw.ThemeData.withFont(base: arabicFont, bold: arabicFontBold),
+      header: (context) => _buildHeader(todayDate),
+      footer: (context) => _buildFooter(context),
+      build: (context) => [
+        _buildItemInfoSection(itemData),
+        pw.SizedBox(height: 20),
+        _rtlText(
+          "سجل حركات الصنف:",
+          fontSize: 16,
+          isBold: true,
+          color: PdfColors.blue900,
+        ),
+        pw.SizedBox(height: 10),
+        _buildMovementsTable(movementsList),
+      ],
+    ),
+  );
+
+  await Printing.layoutPdf(
+    onLayout: (PdfPageFormat format) async => pdf.save(),
+    name: 'حركات_${itemData['name']}_$todayDate.pdf',
+  );
+  await Printing.sharePdf(
+    bytes: await pdf.save(),
+    filename: 'حركات_${itemData['name']}_$todayDate.pdf',
+  );
+}
+
+/// دالة سحرية لمعالجة أي نص عربي وضمان ترابط حروفه واتجاهه
+pw.Widget _rtlText(
+  String text, {
+  double fontSize = 12,
+  bool isBold = false,
+  PdfColor? color,
+}) {
+  return pw.Directionality(
+    textDirection: pw.TextDirection.rtl,
+    child: pw.Text(
+      text,
+      style: pw.TextStyle(
+        fontSize: fontSize,
+        fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+        color: color,
+      ),
+    ),
+  );
+}
+
+pw.Widget _buildHeader(String date) {
+  return pw.Container(
+    alignment: pw.Alignment.centerRight,
+    margin: const pw.EdgeInsets.only(bottom: 20),
+    decoration: const pw.BoxDecoration(
+      border: pw.Border(
+        bottom: pw.BorderSide(color: PdfColors.blue900, width: 2),
+      ),
+    ),
+    child: pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      children: [
+        _rtlText(
+          "تقرير حركة صنف مخزني",
+          fontSize: 22,
+          isBold: true,
+          color: PdfColors.blue900,
+        ),
+        _rtlText("تاريخ التقرير: $date", fontSize: 12),
+      ],
+    ),
+  );
+}
+
+pw.Widget _buildItemInfoSection(Map<String, dynamic> item) {
+  return pw.Container(
+    padding: const pw.EdgeInsets.all(10),
+    decoration: pw.BoxDecoration(
+      color: PdfColors.grey100,
+      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+    ),
+    child: pw.Column(
+      children: [
+        _infoRow("اسم الصنف:", item['name']?.toString() ?? "---"),
+        _infoRow("كود الصنف (SKU):", item['sku']?.toString() ?? "---"),
+        _infoRow("المخزن / الموقع:", item['location']?.toString() ?? "---"),
+        _infoRow(
+          "الكمية الحالية:",
+          "${item['quantity'] ?? 0} ${item['unit'] ?? ''}",
+        ),
+      ],
+    ),
+  );
+}
+
+pw.Widget _infoRow(String label, String value) {
+  return pw.Padding(
+    padding: const pw.EdgeInsets.symmetric(vertical: 2),
+    child: pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.end,
+      children: [
+        pw.Expanded(
+          child: pw.Align(
+            alignment: pw.Alignment.centerLeft,
+            child: _rtlText(value),
+          ),
+        ),
+        pw.SizedBox(width: 10),
+        pw.SizedBox(width: 100, child: _rtlText(label, isBold: true)),
+      ],
+    ),
+  );
+}
+
+pw.Widget _buildMovementsTable(List<Map<String, dynamic>> movements) {
+  return pw.TableHelper.fromTextArray(
+    border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+    headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey100),
+    cellAlignment: pw.Alignment.centerRight,
+    headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11),
+    cellStyle: const pw.TextStyle(fontSize: 10),
+    // الحل الجذري 2: إرسال النصوص كـ Widgets بدلاً من Strings داخل الجدول
+    headers: [
+      _rtlText('ملاحظات', isBold: true),
+      _rtlText('المسؤول', isBold: true),
+      _rtlText('الكمية', isBold: true),
+      _rtlText('النوع', isBold: true),
+      _rtlText('التاريخ', isBold: true),
+    ],
+    data: movements.map((m) {
+      String dateStr = "---";
+      if (m['createdAt'] != null) {
+        DateTime dt = (m['createdAt'] as Timestamp).toDate();
+        dateStr = DateFormat('yyyy-MM-dd HH:mm').format(dt);
+      }
+      String typeStr = m['type'] == 'in'
+          ? 'دخول (+)'
+          : (m['type'] == 'out' ? 'خروج (-)' : m['type'].toString());
+      PdfColor typeColor = m['type'] == 'in'
+          ? PdfColors.green700
+          : PdfColors.red700;
+
+      return [
+        _rtlText(m['note']?.toString() ?? "---"),
+        _rtlText(m['createdBy']?.toString() ?? "---"),
+        _rtlText("${m['qty'] ?? 0} ${m['unit'] ?? ''}"),
+        _rtlText(typeStr, color: typeColor),
+        _rtlText(dateStr),
+      ];
+    }).toList(),
+    columnWidths: {
+      0: const pw.FlexColumnWidth(2),
+      1: const pw.FlexColumnWidth(1.5),
+      2: const pw.FlexColumnWidth(1),
+      3: const pw.FlexColumnWidth(1),
+      4: const pw.FlexColumnWidth(1.5),
+    },
+  );
+}
+
+pw.Widget _buildFooter(pw.Context context) {
+  return pw.Container(
+    alignment: pw.Alignment.center,
+    margin: const pw.EdgeInsets.only(top: 10),
+    child: _rtlText(
+      "صفحة ${context.pageNumber} من ${context.pagesCount}",
+      fontSize: 10,
+      color: PdfColors.grey600,
+    ),
+  );
 }

@@ -1,13 +1,19 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:intl/intl.dart';
 
 int? maxMembers;
 int? currentTeamNumber;
 List admins = [];
+List<Map<String, dynamic>> membersList = [];
 
 class TeamScreen extends StatefulWidget {
   final String groupId;
@@ -43,6 +49,7 @@ class _TeamScreenState extends State<TeamScreen> {
             const Spacer(),
             IconButton(
               icon: const Icon(Icons.person_add),
+              color: const Color.fromARGB(255, 5, 106, 9),
               onPressed: () {
                 if (maxMembers != null &&
                     currentTeamNumber != null &&
@@ -75,9 +82,40 @@ class _TeamScreenState extends State<TeamScreen> {
         children: [
           /*  widget.isXadmin ? _adminTile(widget.adminId) : SizedBox.shrink(),
           const SizedBox(height: 20), */
-          const Text(
-            'الأعضاء',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              const Text(
+                'الأعضاء',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              widget.isAdmin
+                  ? ElevatedButton.icon(
+                      onPressed: () async {
+                        await generateTeamMembersPdf(membersList);
+                      },
+
+                      icon: Icon(Icons.picture_as_pdf),
+                      label: const Text('تقرير PDF'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.withOpacity(0.1),
+                        foregroundColor: Colors.green,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 8,
+                          horizontal: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(
+                            color: Colors.green,
+                            width: 1.5,
+                          ),
+                        ),
+                        elevation: 0,
+                      ),
+                    )
+                  : SizedBox.shrink(),
+            ],
           ),
           const SizedBox(height: 10),
           _memberTile(),
@@ -123,6 +161,7 @@ class _TeamScreenState extends State<TeamScreen> {
     super.initState();
     getVariables();
     getAdmins();
+    membersList.clear();
   }
 
   /// 👤 Member Tile
@@ -153,7 +192,7 @@ class _TeamScreenState extends State<TeamScreen> {
         final confirmedMembers = members
             .where((m) => m['confirm'] == true)
             .toList();
-
+        membersList = confirmedMembers;
         currentTeamNumber = confirmedMembers.length;
 
         if (confirmedMembers.isEmpty) {
@@ -267,6 +306,66 @@ class _TeamScreenState extends State<TeamScreen> {
                                 ),
                                 // label: const Text('اضافته كمسؤول'),
                               )
+                            : isAdmin &&
+                                  member['id'] != uid &&
+                                  admins.contains(member['id']) &&
+                                  member['id'] != widget.adminId
+                            ? IconButton(
+                                onPressed: () async {
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => AlertDialog(
+                                      content: const Text(
+                                        'هل تريد ازالة العضو كمسؤول؟',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context),
+                                          child: const Text('إلغاء'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () async {
+                                            await FirebaseFirestore.instance
+                                                .collection('groups')
+                                                .doc(widget.groupId)
+                                                .update({
+                                                  'admins':
+                                                      FieldValue.arrayRemove([
+                                                        member['id'],
+                                                      ]),
+                                                });
+                                            await FirebaseFirestore.instance
+                                                .collection('teams')
+                                                .doc(widget.groupId)
+                                                .update({
+                                                  'admins':
+                                                      FieldValue.arrayRemove([
+                                                        member['id'],
+                                                      ]),
+                                                });
+                                            await getAdmins();
+                                            setState(() {});
+                                            Navigator.pop(context);
+                                            setState(() {});
+                                          },
+                                          child: const Text('تأكيد'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                                icon: Icon(
+                                  Icons.star,
+                                  color: const Color.fromARGB(
+                                    255,
+                                    164,
+                                    172,
+                                    12,
+                                  ),
+                                ),
+                                // label: const Text('اضافته كمسؤول'),
+                              )
                             : (admins.isNotEmpty &&
                                   admins.contains(member['id']))
                             ? Icon(
@@ -314,7 +413,12 @@ class _TeamScreenState extends State<TeamScreen> {
                         ),
 
                         /// Remove (Admin only)
-                        if (isAdmin && member['id'] != widget.adminId)
+                        if ((member['id'] != widget.adminId &&
+                                member['id'] != uid &&
+                                admins.contains(uid)) ||
+                            member['id'] != widget.adminId &&
+                                (member['id'] != uid &&
+                                    admins.contains(member['id'])))
                           TextButton.icon(
                             onPressed: () {
                               showDialog(
@@ -329,12 +433,15 @@ class _TeamScreenState extends State<TeamScreen> {
                                       child: const Text('إلغاء'),
                                     ),
                                     TextButton(
-                                      onPressed: () {
-                                        removeMemberFromGroupAndTeam(
+                                      onPressed: () async {
+                                        await removeMemberFromGroupAndTeam(
                                           groupId: widget.groupId,
                                           memberId: member['id'],
                                         );
+                                        await getAdmins();
+                                        setState(() {});
                                         Navigator.pop(context);
+                                        setState(() {});
                                       },
                                       child: const Text('تأكيد'),
                                     ),
@@ -348,7 +455,9 @@ class _TeamScreenState extends State<TeamScreen> {
                               size: 18,
                             ),
                             label: const Text('حذف'),
-                          ),
+                          )
+                        else
+                          const SizedBox.shrink(),
                       ],
                     ),
                   ],
@@ -474,14 +583,17 @@ removeMemberFromGroupAndTeam({
   // 🔹 جلب بيانات التيم
   final teamSnap = await teamRef.get();
   if (teamSnap.exists) {
-    final data = teamSnap.data()!;
-    final List members = List.from(data['members'] ?? []);
-
-    members.removeWhere((m) => m['id'] == memberId);
-
-    batch.update(teamRef, {'members': members});
+    final membersRef = teamRef.collection('members').doc(memberId);
+    batch.delete(membersRef);
   }
+  final faceEmbeddingRef = firestore
+      .collection('faceEmbedding')
+      .doc(groupId)
+      .collection('users')
+      .doc(memberId);
+  batch.delete(faceEmbeddingRef);
 
+  await FirebaseMessaging.instance.unsubscribeFromTopic(groupId);
   // 🔹 جلب بيانات الجروب
   final groupSnap = await groupRef.get();
   if (groupSnap.exists) {
@@ -494,4 +606,142 @@ removeMemberFromGroupAndTeam({
   }
 
   await batch.commit();
+}
+
+Future<void> generateTeamMembersPdf(
+  List<Map<String, dynamic>> membersList,
+) async {
+  final pdf = pw.Document();
+
+  // تحميل الخطوط العربية
+  final arabicFont = await PdfGoogleFonts.cairoRegular();
+  final arabicFontBold = await PdfGoogleFonts.cairoBold();
+
+  // تاريخ اليوم للتقرير
+  String todayDate = DateFormat('dd-MM-yyyy').format(DateTime.now());
+
+  pdf.addPage(
+    pw.MultiPage(
+      pageFormat:
+          PdfPageFormat.a4, // وضعية طولية (Portrait) مناسبة لعدد أعمدة أقل
+      theme: pw.ThemeData.withFont(base: arabicFont, bold: arabicFontBold),
+      build: (context) {
+        return [
+          pw.Directionality(
+            textDirection: pw.TextDirection.rtl,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                // الهيدر: العنوان وتاريخ اليوم
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          "تقرير أعضاء الفريق",
+                          style: pw.TextStyle(
+                            fontSize: 24,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.blue900,
+                          ),
+                        ),
+                        pw.SizedBox(height: 5),
+                        pw.Text(
+                          "تاريخ التقرير: $todayDate",
+                          style: pw.TextStyle(
+                            fontSize: 14,
+                            color: PdfColors.grey700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    pw.Text(
+                      "إجمالي الأعضاء: ${membersList.length}",
+                      style: const pw.TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 30),
+
+                // جدول الأعضاء (الاسم، الوظيفة، الهاتف)
+                pw.Table(
+                  border: pw.TableBorder.all(
+                    color: PdfColors.grey400,
+                    width: 0.5,
+                  ),
+                  columnWidths: {
+                    0: const pw.FlexColumnWidth(2), // الاسم (أقصى اليمين)
+                    1: const pw.FlexColumnWidth(2), // الوظيفة
+                    2: const pw.FlexColumnWidth(3), // رقم الهاتف (أقصى اليسار)
+                  },
+                  children: [
+                    // صف العناوين
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(
+                        color: PdfColors.blueGrey100,
+                      ),
+                      children: [
+                        _buildCell("رقم الهاتف", isHeader: true),
+                        _buildCell("الوظيفة", isHeader: true),
+                        _buildCell("الاسم", isHeader: true),
+                      ],
+                    ),
+                    // صفوف البيانات
+                    ...membersList.map((member) {
+                      return pw.TableRow(
+                        children: [
+                          _buildCell(member['phone']?.toString() ?? "---"),
+                          _buildCell(member['job'] ?? "---"),
+                          _buildCell(member['name'] ?? "---"),
+                        ],
+                      );
+                    }).toList(),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ];
+      },
+      // تذييل الصفحة بالعربية
+      footer: (context) => pw.Directionality(
+        textDirection: pw.TextDirection.rtl,
+        child: pw.Container(
+          alignment: pw.Alignment.center,
+          margin: const pw.EdgeInsets.only(top: 20),
+          child: pw.Text(
+            "صفحة ${context.pageNumber} من ${context.pagesCount}",
+            style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  // عرض للطباعة أو الحفظ
+  await Printing.layoutPdf(
+    onLayout: (PdfPageFormat format) async => pdf.save(),
+    name: 'تقرير_أعضاء_الفريق_$todayDate.pdf',
+  );
+  await Printing.sharePdf(
+    bytes: await pdf.save(),
+    filename: 'تقرير_أعضاء_الفريق_$todayDate.pdf',
+  );
+}
+
+// دالة مساعدة لبناء الخلية
+pw.Widget _buildCell(String text, {bool isHeader = false}) {
+  return pw.Padding(
+    padding: const pw.EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+    child: pw.Text(
+      text,
+      textAlign: pw.TextAlign.right,
+      style: pw.TextStyle(
+        fontSize: isHeader ? 12 : 11,
+        fontWeight: isHeader ? pw.FontWeight.bold : pw.FontWeight.normal,
+      ),
+    ),
+  );
 }

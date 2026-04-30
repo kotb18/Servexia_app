@@ -7,15 +7,26 @@ import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:maintenance/JoinGroup.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 String? groupId0;
 List<double> faceEmbeddingLive = [];
+Map<String, dynamic> dataPdf = {};
+List<Map<String, dynamic>> dataPdfList = [];
+DateTime? selectedDate;
 
 class DailyAttendanceScreen extends StatefulWidget {
   final String groupId;
-  const DailyAttendanceScreen({super.key, required this.groupId});
+  final bool isAdmin;
+  const DailyAttendanceScreen({
+    super.key,
+    required this.groupId,
+    required this.isAdmin,
+  });
   static const String screenroute = 'dailyAttendance';
 
   @override
@@ -163,8 +174,10 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
 
   Future<void> _loadTodaysAttendance() async {
     //  final today = DateTime.now();
+    dataPdfList.clear();
+    print(dataPdf);
     final startOfDay = DateTime(result1.year, result1.month, result1.day);
-
+    selectedDate = startOfDay;
     final snap = await FirebaseFirestore.instance
         .collection('attendance')
         .doc(widget.groupId)
@@ -175,6 +188,8 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
     final Map<String, Map<String, dynamic>> map = {};
     for (var doc in snap.docs) {
       map[doc['memberId']] = doc.data();
+      dataPdf = doc.data();
+      dataPdfList.add(dataPdf);
     }
 
     setState(() {
@@ -404,13 +419,52 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Icon(Icons.calendar_today, color: Colors.blue),
-                          const SizedBox(width: 8),
-                          Text(
-                            selectedItem,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.calendar_today,
+                                color: Colors.blue,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                selectedItem,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
+                          widget.isAdmin
+                              ? ElevatedButton.icon(
+                                  onPressed: () async {
+                                    await _loadTodaysAttendance();
+                                    generateDailyAttendancePdf(dataPdfList);
+                                  },
+
+                                  icon: Icon(Icons.picture_as_pdf),
+                                  label: const Text('تقرير PDF'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue.withOpacity(
+                                      0.1,
+                                    ),
+                                    foregroundColor: Colors.blue,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                      horizontal: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      side: const BorderSide(
+                                        color: Colors.blue,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                )
+                              : SizedBox.shrink(),
                         ],
                       ),
                     ),
@@ -754,7 +808,9 @@ Future<List<dynamic>?> loadFaceEmbedding() async {
 
   /// 🔑 Key خاص بكل مستخدم
   String _localKey(String uid) => 'face_data_$uid';
+
   final user = _auth.currentUser;
+
   if (user == null) return null;
 
   final prefs = await SharedPreferences.getInstance();
@@ -763,6 +819,7 @@ Future<List<dynamic>?> loadFaceEmbedding() async {
   // ✅ 1. لو موجود محليًا
   if (localData != null) {
     final List decoded = jsonDecode(localData);
+
     return decoded.map((e) => e.toDouble()).toList();
   }
 
@@ -815,4 +872,153 @@ Future<void> openGoogleMaps(double lat, double lng) async {
   } else {
     throw 'Could not open Google Maps';
   }
+}
+
+// الدالة الآن تستقبل قائمة (List) من البيانات
+
+Future<void> generateDailyAttendancePdf(
+  List<Map<String, dynamic>> allDataList,
+) async {
+  final pdf = pw.Document();
+
+  // تحميل الخطوط العربية
+  final arabicFont = await PdfGoogleFonts.cairoRegular();
+  final arabicFontBold = await PdfGoogleFonts.cairoBold();
+
+  // استخراج التاريخ من أول سجل
+  String reportDate = '---';
+  reportDate = selectedDate != null
+      ? DateFormat('yyyy/MM/dd', 'ar').format(selectedDate!)
+      : '---';
+
+  String formatTime(dynamic d) {
+    if (d == null) return '---';
+    DateTime date = d is Timestamp ? d.toDate() : d;
+    return DateFormat('hh:mm a').format(date);
+  }
+
+  pdf.addPage(
+    pw.MultiPage(
+      pageFormat: PdfPageFormat.a4.landscape,
+      theme: pw.ThemeData.withFont(base: arabicFont, bold: arabicFontBold),
+      build: (context) {
+        return [
+          pw.Directionality(
+            textDirection:
+                pw.TextDirection.rtl, // ضمان الاتجاه من اليمين لليسار
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                // الهيدر: العنوان والتاريخ
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          "تقرير الحضور والانصراف اليومي",
+                          style: pw.TextStyle(
+                            fontSize: 22,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.blue900,
+                          ),
+                        ),
+                        pw.SizedBox(height: 5),
+                        pw.Text(
+                          "تاريخ التقرير: $reportDate",
+                          style: pw.TextStyle(
+                            fontSize: 15,
+                            color: PdfColors.blueGrey900,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 25),
+
+                // الجدول المجمع (بدون عمود الموقع)
+                pw.Table(
+                  border: pw.TableBorder.all(
+                    color: PdfColors.grey400,
+                    width: 0.5,
+                  ),
+                  columnWidths: {
+                    0: const pw.FlexColumnWidth(
+                      1.5,
+                    ), // اسم الموظف (أقصى اليمين)
+                    1: const pw.FlexColumnWidth(1.5), // وقت الدخول
+                    2: const pw.FlexColumnWidth(1.5), // وقت الخروج
+                    3: const pw.FlexColumnWidth(2.5), // المدة (أقصى اليسار)
+                  },
+                  children: [
+                    // صف العناوين (مرتب من اليمين لليسار)
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(
+                        color: PdfColors.blueGrey100,
+                      ),
+                      children: [
+                        _buildCell("المدة", isHeader: true),
+                        _buildCell("وقت الخروج", isHeader: true),
+                        _buildCell("وقت الدخول", isHeader: true),
+                        _buildCell("اسم الموظف", isHeader: true),
+                      ],
+                    ),
+                    // صفوف البيانات
+                    ...allDataList.map((data) {
+                      return pw.TableRow(
+                        children: [
+                          _buildCell(data['workDuration'] ?? "---"),
+                          _buildCell(formatTime(data['checkOutTime'])),
+                          _buildCell(formatTime(data['checkInTime'])),
+                          _buildCell(data['name'] ?? "---"),
+                        ],
+                      );
+                    }).toList(),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ];
+      },
+      // تذييل الصفحة باللغة العربية ومن اليمين لليسار
+      footer: (context) => pw.Directionality(
+        textDirection: pw.TextDirection.rtl,
+        child: pw.Container(
+          alignment: pw.Alignment.center,
+          margin: const pw.EdgeInsets.only(top: 10),
+          child: pw.Text(
+            "صفحة ${context.pageNumber} من ${context.pagesCount}",
+            style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey600),
+          ),
+        ),
+      ),
+    ),
+  );
+  final fileName =
+      'تقرير_الحضور_اليومي_${DateFormat('yyyy_MM_dd').format(selectedDate!)}.pdf';
+  await Printing.layoutPdf(
+    onLayout: (PdfPageFormat format) async => pdf.save(),
+    name: fileName,
+  );
+  await Printing.sharePdf(bytes: await pdf.save(), filename: fileName);
+  allDataList.clear();
+}
+
+// دالة مساعدة لبناء الخلية مع محاذاة النص لليمين
+pw.Widget _buildCell(String text, {bool isHeader = false}) {
+  return pw.Padding(
+    padding: const pw.EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+    child: pw.Text(
+      text,
+      textAlign: pw.TextAlign.right,
+      style: pw.TextStyle(
+        fontSize: isHeader ? 15 : 13,
+        fontWeight: isHeader ? pw.FontWeight.bold : pw.FontWeight.normal,
+      ),
+    ),
+  );
 }

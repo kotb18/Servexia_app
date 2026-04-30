@@ -14,15 +14,15 @@
       },
       "oauth_client": [
         {
-          "client_id": "840926699694-7v3iftptcscr4amvsggt63kkqt8ltgto.apps.googleusercontent.com",
+          "client_id": "840926699694-557gts8ogtg9dvog7a90hpjme6p3dltk.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.masry.maintenance",
-            "certificate_hash": "fed5399d97ed301c8b1338a296a7147c6474d368"
+            "certificate_hash": "cb5157e72b1435d853fd5ed91ab4480abb4ec3bd"
           }
         },
         {
-          "client_id": "840926699694-fg67kdaq9h43mib33ll5nebdpa4v60pn.apps.googleusercontent.com",
+          "client_id": "840926699694-fqsp0g6v9fkgkgjai9laclkhmudiv6ec.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.masry.maintenance",
@@ -30,11 +30,11 @@
           }
         },
         {
-          "client_id": "840926699694-vq4e95gv45opvktkfe54ault5q7jcmuk.apps.googleusercontent.com",
+          "client_id": "840926699694-t51js69stosuqjmtaeieensc2i8j1sr6.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.masry.maintenance",
-            "certificate_hash": "cb5157e72b1435d853fd5ed91ab4480abb4ec3bd"
+            "certificate_hash": "fed5399d97ed301c8b1338a296a7147c6474d368"
           }
         },
         {
@@ -53,6 +53,13 @@
             {
               "client_id": "840926699694-qslfjros665j55vtofid6rghqe4qsiii.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "840926699694-1315pbr8hso1c8ltc55vh0vrml6cg8ft.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.masry.maintenance"
+              }
             }
           ]
         }

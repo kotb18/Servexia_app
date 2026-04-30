@@ -39,12 +39,18 @@ class _LoginState extends State<Login> {
     try {
       setState(() => isLoading = true);
 
-      final googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) return;
+      final GoogleSignIn googleSignIn = GoogleSignIn.instance;
+      await googleSignIn.initialize(
+        serverClientId:
+            '840926699694-qslfjros665j55vtofid6rghqe4qsiii.apps.googleusercontent.com',
+      );
 
+      final GoogleSignInAccount? googleUser = await googleSignIn.authenticate();
+
+      if (googleUser == null) return;
       final googleAuth = await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
+        accessToken: googleAuth.idToken,
         idToken: googleAuth.idToken,
       );
 

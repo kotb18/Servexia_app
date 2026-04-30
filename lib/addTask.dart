@@ -7,10 +7,20 @@ import 'package:intl/intl.dart';
 
 List assetIds = [];
 String? selectedAssetId;
+List<dynamic> constDesc = [];
 
 class AddTaskScreen extends StatefulWidget {
   final String groupId;
-  const AddTaskScreen({super.key, required this.groupId});
+  final bool fromConstTasks;
+  final TextEditingController title;
+  final TextEditingController description;
+  const AddTaskScreen({
+    super.key,
+    required this.groupId,
+    required this.fromConstTasks,
+    required this.title,
+    required this.description,
+  });
   static const String screenroute = 'addTask';
 
   @override
@@ -44,6 +54,126 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     assetIds.clear();
     selectedAssetId = null;
     _loadMembers();
+  }
+
+  // 1. دالة لجلب الاقتراحات من Firebase
+  Future<List<String>> getTaskSuggestions() async {
+    try {
+      // جلب المستند الخاص بالمجموعة
+      DocumentSnapshot snap = await FirebaseFirestore.instance
+          .collection('tasks')
+          .doc(widget.groupId)
+          .get();
+
+      if (snap.exists && snap.data() != null) {
+        Map<String, dynamic> data = snap.data() as Map<String, dynamic>;
+        List<dynamic> constTasks = data['constTasks'] ?? [];
+        constDesc = constTasks
+            .map((e) => e['description'].toString())
+            .toSet()
+            .toList();
+
+        // استخراج العناوين فقط وتحويلها لقائمة نصوص فريدة
+        return constTasks.map((e) => e['title'].toString()).toSet().toList();
+      }
+    } catch (e) {
+      print("Error fetching suggestions: $e");
+    }
+    return [];
+  }
+
+  // 2. تحديث حقل "اسم المهمة" داخل الـ BottomSheet أو الـ Dialog
+  Widget _buildTaskTitleField({
+    String? Function(String?)? validator,
+    Function()? onTap,
+  }) {
+    return FutureBuilder<List<String>>(
+      future: getTaskSuggestions(),
+      builder: (context, snapshot) {
+        List<String> suggestions = snapshot.data ?? [];
+        print(
+          '000000000000000000000000000000000000000000000000000000000000000000000000 $suggestions',
+        );
+        return Autocomplete<String>(
+          optionsBuilder: (TextEditingValue textEditingValue) {
+            if (textEditingValue.text.isEmpty) {
+              return const Iterable<String>.empty();
+            }
+            // تصفية الاقتراحات بناءً على ما يكتبه المستخدم
+            return suggestions.where((String option) {
+              return option.contains(textEditingValue.text);
+            });
+          },
+          onSelected: (String selection) {
+            titleController.text = selection;
+            int index = suggestions.indexOf(selection);
+            if (index != -1 && index < constDesc.length) {
+              descController.text = constDesc[index];
+            }
+          },
+          fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+            // ربط الكنترولر الخاص بك
+            controller.text = titleController.text;
+            controller.addListener(() {
+              titleController.text = controller.text;
+            });
+
+            return TextFormField(
+              controller: widget.fromConstTasks ? widget.title : controller,
+              focusNode: focusNode,
+              validator: validator,
+              onTap: onTap,
+              style: TextStyle(color: Colors.blue),
+              decoration: InputDecoration(
+                labelText: 'اسم المهمة',
+                prefixIcon: const Icon(
+                  Icons.task_alt,
+                  color: Color(0xFF1A237E),
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                suffixIcon: suggestions.isNotEmpty
+                    ? const Icon(Icons.arrow_drop_down, color: Colors.grey)
+                    : null,
+              ),
+            );
+          },
+          // تصميم قائمة الاقتراحات التي تظهر تحت الحقل
+          optionsViewBuilder: (context, onSelected, options) {
+            return Align(
+              alignment: Alignment.topRight, // ليتناسب مع اللغة العربية
+              child: Material(
+                elevation: 4.0,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width:
+                      MediaQuery.of(context).size.width - 40, // نفس عرض الحقل
+                  constraints: const BoxConstraints(maxHeight: 200),
+                  child: ListView.builder(
+                    padding: EdgeInsets.zero,
+                    shrinkWrap: true,
+                    itemCount: options.length,
+                    itemBuilder: (BuildContext context, int index) {
+                      final String option = options.elementAt(index);
+                      return ListTile(
+                        title: Text(
+                          option,
+                          style: const TextStyle(fontFamily: 'Cairo'),
+                        ),
+                        onTap: () {
+                          onSelected(option);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _loadMembers() async {
@@ -135,7 +265,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       await FirebaseFirestore.instance
           .collection('tasks')
           .doc(widget.groupId)
-          .set({'groupId': widget.groupId});
+          .set({'groupId': widget.groupId}, SetOptions(merge: true));
 
       final taskRef = FirebaseFirestore.instance
           .collection('tasks')
@@ -145,8 +275,12 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
 
       await taskRef.set({
         'id': taskRef.id,
-        'title': titleController.text.trim(),
-        'description': descController.text.trim(),
+        'title': widget.fromConstTasks
+            ? widget.title.text.trim()
+            : titleController.text.trim(),
+        'description': widget.fromConstTasks
+            ? widget.description.text.trim()
+            : descController.text.trim(),
         'assignedTo': members
             .where((m) => selectedMembers.contains(m['id']))
             .toList(),
@@ -162,10 +296,15 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       await sendTopicNotification(
         topic: widget.groupId,
         title: 'مهمة جديدة',
-        body: 'تم إضافة مهمة جديدة: ${titleController.text.trim()}',
+        body:
+            'تم إضافة مهمة جديدة: ${widget.fromConstTasks ? widget.title.text.trim() : titleController.text.trim()}',
       );
 
-      if (mounted) Navigator.pop(context);
+      if (mounted && widget.fromConstTasks) {
+        Navigator.pop(context);
+        Navigator.pop(context);
+      } else if (mounted)
+        Navigator.pop(context);
     } catch (e) {
       _snack('حدث خطأ أثناء الحفظ');
     } finally {
@@ -208,6 +347,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     required TextEditingController controller,
     required String label,
     required IconData icon,
+    required Function() onTap,
     int maxLines = 1,
     String? Function(String?)? validator,
   }) {
@@ -215,6 +355,8 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       controller: controller,
       maxLines: maxLines,
       validator: validator,
+      onTap: onTap,
+      style: TextStyle(color: Colors.blue),
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: Colors.grey),
@@ -378,20 +520,33 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 child: ListView(
                   physics: const BouncingScrollPhysics(),
                   children: [
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                ConstTasksManager(groupId: widget.groupId),
+                          ),
+                        );
+                        //  await getTaskSuggestions();
+                      },
+                      label: Text('المهام الثابتة'),
+                    ),
                     const SizedBox(height: 10),
-                    _buildTextField(
-                      controller: titleController,
-                      label: 'عنوان المهمة',
-                      icon: Icons.title,
+                    _buildTaskTitleField(
                       validator: (v) =>
                           v == null || v.isEmpty ? 'أدخل العنوان' : null,
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(
-                      controller: descController,
+                      controller: widget.fromConstTasks
+                          ? widget.description
+                          : descController,
                       label: 'وصف المهمة',
                       icon: Icons.description_outlined,
                       maxLines: 3,
+                      onTap: () {},
                     ),
                     const SizedBox(height: 8),
                     _membersDropdown(),
@@ -723,7 +878,11 @@ Future<void> sendTopicNotification({
   required String title,
   required String body,
 }) async {
+  print(
+    "Sending notification to topic: $topic with title: $title and body: $body",
+  );
   final accessToken = await getAccessToken();
+  print("Obtained access token: $accessToken");
   final url = Uri.parse(
     "https://fcm.googleapis.com/v1/projects/maintenance-b7282/messages:send",
   );
@@ -739,8 +898,466 @@ Future<void> sendTopicNotification({
         "topic": topic,
         "notification": {"title": title, "body": body},
         "data": {"route": "home"},
-        "android": {"priority": "high"},
+        "android": {
+          "priority": "HIGH", // ملاحظة: يجب أن تكون HIGH وليس high
+          "notification": {"channel_id": "high_importance_channel"},
+        },
       },
     }),
   );
+}
+
+Future<void> sendNotificationToDevice({
+  required String deviceToken, // FCM Device Token
+  required String title,
+  required String body,
+  // الـ Access Token اللي حصلت عليه
+}) async {
+  print('111111111111111111111111111111111');
+  final url = Uri.parse(
+    "https://fcm.googleapis.com/v1/projects/maintenance-b7282/messages:send",
+  );
+
+  final payload = {
+    "message": {
+      "token": deviceToken, // هنا نستخدم token بدل topic
+      "notification": {"title": title, "body": body},
+      "android": {
+        "priority": "HIGH", // ملاحظة: يجب أن تكون HIGH وليس high
+        "notification": {"channel_id": "high_importance_channel"},
+      },
+      "data": {"route": "home"},
+    },
+  };
+  final accessToken = await getAccessToken();
+  final response = await http.post(
+    url,
+    headers: {
+      "Authorization": "Bearer $accessToken",
+      "Content-Type": "application/json",
+    },
+    body: jsonEncode(payload),
+  );
+
+  print("FCM Response Status: ${response.statusCode}");
+  print("FCM Response Body: ${response.body}");
+}
+
+class ConstTasksManager extends StatefulWidget {
+  final String groupId;
+  const ConstTasksManager({super.key, required this.groupId});
+
+  @override
+  State<ConstTasksManager> createState() => _ConstTasksManagerState();
+}
+
+class _ConstTasksManagerState extends State<ConstTasksManager> {
+  final TextEditingController editTitleController = TextEditingController();
+  final TextEditingController editDescController = TextEditingController();
+  final constTitleController = TextEditingController();
+  final constDescController = TextEditingController();
+
+  // 1. دالة حذف مهمة من المصفوفة
+  Future<void> deleteTask(Map<String, dynamic> task) async {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('تأكيد الحذف'),
+          content: const Text('هل أنت متأكد أنك تريد حذف هذه المهمة؟'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () async {
+                await FirebaseFirestore.instance
+                    .collection('tasks')
+                    .doc(widget.groupId)
+                    .update({
+                      'constTasks': FieldValue.arrayRemove([task]),
+                    });
+                Navigator.pop(context);
+              },
+              child: const Text('حذف', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 2. دالة تعديل مهمة (حذف القديمة وإضافة الجديدة المعدلة)
+  Future<void> updateTask(Map<String, dynamic> oldTask) async {
+    final newTask = {
+      'title': editTitleController.text.trim(),
+      'description': editDescController.text.trim(),
+    };
+
+    WriteBatch batch = FirebaseFirestore.instance.batch();
+    DocumentReference docRef = FirebaseFirestore.instance
+        .collection('tasks')
+        .doc(widget.groupId);
+
+    batch.update(docRef, {
+      'constTasks': FieldValue.arrayRemove([oldTask]),
+    });
+    batch.update(docRef, {
+      'constTasks': FieldValue.arrayUnion([newTask]),
+    });
+
+    await batch.commit();
+  }
+
+  // 3. واجهة التعديل (BottomSheet)
+  void showEditSheet(Map<String, dynamic> task) {
+    editTitleController.text = task['title'];
+    editDescController.text = task['description'];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          top: 20,
+          left: 20,
+          right: 20,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'تعديل المهمة',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Cairo',
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: editTitleController,
+              decoration: const InputDecoration(
+                labelText: 'العنوان',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 15),
+            TextField(
+              controller: editDescController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'الوصف',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () async {
+                await updateTask(task);
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1A237E),
+                minimumSize: const Size(double.infinity, 50),
+              ),
+              child: const Text(
+                'حفظ التعديلات',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+            SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void addConstTask() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // للسماح للوحة بالارتفاع مع لوحة المفاتيح
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          padding: EdgeInsets.only(
+            bottom:
+                MediaQuery.of(context).viewInsets.bottom +
+                20, // تجنب تداخل الكيبورد
+            top: 20,
+            left: 20,
+            right: 20,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // شريط علوي صغير للجمالية
+                Center(
+                  child: Container(
+                    width: 50,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'إضافة مهمة ثابتة جديدة',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Cairo',
+                    color: Color(0xFF1A237E),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // حقل اسم المهمة
+                TextField(
+                  controller: constTitleController,
+                  decoration: InputDecoration(
+                    labelText: 'اسم المهمة',
+                    hintText: 'مثال: فحص يومي للمعدات',
+                    prefixIcon: const Icon(
+                      Icons.task_alt,
+                      color: Color(0xFF1A237E),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF1A237E),
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 15),
+
+                // حقل وصف المهمة
+                TextField(
+                  controller: constDescController,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: 'وصف المهمة',
+                    prefixIcon: const Icon(
+                      Icons.description_outlined,
+                      color: Color(0xFF1A237E),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF1A237E),
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 25),
+
+                // أزرار التحكم
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'إلغاء',
+                          style: TextStyle(fontFamily: 'Cairo'),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          if (constTitleController.text.isEmpty) return;
+
+                          await FirebaseFirestore.instance
+                              .collection('tasks')
+                              .doc(widget.groupId)
+                              .set(
+                                {
+                                  'constTasks': FieldValue.arrayUnion([
+                                    {
+                                      'title': constTitleController.text.trim(),
+                                      'description': constDescController.text
+                                          .trim(),
+                                    },
+                                  ]),
+                                },
+                                SetOptions(merge: true),
+                              ); // استخدام merge لعدم مسح البيانات القديمة
+
+                          constTitleController.clear();
+                          constDescController.clear();
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1A237E),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 2,
+                        ),
+                        child: const Text(
+                          'تأكيد الإضافة',
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 40),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('إدارة المهام الثابتة'),
+        backgroundColor: const Color(0xFF1A237E),
+        foregroundColor: Colors.white,
+      ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(height: 10),
+          ElevatedButton.icon(
+            onPressed: () {
+              addConstTask();
+            },
+            label: Text('اضافة مهمة ثابتة'),
+            icon: Icon(Icons.add_box_outlined),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color.fromARGB(255, 74, 87, 227),
+              foregroundColor: const Color(0xFFffffff),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+          Expanded(
+            child: StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('tasks')
+                  .doc(widget.groupId)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData || !snapshot.data!.exists) {
+                  return const Center(child: Text('لا توجد مهام ثابتة حالياً'));
+                }
+
+                final data = snapshot.data!.data() as Map<String, dynamic>?;
+                if (data == null || !data.containsKey('constTasks')) {
+                  return const Center(child: Text('لا توجد مهام ثابتة حالياً'));
+                }
+
+                final List<dynamic> tasks =
+                    (data['constTasks'] as List<dynamic>?) ?? [];
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(15),
+                  itemCount: tasks.length,
+                  itemBuilder: (context, index) {
+                    final task = tasks[index] as Map<String, dynamic>;
+                    return Card(
+                      elevation: 3,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: InkWell(
+                        onTap: () async {
+                          await Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => AddTaskScreen(
+                                groupId: widget.groupId,
+                                fromConstTasks: true,
+                                title: TextEditingController(
+                                  text: task['title'],
+                                ),
+                                description: TextEditingController(
+                                  text: task['description'],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                        child: ListTile(
+                          title: Text(
+                            task['title'],
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(task['description']),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.edit,
+                                  color: Colors.blue,
+                                ),
+                                onPressed: () => showEditSheet(task),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                ),
+                                onPressed: () => deleteTask(task),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

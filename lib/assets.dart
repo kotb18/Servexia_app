@@ -638,7 +638,7 @@ class _AssetsScreenState extends State<AssetsScreen>
                       ),
                     ),
                     child: Text(
-                      '${cost.toStringAsFixed(2)} ج',
+                      '${cost.toStringAsFixed(2)}',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -729,7 +729,7 @@ class _AssetsScreenState extends State<AssetsScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${total.toStringAsFixed(2)} جنيه',
+                  '${total.toStringAsFixed(2)} ',
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -950,132 +950,139 @@ class _AssetsScreenState extends State<AssetsScreen>
         worksData.add([
           d['note'] ?? 'لا توجد',
           DateFormat('yyyy/MM/dd').format(date),
-          '${d['cost']} جنيه',
+          '${d['cost']} ',
           d['description'] ?? 'لا يوجد',
           d['title'] ?? 'بدون عنوان',
         ]);
       }
 
       pdf.addPage(
-        pw.Page(
+        pw.MultiPage(
           pageTheme: pw.PageTheme(
             textDirection: pw.TextDirection.rtl,
             pageFormat: PdfPageFormat.a4,
             margin: const pw.EdgeInsets.all(30),
           ),
-          build: (context) => pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              // Header
-              pw.Container(
-                padding: const pw.EdgeInsets.all(15),
-                decoration: pw.BoxDecoration(
-                  color: primaryColor,
-                  borderRadius: pw.BorderRadius.circular(8),
-                ),
-                child: pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text(
-                      'تقرير تفصيلي للأصل',
-                      style: headerTextStyle.copyWith(color: PdfColors.white),
-                    ),
-                    pw.Text(
-                      DateFormat('yyyy/MM/dd').format(DateTime.now()),
-                      style: pw.TextStyle(
-                        font: arabicFont,
-                        fontSize: 11,
-                        color: PdfColors.white,
-                      ),
-                    ),
-                  ],
-                ),
+          footer: (context) => pw.Container(
+            alignment: pw.Alignment.center,
+            margin: const pw.EdgeInsets.only(top: 10),
+            child: pw.Text(
+              'صفحة ${context.pageNumber} من ${context.pagesCount}',
+              style: pw.TextStyle(
+                font: arabicFont,
+                fontSize: 10,
+                color: PdfColors.grey600,
               ),
-              pw.SizedBox(height: 20),
-
-              // بيانات الأصل
-              pw.Text('معلومات الأصل', style: subHeaderTextStyle),
-              pw.SizedBox(height: 10),
-              pw.Container(
-                padding: const pw.EdgeInsets.all(12),
-                decoration: pw.BoxDecoration(
-                  color: accentColor,
-                  borderRadius: pw.BorderRadius.circular(6),
-                  border: pw.Border.all(color: primaryColor, width: 1),
-                ),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text('الموقع: ${asset['site']}', style: boldTextStyle),
-                    pw.SizedBox(height: 6),
-                    pw.Text(
-                      'المكان: ${asset['location']}',
-                      style: boldTextStyle,
-                    ),
-                    pw.SizedBox(height: 6),
-                    pw.Text(
-                      'اسم المعدة: ${asset['name']}',
-                      style: boldTextStyle,
-                    ),
-                    pw.SizedBox(height: 6),
-                    pw.Text(
-                      'رقم المعدة: ${asset['number']}',
-                      style: boldTextStyle,
-                    ),
-                  ],
-                ),
-              ),
-              pw.SizedBox(height: 20),
-
-              // جدول الأعمال
-              pw.Text('سجل الأعمال والصيانة', style: subHeaderTextStyle),
-              pw.SizedBox(height: 10),
-              pw.Table.fromTextArray(
-                headers: ['ملاحظات', 'التاريخ', 'التكلفة', 'الوصف', 'العنوان'],
-                data: worksData,
-                border: pw.TableBorder.all(color: PdfColors.grey300),
-                headerStyle: pw.TextStyle(
-                  font: arabicFont,
-                  fontWeight: pw.FontWeight.bold,
-                  color: PdfColors.white,
-                  fontSize: 10,
-                ),
-                headerDecoration: const pw.BoxDecoration(color: primaryColor),
-                cellStyle: baseTextStyle,
-                cellAlignment: pw.Alignment.centerRight,
-                columnWidths: {
-                  0: const pw.FlexColumnWidth(1.5),
-                  1: const pw.FlexColumnWidth(1.2),
-                  2: const pw.FlexColumnWidth(1.2),
-                  3: const pw.FlexColumnWidth(2),
-                  4: const pw.FlexColumnWidth(1.5),
-                },
-              ),
-              pw.SizedBox(height: 20),
-
-              // الإجمالي
-              pw.Container(
-                alignment: pw.Alignment.centerLeft,
-                padding: const pw.EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 15,
-                ),
-                decoration: pw.BoxDecoration(
-                  color: accentColor,
-                  borderRadius: pw.BorderRadius.circular(6),
-                  border: pw.Border.all(color: successColor, width: 2),
-                ),
-                child: pw.Text(
-                  'إجمالي التكلفة: ${total.toStringAsFixed(2)} جنيه',
-                  style: totalTextStyle,
-                ),
-              ),
-            ],
+            ),
           ),
+          build: (context) => [
+            // Header
+            pw.Container(
+              padding: const pw.EdgeInsets.all(15),
+              decoration: pw.BoxDecoration(
+                color: primaryColor,
+                borderRadius: pw.BorderRadius.circular(8),
+              ),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    'تقرير تفصيلي للأصل',
+                    style: headerTextStyle.copyWith(color: PdfColors.white),
+                  ),
+                  pw.Text(
+                    DateFormat('yyyy/MM/dd').format(DateTime.now()),
+                    style: pw.TextStyle(
+                      font: arabicFont,
+                      fontSize: 11,
+                      color: PdfColors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 20),
+
+            // بيانات الأصل
+            pw.Text('معلومات الأصل', style: subHeaderTextStyle),
+            pw.SizedBox(height: 10),
+            pw.Container(
+              padding: const pw.EdgeInsets.all(12),
+              decoration: pw.BoxDecoration(
+                color: accentColor,
+                borderRadius: pw.BorderRadius.circular(6),
+                border: pw.Border.all(color: primaryColor, width: 1),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('الموقع: ${asset['site']}', style: boldTextStyle),
+                  pw.SizedBox(height: 6),
+                  pw.Text('المكان: ${asset['location']}', style: boldTextStyle),
+                  pw.SizedBox(height: 6),
+                  pw.Text('اسم المعدة: ${asset['name']}', style: boldTextStyle),
+                  pw.SizedBox(height: 6),
+                  pw.Text(
+                    'رقم المعدة: ${asset['number']}',
+                    style: boldTextStyle,
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 20),
+
+            // جدول الأعمال
+            pw.Text('سجل الأعمال والصيانة', style: subHeaderTextStyle),
+            pw.SizedBox(height: 10),
+            pw.Table.fromTextArray(
+              headers: ['ملاحظات', 'التاريخ', 'التكلفة', 'الوصف', 'العنوان'],
+              data: worksData,
+              border: pw.TableBorder.all(color: PdfColors.grey300),
+              headerStyle: pw.TextStyle(
+                font: arabicFont,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.white,
+                fontSize: 10,
+              ),
+              headerDecoration: const pw.BoxDecoration(color: primaryColor),
+              cellStyle: baseTextStyle,
+              cellAlignment: pw.Alignment.centerRight,
+              columnWidths: {
+                0: const pw.FlexColumnWidth(1.5),
+                1: const pw.FlexColumnWidth(1.2),
+                2: const pw.FlexColumnWidth(1.2),
+                3: const pw.FlexColumnWidth(2),
+                4: const pw.FlexColumnWidth(1.5),
+              },
+            ),
+            pw.SizedBox(height: 20),
+
+            // الإجمالي
+            pw.Container(
+              alignment: pw.Alignment.centerLeft,
+              padding: const pw.EdgeInsets.symmetric(
+                vertical: 12,
+                horizontal: 15,
+              ),
+              decoration: pw.BoxDecoration(
+                color: accentColor,
+                borderRadius: pw.BorderRadius.circular(6),
+                border: pw.Border.all(color: successColor, width: 2),
+              ),
+              child: pw.Text(
+                'إجمالي التكلفة: ${total.toStringAsFixed(2)} ',
+                style: totalTextStyle,
+              ),
+            ),
+          ],
         ),
       );
 
       await Printing.layoutPdf(onLayout: (_) => pdf.save());
+      await Printing.sharePdf(
+        bytes: await pdf.save(),
+        filename: 'asset_report.pdf',
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

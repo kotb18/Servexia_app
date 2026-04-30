@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:maintenance/addAsset.dart';
@@ -7,11 +8,15 @@ import 'package:maintenance/addTask.dart';
 import 'package:maintenance/assets.dart';
 import 'package:maintenance/attendance.dart';
 import 'package:maintenance/homePage.dart';
+import 'package:maintenance/invoicePage.dart';
 import 'package:maintenance/joinReq.dart';
+import 'package:maintenance/customersSuppliers.dart';
 import 'package:maintenance/reportPage.dart';
 import 'package:maintenance/tasks.dart';
 import 'package:maintenance/teamWork.dart';
 import 'package:maintenance/warehouseScreen.dart';
+
+Future<String?> aa = FirebaseMessaging.instance.getToken();
 
 class WorkspaceHomeScreen extends StatefulWidget {
   final String workspaceId;
@@ -29,12 +34,21 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
   Map<String, dynamic>? workspaceData;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  String? deviceToken;
+  Future<void> getDeviceToken() async {
+    String? token = await FirebaseMessaging.instance.getToken();
+    setState(() {
+      deviceToken = token;
+    });
+    print("Device FCM Token: $deviceToken");
+  }
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
     _loadWorkspace();
+    getDeviceToken(); // Call the method to get the device token
   }
 
   void _initializeAnimations() {
@@ -157,6 +171,23 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
     );
   }
 
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24, bottom: 16, left: 8, right: 8),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Color.fromARGB(255, 40, 110, 189),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeader(Map<String, dynamic> data) {
     return Container(
       width: double.infinity,
@@ -246,130 +277,214 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
   }
 
   Widget _buildDashboard(bool isAdmin) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: GridView(
-          physics: const BouncingScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 220,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 1.15,
-          ),
-          children: [
-            // Admin Cards
-            if (isAdmin) ...[
-              _buildDashboardCard(
-                icon: Iconsax.building_4,
-                title: 'الأصول والمعدات',
-                color: const Color.fromARGB(255, 126, 6, 98),
-                onTap: () =>
-                    _navigateTo(AssetsScreen(groupId: widget.workspaceId)),
-              ),
-              _buildDashboardCard(
-                icon: Icons.precision_manufacturing,
-                title: 'إضافة أصل أو معدة',
-                color: const Color.fromARGB(255, 139, 10, 194),
-                onTap: () =>
-                    _navigateTo(AddAssetScreen(groupId: widget.workspaceId)),
-              ),
-              _buildDashboardCard(
-                icon: Icons.warehouse,
-                title: 'المخازن',
-                color: const Color.fromARGB(255, 14, 9, 141),
-                onTap: () =>
-                    _navigateTo(StoreScreen(groupId: widget.workspaceId)),
-              ),
-              _buildDashboardCard(
-                icon: Icons.warehouse_outlined,
-                title: 'إضافة صنف مخزني',
-                color: const Color.fromARGB(255, 9, 72, 233),
-                onTap: () => _navigateTo(
-                  AddInventoryItemScreen(groupId: widget.workspaceId),
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader('إدارة المخازن والمبيعات'),
+              GridView(
+                shrinkWrap:
+                    true, // Important for GridView inside SingleChildScrollView
+                physics:
+                    const NeverScrollableScrollPhysics(), // Disable GridView's own scrolling
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 220,
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 16,
+                  childAspectRatio: 1.15,
                 ),
+                children: [
+                  // Admin Cards for Inventory and Sales
+                  if (isAdmin)
+                    _buildDashboardCard(
+                      icon: Icons.warehouse,
+                      title: 'المخازن',
+                      color: const Color.fromARGB(255, 14, 9, 141),
+                      onTap: () => _navigateTo(
+                        StoreScreen(
+                          groupId: widget.workspaceId,
+                          isFromInvoice: false,
+                          deletedItems: false,
+                          invoiceType: '',
+                        ),
+                      ),
+                    ),
+                  if (isAdmin)
+                    _buildDashboardCard(
+                      icon: Icons.warehouse_outlined,
+                      title: 'إضافة صنف مخزني',
+                      color: const Color.fromARGB(255, 9, 72, 233),
+                      onTap: () => _navigateTo(
+                        AddInventoryItemScreen(groupId: widget.workspaceId),
+                      ),
+                    ),
+                  if (isAdmin)
+                    _buildDashboardCard(
+                      icon: Icons.receipt_long,
+                      title: 'الفواتير والمشتريات',
+                      color: const Color.fromARGB(255, 66, 121, 3),
+                      onTap: () => _navigateTo(
+                        InvoicePage(
+                          groupId: widget.workspaceId,
+                          itemsSale: [],
+                          itemsPurchase: [],
+                          name: '',
+                          phone: '',
+                          address: '',
+                          customerId: '',
+                          isFromConstCustomers: false,
+                          isFromWorkSpace: true,
+                        ),
+                      ),
+                    ),
+                  if (isAdmin)
+                    _buildDashboardCard(
+                      icon: Icons.account_balance_wallet,
+                      title: 'العملاء والموردين',
+                      color: const Color.fromARGB(255, 7, 108, 162),
+                      onTap: () => _navigateTo(
+                        CustomersSuppliers(
+                          groupId: widget.workspaceId,
+                          isFromInvoice: false,
+                          items: [],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              _buildSectionHeader('إدارة الصيانة والموارد البشرية'),
+              GridView(
+                shrinkWrap:
+                    true, // Important for GridView inside SingleChildScrollView
+                physics:
+                    const NeverScrollableScrollPhysics(), // Disable GridView's own scrolling
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 220,
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 16,
+                  childAspectRatio: 1.15,
+                ),
+                children: [
+                  // Admin Cards for Maintenance and HR
+                  if (isAdmin)
+                    _buildDashboardCard(
+                      icon: Iconsax.building_4,
+                      title: 'الأصول والمعدات',
+                      color: const Color.fromARGB(255, 126, 6, 98),
+                      onTap: () => _navigateTo(
+                        AssetsScreen(groupId: widget.workspaceId),
+                      ),
+                    ),
+                  if (isAdmin)
+                    _buildDashboardCard(
+                      icon: Icons.precision_manufacturing,
+                      title: 'إضافة أصل أو معدة',
+                      color: const Color.fromARGB(255, 139, 10, 194),
+                      onTap: () => _navigateTo(
+                        AddAssetScreen(groupId: widget.workspaceId),
+                      ),
+                    ),
+                  // Common Cards
+                  _buildDashboardCard(
+                    icon: Icons.assignment,
+                    title: 'المهام والأعطال',
+                    color: Colors.blue,
+                    onTap: () => _navigateTo(
+                      TasksScreen(
+                        groupId: widget.workspaceId,
+                        isAdmin: isAdmin,
+                      ),
+                    ),
+                  ),
+                  // Admin Add Task Card
+                  if (isAdmin)
+                    _buildDashboardCard(
+                      icon: Icons.add_circle,
+                      title: 'إضافة مهمة',
+                      color: const Color.fromARGB(255, 97, 12, 108),
+                      onTap: () {
+                        _navigateTo(
+                          AddTaskScreen(
+                            groupId: widget.workspaceId,
+                            fromConstTasks: false,
+                            description: TextEditingController(),
+                            title: TextEditingController(),
+                          ),
+                        );
+                        print(
+                          '111111111111111111111 ${'aa'}',
+                        ); // Debug: Print FCM token
+                      },
+                    ),
+                  _buildDashboardCard(
+                    icon: Icons.handyman,
+                    title: 'الابلاغ عن الاعطال',
+                    color: const Color.fromARGB(255, 126, 34, 34),
+                    onTap: () =>
+                        _navigateTo(AddReportPage(groupId: widget.workspaceId)),
+                  ),
+                  _buildDashboardCard(
+                    icon: Icons.group,
+                    title: 'الفريق',
+                    color: Colors.green,
+                    onTap: () => _navigateTo(
+                      TeamScreen(
+                        groupId: widget.workspaceId,
+                        adminId: workspaceData!['adminId'] ?? '',
+                        isXadmin: workspaceData!['adminId'] == uid,
+                        isAdmin: isAdmin,
+                      ),
+                    ),
+                  ),
+                  _buildDashboardCard(
+                    icon: Icons.badge,
+                    title: 'الحضور والانصراف',
+                    color: const Color.fromARGB(255, 6, 104, 160),
+                    onTap: () => _navigateTo(
+                      DailyAttendanceScreen(
+                        groupId: widget.workspaceId,
+                        isAdmin: isAdmin,
+                      ),
+                    ),
+                  ),
+                  // Admin Join Requests Card with Badge
+                  if (isAdmin)
+                    StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('teams')
+                          .doc(widget.workspaceId)
+                          .collection('members')
+                          .where(
+                            'confirm',
+                            isEqualTo: false,
+                          ) // فلترة من السيرفر 🔥
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        int notificationCount = 0;
+
+                        if (snapshot.hasData) {
+                          notificationCount = snapshot.data!.docs.length;
+                        }
+
+                        return _buildDashboardCard(
+                          icon: Icons.person_add,
+                          title: 'طلبات الانضمام',
+                          color: const Color.fromARGB(255, 16, 10, 194),
+                          badgeCount: notificationCount,
+                          onTap: () => _navigateTo(
+                            AdminApprovalPage(groupId: widget.workspaceId),
+                          ),
+                        );
+                      },
+                    ),
+                ],
               ),
             ],
-
-            // Common Cards
-            _buildDashboardCard(
-              icon: Icons.assignment,
-              title: 'المهام والأعطال',
-              color: Colors.blue,
-              onTap: () => _navigateTo(
-                TasksScreen(groupId: widget.workspaceId, isAdmin: isAdmin),
-              ),
-            ),
-
-            // Admin Add Task Card
-            if (isAdmin)
-              _buildDashboardCard(
-                icon: Icons.add_circle,
-                title: 'إضافة مهمة',
-                color: const Color.fromARGB(255, 97, 12, 108),
-                onTap: () =>
-                    _navigateTo(AddTaskScreen(groupId: widget.workspaceId)),
-              ),
-            _buildDashboardCard(
-              icon: Icons.handyman,
-              title: 'الابلاغ عن الاعطال',
-              color: const Color.fromARGB(255, 126, 34, 34),
-              onTap: () =>
-                  _navigateTo(AddReportPage(groupId: widget.workspaceId)),
-            ),
-
-            _buildDashboardCard(
-              icon: Icons.group,
-              title: 'الفريق',
-              color: Colors.green,
-              onTap: () => _navigateTo(
-                TeamScreen(
-                  groupId: widget.workspaceId,
-                  adminId: workspaceData!['adminId'] ?? '',
-                  isXadmin: workspaceData!['adminId'] == uid,
-                  isAdmin: isAdmin,
-                ),
-              ),
-            ),
-
-            _buildDashboardCard(
-              icon: Icons.badge,
-              title: 'الحضور والانصراف',
-              color: const Color.fromARGB(255, 6, 104, 160),
-              onTap: () => _navigateTo(
-                DailyAttendanceScreen(groupId: widget.workspaceId),
-              ),
-            ),
-
-            // Admin Join Requests Card with Badge
-            if (isAdmin)
-              StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('teams')
-                    .doc(widget.workspaceId)
-                    .collection('members')
-                    .where('confirm', isEqualTo: false) // فلترة من السيرفر 🔥
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  int notificationCount = 0;
-
-                  if (snapshot.hasData) {
-                    notificationCount = snapshot.data!.docs.length;
-                  }
-
-                  return _buildDashboardCard(
-                    icon: Icons.person_add,
-                    title: 'طلبات الانضمام',
-                    color: const Color.fromARGB(255, 16, 10, 194),
-                    badgeCount: notificationCount,
-                    onTap: () => _navigateTo(
-                      AdminApprovalPage(groupId: widget.workspaceId),
-                    ),
-                  );
-                },
-              ),
-          ],
+          ),
         ),
       ),
     );
@@ -466,3 +581,67 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
     );
   }
 }
+
+/* Widget _buildDashboardCard2({
+  required IconData icon,
+  required String title,
+  required Color color,
+  required VoidCallback onTap,
+  int? badgeCount,
+}) {
+  return InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(12),
+    child: Container(
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3), width: 1),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Icon(icon, size: 40, color: color),
+              if (badgeCount != null && badgeCount > 0)
+                Positioned(
+                  top: -5,
+                  right: -5,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 20,
+                      minHeight: 20,
+                    ),
+                    child: Text(
+                      badgeCount.toString(),
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: color,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+ */

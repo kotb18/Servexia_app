@@ -14,6 +14,8 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+String? intPhone;
+
 class JoinGroupScreen extends StatefulWidget {
   const JoinGroupScreen({super.key});
   static const String screenroute = 'joinGroup';
@@ -109,19 +111,31 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
                         child: IntlPhoneField(
                           decoration: _inputDecoration(
                             'رقم الهاتف',
-                            Icons.phone,
+                            Icons.phone_android,
                           ),
                           initialCountryCode: 'EG',
+
                           onChanged: (phone) {
+                            intPhone = phone.number;
                             _completePhoneNumber = phone.completeNumber;
+                            // مثال: +201012345678
                           },
+
                           validator: (phone) {
                             if (phone == null || phone.number.isEmpty) {
                               return 'رقم الهاتف مطلوب';
                             }
+
+                            // ❌ منع البداية بـ 0
+                            if (phone.number.startsWith('0')) {
+                              return 'لا تبدأ الرقم بـ 0 بعد كود الدولة';
+                            }
+
+                            // validation الخاص بالمكتبة
                             if (!phone.isValidNumber()) {
                               return 'رقم غير صحيح';
                             }
+
                             return null;
                           },
                         ),
@@ -206,12 +220,15 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
       _showError("رقم الهاتف مطلوب");
       return;
     }
-
+    if (intPhone != null && intPhone!.startsWith('0')) {
+      _showError('لا تبدأ الرقم بـ 0 بعد كود الدولة');
+      return;
+    }
     if (faceEmbedding.isEmpty) {
       _showError("بصمة الوجه مطلوبة");
       return;
     }
-
+    intPhone = null;
     final scanResult = await Navigator.push<String>(
       context,
       MaterialPageRoute(builder: (_) => const QrScanScreen()),

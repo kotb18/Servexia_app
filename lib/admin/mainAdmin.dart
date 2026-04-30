@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:maintenance/admin/feedBack.dart';
+import 'package:maintenance/admin/groups.dart';
 
 class MainAdmin extends StatelessWidget {
   const MainAdmin({super.key});
@@ -25,6 +26,16 @@ class MainAdmin extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const FeedbacksPage()),
+                );
+              },
+            ),
+            _adminButton(
+              icon: Icons.group,
+              title: 'متابعة المجموعات',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const GroupsMintor()),
                 );
               },
             ),

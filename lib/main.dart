@@ -7,13 +7,17 @@ import 'package:maintenance/addAsset.dart';
 import 'package:maintenance/addAwarehouseItem.dart';
 import 'package:maintenance/addTask.dart';
 import 'package:maintenance/admin/feedBack.dart';
+import 'package:maintenance/admin/groups.dart';
 import 'package:maintenance/admin/mainAdmin.dart';
 import 'package:maintenance/assets.dart';
 import 'package:maintenance/attendance.dart';
 import 'package:maintenance/createGroup.dart' hide billingService;
 import 'package:maintenance/homePage.dart';
+import 'package:maintenance/invoiceSettings.dart';
 import 'package:maintenance/joinReq.dart';
+import 'package:maintenance/customersSuppliers.dart';
 import 'package:maintenance/reportPage.dart';
+import 'package:maintenance/invoicePage.dart';
 import 'package:maintenance/signIn.dart';
 import 'package:maintenance/splashScreen.dart';
 import 'package:maintenance/tasks.dart';
@@ -102,20 +106,30 @@ class MyApp extends StatelessWidget {
         ),
         AdminApprovalPage.screenroute: (context) =>
             AdminApprovalPage(groupId: ''),
-        AddTaskScreen.screenroute: (context) => AddTaskScreen(groupId: ''),
+        AddTaskScreen.screenroute: (context) => AddTaskScreen(
+          groupId: '',
+          fromConstTasks: false,
+          description: TextEditingController(),
+          title: TextEditingController(),
+        ),
         AddAssetScreen.screenroute: (context) => AddAssetScreen(groupId: ''),
         AssetsScreen.screenroute: (context) => AssetsScreen(groupId: ''),
         TasksScreen.screenroute: (context) =>
             TasksScreen(groupId: '', isAdmin: false),
         DailyAttendanceScreen.screenroute: (context) =>
-            DailyAttendanceScreen(groupId: ''),
+            DailyAttendanceScreen(groupId: '', isAdmin: false),
         SplashScreen.screenroute: (context) => SplashScreen(),
         Updateversion.screenroute: (context) => Updateversion(storeLink: ''),
         TermsAndConditionsScreen.screenroute: (context) =>
             TermsAndConditionsScreen(),
         AddInventoryItemScreen.screenroute: (context) =>
             AddInventoryItemScreen(groupId: ''),
-        StoreScreen.screenroute: (context) => StoreScreen(groupId: ''),
+        StoreScreen.screenroute: (context) => StoreScreen(
+          groupId: '',
+          isFromInvoice: false,
+          deletedItems: false,
+          invoiceType: '',
+        ),
         InventoryItemDetailsScreenRefactored.screenroute: (context) =>
             InventoryItemDetailsScreenRefactored(
               groupId: '',
@@ -125,6 +139,32 @@ class MyApp extends StatelessWidget {
         MainAdmin.screenroute: (context) => const MainAdmin(),
         FeedbacksPage.screenroute: (context) => const FeedbacksPage(),
         AddReportPage.screenroute: (context) => AddReportPage(groupId: ''),
+        GroupsMintor.screenroute: (context) => const GroupsMintor(),
+        InvoicePage.screenroute: (context) => InvoicePage(
+          groupId: '',
+          itemsSale: [],
+          itemsPurchase: [],
+          name: '',
+          phone: '',
+          address: '',
+          customerId: '',
+          isFromConstCustomers: false,
+          isFromWorkSpace: false,
+        ),
+        CustomersSuppliers.screenroute: (context) => const CustomersSuppliers(
+          groupId: '',
+          isFromInvoice: false,
+          items: [],
+        ),
+        InvoiceSettingsPage.routeName: (context) => const InvoiceSettingsPage(
+          groupId: '',
+          items: [],
+          isFromConstCustomers: false,
+          customerId: '',
+          name: '',
+          phone: '',
+          address: '',
+        ),
       },
     );
   }
