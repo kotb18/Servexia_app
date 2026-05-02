@@ -319,7 +319,11 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                       title: 'إضافة صنف مخزني',
                       color: const Color.fromARGB(255, 9, 72, 233),
                       onTap: () => _navigateTo(
-                        AddInventoryItemScreen(groupId: widget.workspaceId),
+                        AddInventoryItemScreen(
+                          groupId: widget.workspaceId,
+                          invoiceType: '',
+                          isFromInvoice: false,
+                        ),
                       ),
                     ),
                   if (isAdmin)
@@ -338,6 +342,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                           customerId: '',
                           isFromConstCustomers: false,
                           isFromWorkSpace: true,
+                          type: 'بيع',
                         ),
                       ),
                     ),
@@ -350,7 +355,9 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                         CustomersSuppliers(
                           groupId: widget.workspaceId,
                           isFromInvoice: false,
-                          items: [],
+                          itemsSale: [],
+                          itemsPruchase: [],
+                          invoiceType: '',
                         ),
                       ),
                     ),

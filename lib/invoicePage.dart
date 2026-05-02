@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:maintenance/addAwarehouseItem.dart';
 import 'package:maintenance/customersSuppliers.dart';
 import 'package:maintenance/invoiceSettings.dart';
+import 'package:maintenance/myInvoices.dart';
 import 'package:maintenance/warehouseScreen.dart';
 import 'package:maintenance/workSpace.dart';
 import 'package:pdf/pdf.dart';
@@ -179,6 +180,7 @@ class InvoicePage extends StatefulWidget {
     required this.isFromConstCustomers,
     required this.isFromWorkSpace,
     required this.itemsPurchase,
+    required this.type,
   });
 
   static const String screenroute = 'InvoicePage';
@@ -192,6 +194,7 @@ class InvoicePage extends StatefulWidget {
   final String customerId;
   final bool isFromConstCustomers;
   final bool isFromWorkSpace;
+  final String type;
 
   @override
   State<InvoicePage> createState() => _InvoicePageState();
@@ -245,6 +248,8 @@ class _InvoicePageState extends State<InvoicePage>
   @override
   void initState() {
     super.initState();
+    print(widget.itemsPurchase);
+    selectedFilter = widget.type;
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -330,10 +335,35 @@ class _InvoicePageState extends State<InvoicePage>
         return false;
       },
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: selectedFilter == 'بيع'
+            ? AppColors.success
+            : selectedFilter == 'شراء'
+            ? AppColors.primary
+            : selectedFilter == 'صيانة'
+            ? AppColors.warning
+            : selectedFilter == 'مرتجع'
+            ? AppColors.danger
+            : selectedFilter == 'عرض سعر'
+            ? AppColors.secondary
+            : AppColors.background,
         appBar: AppBar(
-          title: const Text('تسجيل فاتورة جديدة'),
+          title: const Text(
+            'تسجيل فاتورة جديدة',
+            style: TextStyle(fontSize: 18),
+          ),
           actions: [
+            IconButton(
+              icon: const Icon(Icons.receipt_long),
+              tooltip: 'فواتيري',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => MyInvoicesPage(groupId: widget.groupId),
+                  ),
+                );
+              },
+            ),
             IconButton(
               onPressed: () async {
                 final result = await Navigator.push(
@@ -396,9 +426,7 @@ class _InvoicePageState extends State<InvoicePage>
                               : FontWeight.normal,
                         ),
                         backgroundColor: AppColors.surface,
-                        side: BorderSide(
-                          color: isSelected ? type.color : AppColors.border,
-                        ),
+                        side: BorderSide(color: AppColors.border, width: 2),
                         onSelected: (_) {
                           setState(() {
                             selectedFilter = type.type;
@@ -428,36 +456,37 @@ class _InvoicePageState extends State<InvoicePage>
                 },
               ),
             ),
-
+            selectedFilter == 'بيع'
+                ? Text(
+                    'عند حفظ الفاتورة، سيتم خصم الكميات من المخزون',
+                    style: TextStyle(color: Colors.white),
+                  )
+                : selectedFilter == 'شراء'
+                ? Text(
+                    'عند حفظ الفاتورة، سيتم إضافة الكميات إلى المخزون',
+                    style: TextStyle(color: Colors.white),
+                  )
+                : selectedFilter == 'مرتجع'
+                ? Text(
+                    'عند حفظ الفاتورة، سيتم إعادة تعين الكميات إلى المخزون',
+                    style: TextStyle(color: Colors.white),
+                  )
+                : Container(),
             // Invoice Content
             Expanded(
-              child: AnimatedBuilder(
-                animation: _animationController,
-                builder: (context, child) {
-                  return FadeTransition(
-                    opacity: Tween<double>(begin: 0.8, end: 1.0).animate(
-                      CurvedAnimation(
-                        parent: _animationController,
-                        curve: Curves.easeInOut,
-                      ),
-                    ),
-                    child: child,
-                  );
-                },
-                child: InvoicePageDesign(
-                  type: selectedFilter,
-                  groupId: widget.groupId,
-                  itemsSale: widget.itemsSale,
-                  itemsPurchase: [],
-                  name: widget.name,
-                  phone: widget.phone,
-                  address: widget.address,
-                  customerId: widget.customerId,
-                  isFromConstCustomers: widget.isFromConstCustomers,
-                  state: state,
-                  invoiceType: selectedType,
-                  reCalculate: reCalculate,
-                ),
+              child: InvoicePageDesign(
+                type: selectedFilter,
+                groupId: widget.groupId,
+                itemsSale: widget.itemsSale,
+                itemsPurchase: widget.itemsPurchase,
+                name: widget.name,
+                phone: widget.phone,
+                address: widget.address,
+                customerId: widget.customerId,
+                isFromConstCustomers: widget.isFromConstCustomers,
+                state: state,
+                invoiceType: selectedType,
+                reCalculate: reCalculate,
               ),
             ),
           ],
@@ -565,13 +594,21 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
 
   void _calculateTotals() {
     setState(() {
-      widget.state.priceSumItems = widget.itemsSale.isEmpty
-          ? 0.0
-          : widget.itemsSale.fold(
+      widget.state.priceSumItems =
+          widget.itemsSale.isNotEmpty && widget.type == 'بيع'
+          ? widget.itemsSale.fold(
               0.0,
               (sum, item) =>
                   sum + ((item['price'] ?? 0) * (item['quantity'] ?? 1)),
-            );
+            )
+          : widget.state.priceSumItems =
+                widget.itemsPurchase.isNotEmpty && widget.type == 'شراء'
+                ? widget.itemsPurchase.fold(
+                    0.0,
+                    (sum, item) =>
+                        sum + ((item['price'] ?? 0) * (item['quantity'] ?? 1)),
+                  )
+                : 0.0;
 
       final discountPercent = double.tryParse(discountController.text) ?? 0;
       widget.state.discountValue =
@@ -693,6 +730,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               taxController.text = widget.state.showTax ? '14' : '0';
               discountController.text = '0';
               widget.itemsSale.clear();
+              widget.itemsPurchase.clear();
               selectedPaymentMethod = 'كاش';
               indexes = [0, 1];
               _calculateTotals();
@@ -725,9 +763,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
 
   Map<String, dynamic> buildInvoiceData() {
     return {
-      "groupId": widget.groupId,
       "type": widget.type,
-      "titleEnglish": _getTitleEnglish(widget.type),
       "customer": {
         "id": widget.customerId.isNotEmpty ? widget.customerId : null,
         "name": nameController.text.isNotEmpty ? nameController.text : null,
@@ -736,16 +772,29 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
             ? addressController.text
             : null,
       },
-      "items": widget.itemsSale
-          .map(
-            (item) => {
-              "name": item['name'],
-              "quantity": item['quantity'] ?? 0,
-              "price": item['price'] ?? 0,
-              "total": (item['quantity'] ?? 0) * (item['price'] ?? 0),
-            },
-          )
-          .toList(),
+      "items": widget.type == 'بيع'
+          ? widget.itemsSale
+                .map(
+                  (item) => {
+                    "name": item['name'],
+                    "quantity": item['quantity'] ?? 0,
+                    "price": item['price'] ?? 0,
+                    "total": (item['quantity'] ?? 0) * (item['price'] ?? 0),
+                  },
+                )
+                .toList()
+          : widget.type == 'شراء'
+          ? widget.itemsPurchase
+                .map(
+                  (item) => {
+                    "name": item['name'],
+                    "quantity": item['quantity'] ?? 0,
+                    "price": item['price'] ?? 0,
+                    "total": (item['quantity'] ?? 0) * (item['price'] ?? 0),
+                  },
+                )
+                .toList()
+          : [],
       "summary": {
         "subTotal": widget.state.priceSumItems,
         "discountPercent": double.tryParse(discountController.text) ?? 0,
@@ -759,16 +808,33 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
       "invoiceNumber":
           "${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}",
       "createdAt": DateTime.now().toIso8601String(),
+      'paymentMethod': selectedPaymentMethod,
     };
   }
 
   Future<void> saveInvoice() async {
-    final data = buildInvoiceData();
+    final dataFinal = buildInvoiceData();
+    // final Map<String, dynamic> dataMap = data.asMap().cast<String, dynamic>();
+    if (selectedPaymentMethod != 'كاش') {
+      for (int i = 0; i < data.length; i++) {
+        dataFinal['payment${i + 1}'] = {
+          "type": data[i]['type'],
+          "value": data[i]['value'],
+          "date": data[i]['date'].toIso8601String(),
+          "status": data[i]['status'],
+        };
+      }
+    }
     await FirebaseFirestore.instance
         .collection('invoices')
         .doc(widget.groupId)
         .collection('items')
-        .add(data);
+        .add(dataFinal);
+    await FirebaseFirestore.instance
+        .collection('invoices')
+        .doc(widget.groupId)
+        .update({'lastInvoiceNumber': widget.state.lastInvoiceNumber + 1});
+    setState(() {});
   }
 
   String _getCustomerLabel() {
@@ -811,11 +877,6 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                           // Invoice Info
                           _buildInvoiceInfo(),
                           const Divider(height: 32),
-
-                          // Payment Method
-                          if (widget.type == 'بيع' || widget.type == 'شراء')
-                            _buildPaymentMethod(),
-
                           // Customer Section
                           _buildCustomerSection(),
                           const Divider(height: 32),
@@ -827,6 +888,8 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                           // Totals
                           _buildTotalsSection(),
                           const Divider(height: 32),
+                          if (widget.type == 'بيع' || widget.type == 'شراء')
+                            _buildPaymentMethod(),
 
                           // Due Payments (if applicable)
                           if (selectedPaymentMethod == 'آجل' ||
@@ -1102,8 +1165,14 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                   MaterialPageRoute(
                     builder: (_) => CustomersSuppliers(
                       groupId: widget.groupId,
-                      items: widget.itemsSale.isEmpty ? [] : widget.itemsSale,
+                      itemsSale: widget.itemsSale.isEmpty
+                          ? []
+                          : widget.itemsSale,
+                      itemsPruchase: widget.itemsPurchase.isEmpty
+                          ? []
+                          : widget.itemsPurchase,
                       isFromInvoice: true,
+                      invoiceType: widget.type,
                     ),
                   ),
                 );
@@ -1174,7 +1243,11 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               ),
             ),
             Text(
-              '${widget.itemsSale.length} صنف',
+              widget.type == 'بيع'
+                  ? '${widget.itemsSale.length} صنف'
+                  : widget.type == 'شراء'
+                  ? '${widget.itemsPurchase.length} صنف'
+                  : '',
               style: const TextStyle(
                 fontSize: 13,
                 color: AppColors.textSecondary,
@@ -1184,7 +1257,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
         ),
         const SizedBox(height: 12),
 
-        if (widget.itemsSale.isEmpty)
+        if (widget.itemsSale.isEmpty && widget.itemsPurchase.isEmpty)
           _buildEmptyItemsState()
         else
           _buildItemsList(),
@@ -1231,10 +1304,19 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: widget.itemsSale.length,
+      itemCount: widget.type == 'بيع'
+          ? widget.itemsSale.length
+          : widget.type == 'شراء'
+          ? widget.itemsPurchase.length
+          : widget.itemsSale.length,
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
-        final item = widget.itemsSale[index];
+        final item = widget.type == 'بيع'
+            ? widget.itemsSale[index]
+            : widget.type == 'شراء'
+            ? widget.itemsPurchase[index]
+            : widget.itemsSale[index];
+
         final total = (item['quantity'] ?? 0) * (item['price'] ?? 0);
 
         return Container(
@@ -1334,8 +1416,11 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          AddInventoryItemScreen(groupId: widget.groupId),
+                      builder: (_) => AddInventoryItemScreen(
+                        groupId: widget.groupId,
+                        invoiceType: widget.type,
+                        isFromInvoice: true,
+                      ),
                     ),
                   );
                 },
@@ -1555,7 +1640,8 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
 
   Widget _buildSaveButton(double total) {
     final isValid =
-        widget.itemsSale.isNotEmpty && nameController.text.isNotEmpty;
+        widget.itemsSale.isNotEmpty ||
+        widget.itemsPurchase.isNotEmpty; // && nameController.text.isNotEmpty;
 
     return SizedBox(
       width: double.infinity,
@@ -1602,16 +1688,29 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
         clientName: nameController.text,
         clientAddress: addressController.text,
         clientPhone: phoneController.text,
-        items: widget.itemsSale
-            .map(
-              (item) => {
-                'name': item['name'] ?? '',
-                'quantity': item['quantity'] ?? 0,
-                'price': item['price'] ?? 0,
-                'total': (item['quantity'] ?? 0) * (item['price'] ?? 0),
-              },
-            )
-            .toList(),
+        items: widget.type == 'بيع'
+            ? widget.itemsSale
+                  .map(
+                    (item) => {
+                      'name': item['name'] ?? '',
+                      'quantity': item['quantity'] ?? 0,
+                      'price': item['price'] ?? 0,
+                      'total': (item['quantity'] ?? 0) * (item['price'] ?? 0),
+                    },
+                  )
+                  .toList()
+            : widget.type == 'شراء'
+            ? widget.itemsPurchase
+                  .map(
+                    (item) => {
+                      'name': item['name'] ?? '',
+                      'quantity': item['quantity'] ?? 0,
+                      'price': item['price'] ?? 0,
+                      'total': (item['quantity'] ?? 0) * (item['price'] ?? 0),
+                    },
+                  )
+                  .toList()
+            : [],
         subtotal: widget.state.priceSumItems,
         discount: widget.state.discountValue,
         tax: widget.state.taxValue,

@@ -122,8 +122,11 @@ class MyApp extends StatelessWidget {
         Updateversion.screenroute: (context) => Updateversion(storeLink: ''),
         TermsAndConditionsScreen.screenroute: (context) =>
             TermsAndConditionsScreen(),
-        AddInventoryItemScreen.screenroute: (context) =>
-            AddInventoryItemScreen(groupId: ''),
+        AddInventoryItemScreen.screenroute: (context) => AddInventoryItemScreen(
+          groupId: '',
+          isFromInvoice: false,
+          invoiceType: '',
+        ),
         StoreScreen.screenroute: (context) => StoreScreen(
           groupId: '',
           isFromInvoice: false,
@@ -150,11 +153,14 @@ class MyApp extends StatelessWidget {
           customerId: '',
           isFromConstCustomers: false,
           isFromWorkSpace: false,
+          type: '',
         ),
         CustomersSuppliers.screenroute: (context) => const CustomersSuppliers(
           groupId: '',
           isFromInvoice: false,
-          items: [],
+          itemsSale: [],
+          itemsPruchase: [],
+          invoiceType: '',
         ),
         InvoiceSettingsPage.routeName: (context) => const InvoiceSettingsPage(
           groupId: '',

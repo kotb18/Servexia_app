@@ -98,6 +98,7 @@ class _StoreScreenState extends State<StoreScreen> {
   TextEditingController itemNameController = TextEditingController();
   TextEditingController itemQuantityController = TextEditingController();
   TextEditingController itemPriceController = TextEditingController();
+  TextEditingController itemBuyController = TextEditingController();
   @override
   void initState() {
     // TODO: implement initState
@@ -122,6 +123,7 @@ class _StoreScreenState extends State<StoreScreen> {
     itemNameController.dispose();
     itemQuantityController.dispose();
     itemPriceController.dispose();
+    itemBuyController.dispose();
     selectedIndex.clear();
     items.clear();
   }
@@ -137,14 +139,15 @@ class _StoreScreenState extends State<StoreScreen> {
               MaterialPageRoute(
                 builder: (_) => InvoicePage(
                   groupId: widget.groupId,
-                  itemsSale: items,
-                  itemsPurchase: [],
+                  itemsSale: widget.invoiceType == 'بيع' ? items : [],
+                  itemsPurchase: widget.invoiceType == 'شراء' ? items : [],
                   name: '',
                   phone: '',
                   address: '',
                   customerId: '',
                   isFromConstCustomers: false,
                   isFromWorkSpace: false,
+                  type: widget.invoiceType,
                 ),
               ),
             );
@@ -420,9 +423,18 @@ class _StoreScreenState extends State<StoreScreen> {
                                                   itemQuantityController,
                                               keyboardType:
                                                   TextInputType.number,
-                                              decoration: const InputDecoration(
+                                              decoration: InputDecoration(
                                                 labelText:
-                                                    'الكمية المراد إضافتها',
+                                                    widget.invoiceType == 'بيع'
+                                                    ? 'الكمية المراد بيعها'
+                                                    : 'الكمية المراد إضافتها',
+                                                labelStyle: TextStyle(
+                                                  color:
+                                                      widget.invoiceType ==
+                                                          'بيع'
+                                                      ? Colors.green
+                                                      : Colors.blue,
+                                                ),
                                               ),
                                               onTap: () {
                                                 itemQuantityController
@@ -459,6 +471,27 @@ class _StoreScreenState extends State<StoreScreen> {
                                                 return null; // يعني مفيش خطأ
                                               },
                                             ),
+                                            if (widget.invoiceType == 'شراء')
+                                              TextFormField(
+                                                controller: itemBuyController,
+                                                keyboardType:
+                                                    TextInputType.number,
+                                                decoration:
+                                                    const InputDecoration(
+                                                      labelText:
+                                                          'سعر الشراء للفاتورة',
+                                                    ),
+                                                onTap: () {
+                                                  itemBuyController.selection =
+                                                      TextSelection(
+                                                        baseOffset: 0,
+                                                        extentOffset:
+                                                            itemBuyController
+                                                                .text
+                                                                .length,
+                                                      );
+                                                },
+                                              ),
                                             TextFormField(
                                               controller: itemPriceController,
 
@@ -499,6 +532,7 @@ class _StoreScreenState extends State<StoreScreen> {
                                                 });
                                                 items.add({
                                                   'id': id,
+                                                  'isInventoryItem': true,
                                                   'name': data['name'],
                                                   'quantity':
                                                       int.tryParse(
@@ -514,6 +548,22 @@ class _StoreScreenState extends State<StoreScreen> {
                                                             .text,
                                                       ) ??
                                                       0,
+
+                                                  'location': data['location'],
+                                                  'notes': data['notes'],
+                                                  'createdAt':
+                                                      FieldValue.serverTimestamp(),
+                                                  'deleted': false,
+
+                                                  'coast':
+                                                      itemBuyController
+                                                          .text
+                                                          .isNotEmpty
+                                                      ? double.tryParse(
+                                                          itemBuyController
+                                                              .text,
+                                                        )
+                                                      : 0.0,
                                                 });
                                                 Navigator.pop(context);
                                               }

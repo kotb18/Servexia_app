@@ -28,11 +28,15 @@ class CustomersSuppliers extends StatefulWidget {
     super.key,
     required this.groupId,
     required this.isFromInvoice,
-    required this.items,
+    required this.invoiceType,
+    required this.itemsSale,
+    required this.itemsPruchase,
   });
   final String groupId;
   final bool isFromInvoice;
-  final List<Map> items;
+  final String invoiceType;
+  final List<Map> itemsSale;
+  final List<Map> itemsPruchase;
   static const String screenroute = '/customersSuppliers';
 
   @override
@@ -245,14 +249,15 @@ class _CustomersSuppliersState extends State<CustomersSuppliers> {
             MaterialPageRoute(
               builder: (_) => InvoicePage(
                 groupId: widget.groupId,
-                itemsSale: widget.items,
-                itemsPurchase: [],
+                itemsSale: widget.itemsSale,
+                itemsPurchase: widget.itemsPruchase,
                 name: item.name,
                 phone: item.phone,
                 address: item.address,
                 customerId: item.id,
                 isFromConstCustomers: true,
                 isFromWorkSpace: false,
+                type: widget.invoiceType,
               ),
             ),
           );

@@ -4,6 +4,7 @@ import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:maintenance/invoicePage.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 bool showUnits = false;
@@ -14,7 +15,14 @@ String? codeCheck;
 
 class AddInventoryItemScreen extends StatefulWidget {
   final String groupId;
-  const AddInventoryItemScreen({super.key, required this.groupId});
+  final bool isFromInvoice;
+  final String invoiceType;
+  const AddInventoryItemScreen({
+    super.key,
+    required this.groupId,
+    required this.isFromInvoice,
+    required this.invoiceType,
+  });
   static const String screenroute = 'addInventoryItem';
 
   @override
@@ -258,61 +266,99 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
 
   Future<void> saveItem() async {
     if (!_formKey.currentState!.validate()) return;
+    if (widget.isFromInvoice) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => InvoicePage(
+            groupId: widget.groupId,
+            itemsSale: [],
+            itemsPurchase: [
+              {
+                'id': skuController.text.trim(),
+                'isInventoryItem': false,
+                'name': nameController.text.trim(),
+                'sku': skuController.text.trim(),
+                'quantity': int.parse(qtyController.text),
+                'unit': unitController.text.trim(),
+                'location': locationController.text.trim(),
+                'notes': notesController.text.trim(),
+                'createdAt': FieldValue.serverTimestamp(),
+                'deleted': false,
+                'price': priceController.text.isNotEmpty
+                    ? double.parse(priceController.text)
+                    : 0.0,
+                'coast': coastController.text.isNotEmpty
+                    ? double.parse(coastController.text)
+                    : 0.0,
+              },
+            ],
+            name: '',
+            phone: '',
+            address: '',
+            customerId: '',
+            isFromConstCustomers: false,
+            isFromWorkSpace: false,
+            type: widget.invoiceType,
+          ),
+        ),
+      );
+    } else {
+      setState(() => loading = true);
+      final existingItem = await FirebaseFirestore.instance
+          .collection('inventory')
+          .doc(widget.groupId)
+          .collection('items')
+          .doc(skuController.text.trim())
+          .get();
+      if (existingItem.exists) {
+        setState(() => loading = false);
+        _showError("يوجد صنف آخر بنفس الكود، الرجاء استخدام كود مختلف");
+        return;
+      }
 
-    setState(() => loading = true);
-    final existingItem = await FirebaseFirestore.instance
-        .collection('inventory')
-        .doc(widget.groupId)
-        .collection('items')
-        .doc(skuController.text.trim())
-        .get();
-    if (existingItem.exists) {
+      final docRef = FirebaseFirestore.instance
+          .collection('inventory')
+          .doc(widget.groupId)
+          .collection('items')
+          .doc(skuController.text.trim());
+
+      await docRef.set({
+        'name': nameController.text.trim(),
+        'sku': skuController.text.trim(),
+        'quantity': int.parse(qtyController.text),
+        'unit': unitController.text.trim(),
+        'location': locationController.text.trim(),
+        'notes': notesController.text.trim(),
+        'createdAt': FieldValue.serverTimestamp(),
+        'deleted': false,
+        'price': priceController.text.isNotEmpty
+            ? double.parse(priceController.text)
+            : 0.0,
+        'coast': coastController.text.isNotEmpty
+            ? double.parse(coastController.text)
+            : 0.0,
+      });
+
+      await docRef.collection('movements').add({
+        'type': 'in',
+        'qty': int.parse(qtyController.text),
+        'unit': unitController.text.trim(),
+        'note': notesController.text.trim(),
+        'createdBy':
+            FirebaseAuth.instance.currentUser?.displayName ?? 'غير معروف',
+        'createdAt': FieldValue.serverTimestamp(),
+        'price': priceController.text.isNotEmpty
+            ? double.parse(priceController.text)
+            : 0.0,
+        'coast': coastController.text.isNotEmpty
+            ? double.parse(coastController.text)
+            : 0.0,
+      });
+
       setState(() => loading = false);
-      _showError("يوجد صنف آخر بنفس الكود، الرجاء استخدام كود مختلف");
-      return;
+      Navigator.pop(context);
     }
-
-    final docRef = FirebaseFirestore.instance
-        .collection('inventory')
-        .doc(widget.groupId)
-        .collection('items')
-        .doc(skuController.text.trim());
-
-    await docRef.set({
-      'name': nameController.text.trim(),
-      'sku': skuController.text.trim(),
-      'quantity': int.parse(qtyController.text),
-      'unit': unitController.text.trim(),
-      'location': locationController.text.trim(),
-      'notes': notesController.text.trim(),
-      'createdAt': FieldValue.serverTimestamp(),
-      'deleted': false,
-      'price': priceController.text.isNotEmpty
-          ? double.parse(priceController.text)
-          : 0.0,
-      'coast': coastController.text.isNotEmpty
-          ? double.parse(coastController.text)
-          : 0.0,
-    });
-
-    await docRef.collection('movements').add({
-      'type': 'in',
-      'qty': int.parse(qtyController.text),
-      'unit': unitController.text.trim(),
-      'note': notesController.text.trim(),
-      'createdBy':
-          FirebaseAuth.instance.currentUser?.displayName ?? 'غير معروف',
-      'createdAt': FieldValue.serverTimestamp(),
-      'price': priceController.text.isNotEmpty
-          ? double.parse(priceController.text)
-          : 0.0,
-      'coast': coastController.text.isNotEmpty
-          ? double.parse(coastController.text)
-          : 0.0,
-    });
-
-    setState(() => loading = false);
-    Navigator.pop(context);
   }
 
   void _showError(String msg) {
@@ -662,8 +708,10 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                                 ? const CircularProgressIndicator(
                                     color: Colors.white,
                                   )
-                                : const Text(
-                                    'حفظ الصنف',
+                                : Text(
+                                    widget.isFromInvoice
+                                        ? 'إضافة الصنف'
+                                        : 'حفظ الصنف',
                                     style: TextStyle(fontSize: 16),
                                   ),
                           ),
