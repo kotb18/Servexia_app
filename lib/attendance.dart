@@ -353,7 +353,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
 
       final hours = duration.inHours;
       final minutes = duration.inMinutes.remainder(60);
-      String workDuration = '${hours} ساعة و ${minutes} دقيقة';
+      String workDuration = '$hours ساعة و $minutes دقيقة';
 
       await docRef.update({
         'checkOutTime': checkOutTime,
@@ -803,18 +803,18 @@ List<dynamic>? storedEmbeddingDynamic = [
 /// 📥 تحميل بصمة الوجه (Local → Firebase)
 /// ================================
 Future<List<dynamic>?> loadFaceEmbedding() async {
-  final _firestore = FirebaseFirestore.instance;
-  final _auth = FirebaseAuth.instance;
+  final firestore = FirebaseFirestore.instance;
+  final auth = FirebaseAuth.instance;
 
   /// 🔑 Key خاص بكل مستخدم
-  String _localKey(String uid) => 'face_data_$uid';
+  String localKey(String uid) => 'face_data_$uid';
 
-  final user = _auth.currentUser;
+  final user = auth.currentUser;
 
   if (user == null) return null;
 
   final prefs = await SharedPreferences.getInstance();
-  final localData = prefs.getString(_localKey('$groupId0 ${user.uid}'));
+  final localData = prefs.getString(localKey('$groupId0 ${user.uid}'));
 
   // ✅ 1. لو موجود محليًا
   if (localData != null) {
@@ -824,7 +824,7 @@ Future<List<dynamic>?> loadFaceEmbedding() async {
   }
 
   // ☁️ 2. مش موجود محليًا → Firebase
-  final doc = await _firestore
+  final doc = await firestore
       .collection('faceEmbedding')
       .doc(groupId0)
       .collection('users')
@@ -841,7 +841,7 @@ Future<List<dynamic>?> loadFaceEmbedding() async {
 
   // 💾 خزنه محليًا
   await prefs.setString(
-    _localKey('$groupId0 ${user.uid}'),
+    localKey('$groupId0 ${user.uid}'),
     jsonEncode(embedding),
   );
 
@@ -976,7 +976,7 @@ Future<void> generateDailyAttendancePdf(
                           _buildCell(data['name'] ?? "---"),
                         ],
                       );
-                    }).toList(),
+                    }),
                   ],
                 ),
               ],

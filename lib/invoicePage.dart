@@ -17,7 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 bool loading = false;
 bool reCalculate = false;
 
-List<Map<String, dynamic>> data = [
+List<Map<String, dynamic>> paymentScheduleData = [
   {
     "type": "مدفوع",
     "value": 0.0,
@@ -27,7 +27,7 @@ List<Map<String, dynamic>> data = [
     "status": "تم",
   },
   {
-    "type": selectedPaymentMethod == 'آجل' ? "مستحق" : 'قسط 1',
+    "type": "مستحق",
     "value": 0.0,
     "valuePicked": false,
     "date": DateTime.now().add(const Duration(days: 30)),
@@ -35,7 +35,7 @@ List<Map<String, dynamic>> data = [
     "status": "!",
   },
 ];
-List indexes = [0, 1];
+List<int> paymentIndexes = [0, 1];
 
 // ==================== CONSTANTS & THEME ====================
 
@@ -123,25 +123,33 @@ class AppTheme {
   );
 }
 
-// ==================== MODELS ====================
+// ==================== INVOICE TYPE MODEL ====================
 
-class InvoiceType {
+class InvoiceTypeModel {
   final String title;
   final String type;
   final String titleEnglish;
   final IconData icon;
   final Color color;
+  final bool affectsStock;
+  final bool needsWarehouseItems;
+  final bool allowsManualItems;
+  final bool requiresOriginalInvoice;
 
-  const InvoiceType({
+  const InvoiceTypeModel({
     required this.title,
     required this.type,
     required this.titleEnglish,
     required this.icon,
     required this.color,
+    required this.affectsStock,
+    required this.needsWarehouseItems,
+    required this.allowsManualItems,
+    required this.requiresOriginalInvoice,
   });
 }
 
-// ==================== GLOBAL STATE (Refactored) ====================
+// ==================== GLOBAL STATE ====================
 
 class InvoiceState {
   static DateTime selectedDate = DateTime.now();
@@ -164,6 +172,10 @@ class InvoiceState {
   late bool showNotes = true;
   late bool showTax = true;
   late bool showDiscount = true;
+
+  // For return invoices
+  String? originalInvoiceId;
+  String? originalInvoiceNumber;
 }
 
 // ==================== MAIN PAGE ====================
@@ -205,41 +217,61 @@ class _InvoicePageState extends State<InvoicePage>
   late AnimationController _animationController;
   String selectedFilter = 'بيع';
 
-  final List<InvoiceType> invoiceTypes = [
-    const InvoiceType(
+  final List<InvoiceTypeModel> invoiceTypes = [
+    const InvoiceTypeModel(
       title: 'فاتورة بيع',
       type: 'بيع',
       titleEnglish: 'sale',
       icon: Icons.shopping_cart_outlined,
       color: AppColors.success,
+      affectsStock: true,
+      needsWarehouseItems: true,
+      allowsManualItems: false,
+      requiresOriginalInvoice: false,
     ),
-    const InvoiceType(
+    const InvoiceTypeModel(
       title: 'فاتورة شراء',
       type: 'شراء',
       titleEnglish: 'purchase',
       icon: Icons.shopping_bag_outlined,
       color: AppColors.primary,
+      affectsStock: true,
+      needsWarehouseItems: true,
+      allowsManualItems: false,
+      requiresOriginalInvoice: false,
     ),
-    const InvoiceType(
+    const InvoiceTypeModel(
       title: 'فاتورة صيانة',
       type: 'صيانة',
       titleEnglish: 'maintenance',
       icon: Icons.build_outlined,
       color: AppColors.warning,
+      affectsStock: false,
+      needsWarehouseItems: false,
+      allowsManualItems: true,
+      requiresOriginalInvoice: false,
     ),
-    const InvoiceType(
+    const InvoiceTypeModel(
       title: 'مرتجع',
       type: 'مرتجع',
       titleEnglish: 'return',
       icon: Icons.assignment_return_outlined,
       color: AppColors.danger,
+      affectsStock: true,
+      needsWarehouseItems: false,
+      allowsManualItems: false,
+      requiresOriginalInvoice: true,
     ),
-    const InvoiceType(
+    const InvoiceTypeModel(
       title: 'عرض سعر',
       type: 'عرض سعر',
       titleEnglish: 'quote',
       icon: Icons.description_outlined,
       color: AppColors.secondary,
+      affectsStock: false,
+      needsWarehouseItems: true,
+      allowsManualItems: true,
+      requiresOriginalInvoice: false,
     ),
   ];
 
@@ -248,7 +280,6 @@ class _InvoicePageState extends State<InvoicePage>
   @override
   void initState() {
     super.initState();
-    print(widget.itemsPurchase);
     selectedFilter = widget.type;
     _animationController = AnimationController(
       vsync: this,
@@ -287,27 +318,153 @@ class _InvoicePageState extends State<InvoicePage>
           state.lastInvoiceNumber = data['lastInvoiceNumber'] ?? 1;
         });
       }
+
       setState(() {
         taxController.text = state.showTax ? '14' : '0';
-        discountController.text =
-            state.showDiscount && discountController.text.isNotEmpty
-            ? discountController.text
-            : '0';
+        discountController.text = state.showDiscount ? '0' : '0';
       });
+
       if (widget.isFromWorkSpace) {
-        setState(() {
-          reCalculate = false;
-        });
+        setState(() => reCalculate = false);
       } else {
-        setState(() {
-          reCalculate = true;
-        });
+        setState(() => reCalculate = true);
       }
 
       final prefs = await SharedPreferences.getInstance();
       state.companyLogoPath = prefs.getString('logoPath${widget.groupId}');
     } catch (e) {
       debugPrint('Error loading settings: $e');
+    }
+  }
+
+  void _resetForNewType(String newType) {
+    setState(() {
+      selectedFilter = newType;
+      nameController.clear();
+      addressController.clear();
+      phoneController.clear();
+      notesController.clear();
+      widget.itemsPurchase.clear();
+      widget.itemsSale.clear();
+
+      // Clear items based on type
+      if (newType != 'بيع' && newType != 'عرض سعر') {
+        widget.itemsSale.clear();
+      }
+      if (newType != 'شراء' && newType != 'عرض سعر') {
+        widget.itemsPurchase.clear();
+      }
+
+      // Reset return-specific data
+      if (newType != 'مرتجع') {
+        state.originalInvoiceId = null;
+        state.originalInvoiceNumber = null;
+      }
+
+      selectedPaymentMethod = 'كاش';
+      paymentScheduleData = [
+        {
+          "type": "مدفوع",
+          "value": 0.0,
+          'valuePicked': false,
+          "date": DateTime.now(),
+          'datePicked': false,
+          "status": "تم",
+        },
+        {
+          "type": "مستحق",
+          "value": 0.0,
+          "valuePicked": false,
+          "date": DateTime.now().add(const Duration(days: 30)),
+          'datePicked': false,
+          "status": "!",
+        },
+      ];
+      paymentIndexes = [0, 1];
+    });
+    _animationController.forward(from: 0);
+    setState(() => reCalculate = true);
+  }
+
+  Future<void> _selectOriginalInvoice() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            MyInvoicesPage(groupId: widget.groupId, isSelectionMode: true),
+      ),
+    );
+
+    if (result != null && result is Map<String, dynamic>) {
+      setState(() {
+        state.originalInvoiceId = result['id'];
+        state.originalInvoiceNumber = result['invoiceNumber'];
+
+        // Auto-fill customer data from original invoice
+        final customer = result['customer'] as Map<String, dynamic>?;
+        if (customer != null) {
+          nameController.text = customer['name'] ?? '';
+          phoneController.text = customer['phone'] ?? '';
+          addressController.text = customer['address'] ?? '';
+        }
+
+        // Copy items for return (with negative quantities)
+        final items = result['items'] as List<dynamic>? ?? [];
+        widget.itemsSale.clear();
+        for (var item in items) {
+          widget.itemsSale.add({
+            'name': item['name'],
+            'quantity': -(item['quantity'] ?? 0).abs(), // Negative for return
+            'price': item['price'] ?? 0,
+            'originalItem': true, // Mark as from original invoice
+          });
+        }
+
+        reCalculate = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'تم اختيار الفاتورة الأصلية: ${result['invoiceNumber']}',
+          ),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    }
+  }
+
+  Color _getBackgroundColor(String type) {
+    switch (type) {
+      case 'بيع':
+        return AppColors.success;
+      case 'شراء':
+        return AppColors.primary;
+      case 'صيانة':
+        return AppColors.warning;
+      case 'مرتجع':
+        return AppColors.danger;
+      case 'عرض سعر':
+        return AppColors.secondary;
+      default:
+        return AppColors.background;
+    }
+  }
+
+  String _getTypeHint(String type) {
+    switch (type) {
+      case 'بيع':
+        return 'عند حفظ الفاتورة، سيتم خصم الكميات من المخزون';
+      case 'شراء':
+        return 'عند حفظ الفاتورة، سيتم إضافة الكميات إلى المخزون';
+      case 'مرتجع':
+        return 'سيتم إعادة الكميات إلى المخزون عند الحفظ';
+      case 'صيانة':
+        return 'إضافة بنود الصيانة يدوياً';
+      case 'عرض سعر':
+        return 'عرض سعر - لا يؤثر على المخزون';
+      default:
+        return '';
     }
   }
 
@@ -327,6 +484,7 @@ class _InvoicePageState extends State<InvoicePage>
         taxController.text = '14';
         discountController.text = '0';
         widget.itemsSale.clear();
+        widget.itemsPurchase.clear();
         selectedPaymentMethod = 'كاش';
         Navigator.popUntil(
           context,
@@ -335,17 +493,7 @@ class _InvoicePageState extends State<InvoicePage>
         return false;
       },
       child: Scaffold(
-        backgroundColor: selectedFilter == 'بيع'
-            ? AppColors.success
-            : selectedFilter == 'شراء'
-            ? AppColors.primary
-            : selectedFilter == 'صيانة'
-            ? AppColors.warning
-            : selectedFilter == 'مرتجع'
-            ? AppColors.danger
-            : selectedFilter == 'عرض سعر'
-            ? AppColors.secondary
-            : AppColors.background,
+        backgroundColor: _getBackgroundColor(selectedFilter),
         appBar: AppBar(
           title: const Text(
             'تسجيل فاتورة جديدة',
@@ -359,7 +507,10 @@ class _InvoicePageState extends State<InvoicePage>
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => MyInvoicesPage(groupId: widget.groupId),
+                    builder: (_) => MyInvoicesPage(
+                      groupId: widget.groupId,
+                      isSelectionMode: false,
+                    ),
                   ),
                 );
               },
@@ -375,15 +526,18 @@ class _InvoicePageState extends State<InvoicePage>
                       name: widget.name,
                       phone: widget.phone,
                       address: widget.address,
-                      items: widget.itemsSale,
+                      items: selectedFilter == 'بيع'
+                          ? widget.itemsSale
+                          : selectedFilter == 'شراء'
+                          ? widget.itemsPurchase
+                          : selectedFilter == 'عرض سعر'
+                          ? []
+                          : [],
                       customerId: widget.customerId,
                     ),
                   ),
                 );
-
-                if (result == true) {
-                  _loadSettings(); // 🔥 اعمل reload
-                }
+                if (result == true) _loadSettings();
               },
               icon: const Icon(Icons.settings_outlined),
             ),
@@ -427,51 +581,81 @@ class _InvoicePageState extends State<InvoicePage>
                         ),
                         backgroundColor: AppColors.surface,
                         side: BorderSide(color: AppColors.border, width: 2),
-                        onSelected: (_) {
-                          setState(() {
-                            selectedFilter = type.type;
-                            nameController.clear();
-                            addressController.clear();
-                            phoneController.clear();
-                            notesController.clear();
-                            print(selectedFilter);
-
-                            if (selectedFilter != 'بيع') {
-                              widget.itemsSale.clear();
-                            }
-                            if (selectedFilter != 'شراء') {
-                              widget.itemsPurchase.clear();
-                            }
-
-                            selectedPaymentMethod = 'كاش';
-                          });
-                          _animationController.forward(from: 0);
-                          setState(() {
-                            reCalculate = true;
-                          });
-                        },
+                        onSelected: (_) => _resetForNewType(type.type),
                       ),
                     ),
                   );
                 },
               ),
             ),
-            selectedFilter == 'بيع'
-                ? Text(
-                    'عند حفظ الفاتورة، سيتم خصم الكميات من المخزون',
-                    style: TextStyle(color: Colors.white),
-                  )
-                : selectedFilter == 'شراء'
-                ? Text(
-                    'عند حفظ الفاتورة، سيتم إضافة الكميات إلى المخزون',
-                    style: TextStyle(color: Colors.white),
-                  )
-                : selectedFilter == 'مرتجع'
-                ? Text(
-                    'عند حفظ الفاتورة، سيتم إعادة تعين الكميات إلى المخزون',
-                    style: TextStyle(color: Colors.white),
-                  )
-                : Container(),
+
+            // Type hint
+            if (_getTypeHint(selectedFilter).isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                child: Text(
+                  _getTypeHint(selectedFilter),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+
+            // Return invoice selector
+            if (selectedFilter == 'مرتجع')
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'الفاتورة الأصلية',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          if (state.originalInvoiceNumber != null)
+                            Text(
+                              state.originalInvoiceNumber!,
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: _selectOriginalInvoice,
+                      icon: const Icon(Icons.search),
+                      label: Text(
+                        state.originalInvoiceId == null
+                            ? 'اختيار فاتورة'
+                            : 'تغيير',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.danger,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // Invoice Content
             Expanded(
               child: InvoicePageDesign(
@@ -509,7 +693,7 @@ class InvoicePageDesign extends StatefulWidget {
   final String customerId;
   final bool isFromConstCustomers;
   final InvoiceState state;
-  final InvoiceType invoiceType;
+  final InvoiceTypeModel invoiceType;
   final bool reCalculate;
 
   const InvoicePageDesign({
@@ -537,13 +721,15 @@ TextEditingController nameController = TextEditingController();
 TextEditingController addressController = TextEditingController();
 TextEditingController phoneController = TextEditingController();
 TextEditingController notesController = TextEditingController();
-TextEditingController taxController = TextEditingController(
-  //  text: state.showTax ? '14' : '0',
-);
-TextEditingController discountController = TextEditingController(
-  // text: state.showDiscount ? discountController.text : '0',
-);
+TextEditingController taxController = TextEditingController();
+TextEditingController discountController = TextEditingController();
 String? selectedPaymentMethod = 'كاش';
+
+// For maintenance items (manual entry)
+List<Map<String, dynamic>> maintenanceItems = [];
+TextEditingController maintenanceDescController = TextEditingController();
+TextEditingController maintenancePriceController = TextEditingController();
+String? customerId;
 
 class _InvoicePageDesignState extends State<InvoicePageDesign> {
   final List<String> paymentMethods = ['كاش', 'آجل', 'تقسيط'];
@@ -554,6 +740,11 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     nameController = TextEditingController(
       text: widget.isFromConstCustomers ? widget.name : nameController.text,
     );
+    customerId = widget.isFromConstCustomers ? widget.customerId : customerId;
+    print(
+      '/////////////////////////////$customerId/////////////////////////////',
+    );
+
     addressController = TextEditingController(
       text: widget.isFromConstCustomers
           ? widget.address
@@ -564,21 +755,13 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     );
     notesController = TextEditingController();
     discountController = TextEditingController(
-      text: !state.showDiscount
-          ? '0'
-          : discountController.text.isNotEmpty
-          ? discountController.text
-          : '0',
+      text: !state.showDiscount ? '0' : '0',
     );
-    taxController = TextEditingController(
-      text: !state.showTax
-          ? '0'
-          : taxController.text.isNotEmpty
-          ? taxController.text
-          : '14',
-    );
+    taxController = TextEditingController(text: !state.showTax ? '0' : '14');
+    maintenanceDescController = TextEditingController();
+    maintenancePriceController = TextEditingController();
 
-    _calculateTotals();
+    // _calculateTotals();
   }
 
   @override
@@ -589,26 +772,48 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     notesController.dispose();
     taxController.dispose();
     discountController.dispose();
+    maintenanceDescController.dispose();
+    maintenancePriceController.dispose();
     super.dispose();
+  }
+
+  List<Map> get _currentItems {
+    switch (widget.type) {
+      case 'صيانة':
+        return maintenanceItems;
+      case 'شراء':
+        return widget.itemsPurchase;
+      case 'بيع':
+      case 'مرتجع':
+      case 'عرض سعر':
+      default:
+        return widget.itemsSale;
+    }
   }
 
   void _calculateTotals() {
     setState(() {
-      widget.state.priceSumItems =
-          widget.itemsSale.isNotEmpty && widget.type == 'بيع'
-          ? widget.itemsSale.fold(
-              0.0,
-              (sum, item) =>
-                  sum + ((item['price'] ?? 0) * (item['quantity'] ?? 1)),
-            )
-          : widget.state.priceSumItems =
-                widget.itemsPurchase.isNotEmpty && widget.type == 'شراء'
-                ? widget.itemsPurchase.fold(
-                    0.0,
-                    (sum, item) =>
-                        sum + ((item['price'] ?? 0) * (item['quantity'] ?? 1)),
-                  )
-                : 0.0;
+      double sum = 0.0;
+
+      if (widget.type == 'صيانة') {
+        sum = maintenanceItems.fold(
+          0.0,
+          (sum, item) => sum + ((item['price'] ?? 0) * (item['quantity'] ?? 1)),
+        );
+      } else if (widget.type == 'شراء') {
+        sum = widget.itemsPurchase.fold(
+          0.0,
+          (sum, item) => sum + ((item['price'] ?? 0) * (item['quantity'] ?? 1)),
+        );
+      } else {
+        sum = widget.itemsSale.fold(
+          0.0,
+          (sum, item) =>
+              sum + ((item['price'] ?? 0) * (item['quantity'] ?? 1).abs()),
+        );
+      }
+
+      widget.state.priceSumItems = sum;
 
       final discountPercent = double.tryParse(discountController.text) ?? 0;
       widget.state.discountValue =
@@ -695,7 +900,9 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
             Text('تأكيد'),
           ],
         ),
-        content: const Text('هل أنت متأكد من إعادة تعين جميع بيانات الفاتورة؟'),
+        content: const Text(
+          'هل أنت متأكد من إعادة تعيين جميع بيانات الفاتورة؟',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -704,7 +911,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           ElevatedButton(
             onPressed: () {
               setState(() {
-                data = [
+                paymentScheduleData = [
                   {
                     "type": "مدفوع",
                     "value": 0.0,
@@ -714,7 +921,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                     "status": "تم",
                   },
                   {
-                    "type": selectedPaymentMethod == 'آجل' ? "مستحق" : 'قسط 1',
+                    "type": "مستحق",
                     "value": 0.0,
                     "valuePicked": false,
                     "date": DateTime.now().add(const Duration(days: 30)),
@@ -722,6 +929,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                     "status": "!",
                   },
                 ];
+                maintenanceItems.clear();
               });
               nameController.clear();
               addressController.clear();
@@ -732,7 +940,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               widget.itemsSale.clear();
               widget.itemsPurchase.clear();
               selectedPaymentMethod = 'كاش';
-              indexes = [0, 1];
+              paymentIndexes = [0, 1];
               _calculateTotals();
               Navigator.pop(context);
             },
@@ -762,39 +970,59 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
   }
 
   Map<String, dynamic> buildInvoiceData() {
+    final List<Map<String, dynamic>> items = [];
+
+    if (widget.type == 'صيانة') {
+      items.addAll(
+        maintenanceItems.map(
+          (item) => {
+            "name": item['name'],
+            "quantity": item['quantity'] ?? 1,
+            "price": item['price'] ?? 0,
+            "total": (item['quantity'] ?? 1) * (item['price'] ?? 0),
+            "isManual": true,
+            'itemId': item['id'] ?? '',
+          },
+        ),
+      );
+    } else if (widget.type == 'شراء') {
+      items.addAll(
+        widget.itemsPurchase.map(
+          (item) => {
+            "name": item['name'],
+            "quantity": item['quantity'] ?? 0,
+            "price": item['price'] ?? 0,
+            "total": (item['quantity'] ?? 0) * (item['price'] ?? 0),
+            'itemId': item['id'] ?? '',
+          },
+        ),
+      );
+    } else {
+      items.addAll(
+        widget.itemsSale.map(
+          (item) => {
+            "name": item['name'],
+            "quantity": item['quantity'] ?? 0,
+            "price": item['price'] ?? 0,
+            "total": (item['quantity'] ?? 0).abs() * (item['price'] ?? 0),
+            "isReturn": widget.type == 'مرتجع',
+            'itemId': item['id'] ?? '',
+          },
+        ),
+      );
+    }
+
     return {
       "type": widget.type,
       "customer": {
-        "id": widget.customerId.isNotEmpty ? widget.customerId : null,
+        "id": customerId ?? '',
         "name": nameController.text.isNotEmpty ? nameController.text : null,
         "phone": phoneController.text.isNotEmpty ? phoneController.text : null,
         "address": addressController.text.isNotEmpty
             ? addressController.text
             : null,
       },
-      "items": widget.type == 'بيع'
-          ? widget.itemsSale
-                .map(
-                  (item) => {
-                    "name": item['name'],
-                    "quantity": item['quantity'] ?? 0,
-                    "price": item['price'] ?? 0,
-                    "total": (item['quantity'] ?? 0) * (item['price'] ?? 0),
-                  },
-                )
-                .toList()
-          : widget.type == 'شراء'
-          ? widget.itemsPurchase
-                .map(
-                  (item) => {
-                    "name": item['name'],
-                    "quantity": item['quantity'] ?? 0,
-                    "price": item['price'] ?? 0,
-                    "total": (item['quantity'] ?? 0) * (item['price'] ?? 0),
-                  },
-                )
-                .toList()
-          : [],
+      "items": items,
       "summary": {
         "subTotal": widget.state.priceSumItems,
         "discountPercent": double.tryParse(discountController.text) ?? 0,
@@ -809,32 +1037,98 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           "${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}",
       "createdAt": DateTime.now().toIso8601String(),
       'paymentMethod': selectedPaymentMethod,
+      if (widget.type == 'مرتجع') ...{
+        'originalInvoiceId': widget.state.originalInvoiceId,
+        'originalInvoiceNumber': widget.state.originalInvoiceNumber,
+      },
+      if (widget.type == 'عرض سعر') 'isQuote': true,
     };
   }
 
   Future<void> saveInvoice() async {
     final dataFinal = buildInvoiceData();
-    // final Map<String, dynamic> dataMap = data.asMap().cast<String, dynamic>();
+
     if (selectedPaymentMethod != 'كاش') {
-      for (int i = 0; i < data.length; i++) {
+      for (int i = 0; i < paymentScheduleData.length; i++) {
         dataFinal['payment${i + 1}'] = {
-          "type": data[i]['type'],
-          "value": data[i]['value'],
-          "date": data[i]['date'].toIso8601String(),
-          "status": data[i]['status'],
+          "type": paymentScheduleData[i]['type'],
+          "value": paymentScheduleData[i]['value'],
+          "date": paymentScheduleData[i]['date'].toIso8601String(),
+          "status": paymentScheduleData[i]['status'],
         };
       }
     }
+
+    // Save to Firestore
     await FirebaseFirestore.instance
         .collection('invoices')
         .doc(widget.groupId)
         .collection('items')
         .add(dataFinal);
+
+    // Update last invoice number
     await FirebaseFirestore.instance
         .collection('invoices')
         .doc(widget.groupId)
         .update({'lastInvoiceNumber': widget.state.lastInvoiceNumber + 1});
-    setState(() {});
+
+    // Update stock if needed
+    if (widget.invoiceType.affectsStock && widget.type != 'مرتجع') {
+      await _updateStock();
+    } else if (widget.type == 'مرتجع') {
+      await _restoreStock();
+    }
+  }
+
+  Future<void> _updateStock() async {
+    final items = widget.type == 'شراء'
+        ? widget.itemsPurchase
+        : widget.itemsSale;
+    final batch = FirebaseFirestore.instance.batch();
+
+    for (var item in items) {
+      if (item['id'] != null) {
+        final ref = FirebaseFirestore.instance
+            .collection('inventory')
+            .doc(widget.groupId)
+            .collection('items')
+            .doc(item['id']);
+
+        final doc = await ref.get();
+        if (doc.exists) {
+          final currentQty = (doc.data()?['quantity'] ?? 0) as num;
+          final newQty = widget.type == 'شراء'
+              ? currentQty + (item['quantity'] ?? 0)
+              : currentQty - (item['quantity'] ?? 0);
+          batch.update(ref, {'quantity': newQty});
+        }
+      }
+    }
+
+    await batch.commit();
+  }
+
+  Future<void> _restoreStock() async {
+    final batch = FirebaseFirestore.instance.batch();
+
+    for (var item in widget.itemsSale) {
+      if (item['id'] != null) {
+        final ref = FirebaseFirestore.instance
+            .collection('inventory')
+            .doc(widget.groupId)
+            .collection('items')
+            .doc(item['id']);
+
+        final doc = await ref.get();
+        if (doc.exists) {
+          final currentQty = (doc.data()?['quantity'] ?? 0) as num;
+          final returnedQty = (item['quantity'] ?? 0).abs();
+          batch.update(ref, {'quantity': currentQty + returnedQty});
+        }
+      }
+    }
+
+    await batch.commit();
   }
 
   String _getCustomerLabel() {
@@ -848,10 +1142,77 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     }
   }
 
+  void _addMaintenanceItem() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'إضافة بند صيانة',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: maintenanceDescController,
+              textAlign: TextAlign.right,
+              decoration: InputDecoration(
+                labelText: 'وصف البند',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: maintenancePriceController,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.right,
+              decoration: InputDecoration(
+                labelText: 'السعر',
+                suffixText: 'ج.م',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (maintenanceDescController.text.isNotEmpty &&
+                  maintenancePriceController.text.isNotEmpty) {
+                setState(() {
+                  maintenanceItems.add({
+                    'name': maintenanceDescController.text,
+                    'price':
+                        double.tryParse(maintenancePriceController.text) ?? 0,
+                    'quantity': 1,
+                  });
+                  maintenanceDescController.clear();
+                  maintenancePriceController.clear();
+                  _calculateTotals();
+                });
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('إضافة'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return loading
-        ? Center(
+        ? const Center(
             child: CircularProgressIndicator(
               strokeWidth: 4,
               valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
@@ -863,46 +1224,35 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  // Main Card
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Header
                           _buildHeader(),
                           const SizedBox(height: 20),
-
-                          // Invoice Info
                           _buildInvoiceInfo(),
                           const Divider(height: 32),
-                          // Customer Section
                           _buildCustomerSection(),
                           const Divider(height: 32),
-
-                          // Items Section
                           _buildItemsSection(),
                           const Divider(height: 32),
-
-                          // Totals
                           _buildTotalsSection(),
                           const Divider(height: 32),
+
                           if (widget.type == 'بيع' || widget.type == 'شراء')
                             _buildPaymentMethod(),
 
-                          // Due Payments (if applicable)
-                          if (selectedPaymentMethod == 'آجل' ||
-                              selectedPaymentMethod == 'تقسيط') ...[
+                          if ((selectedPaymentMethod == 'آجل' ||
+                                  selectedPaymentMethod == 'تقسيط') &&
+                              widget.type != 'عرض سعر') ...[
                             _buildDuePaymentsSection(),
                             const SizedBox(height: 20),
                           ],
 
-                          // Notes
                           _buildNotesSection(),
                           const SizedBox(height: 24),
-
-                          // Save Button
                           _buildSaveButton(widget.state.total),
                         ],
                       ),
@@ -964,7 +1314,9 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
 
   Widget _buildInvoiceInfo() {
     final formattedDate =
-        '${InvoiceState.selectedDate.year}-${InvoiceState.selectedDate.month.toString().padLeft(2, '0')}-${InvoiceState.selectedDate.day.toString().padLeft(2, '0')}';
+        '${InvoiceState.selectedDate.year}-'
+        '${InvoiceState.selectedDate.month.toString().padLeft(2, '0')}-'
+        '${InvoiceState.selectedDate.day.toString().padLeft(2, '0')}';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -995,9 +1347,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                   ),
                 );
                 if (picked != null) {
-                  setState(() {
-                    InvoiceState.selectedDate = picked;
-                  });
+                  setState(() => InvoiceState.selectedDate = picked);
                 }
               },
             ),
@@ -1086,9 +1436,9 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               return Expanded(
                 child: InkWell(
                   onTap: () => setState(() {
-                    indexes = [0, 1];
+                    paymentIndexes = [0, 1];
                     selectedPaymentMethod = method;
-                    data = [
+                    paymentScheduleData = [
                       {
                         "type": "مدفوع",
                         "value": 0.0,
@@ -1108,9 +1458,6 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                         "status": "!",
                       },
                     ];
-                    print(selectedPaymentMethod);
-
-                    print(data);
                   }),
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
@@ -1159,27 +1506,28 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                 color: AppColors.textPrimary,
               ),
             ),
-            TextButton.icon(
-              onPressed: () {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (_) => CustomersSuppliers(
-                      groupId: widget.groupId,
-                      itemsSale: widget.itemsSale.isEmpty
-                          ? []
-                          : widget.itemsSale,
-                      itemsPruchase: widget.itemsPurchase.isEmpty
-                          ? []
-                          : widget.itemsPurchase,
-                      isFromInvoice: true,
-                      invoiceType: widget.type,
+            if (widget.type != 'مرتجع')
+              TextButton.icon(
+                onPressed: () {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (_) => CustomersSuppliers(
+                        groupId: widget.groupId,
+                        itemsSale: widget.itemsSale.isEmpty
+                            ? []
+                            : widget.itemsSale,
+                        itemsPruchase: widget.itemsPurchase.isEmpty
+                            ? []
+                            : widget.itemsPurchase,
+                        isFromInvoice: true,
+                        invoiceType: widget.type,
+                      ),
                     ),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.people_outline, size: 18),
-              label: const Text('اختيار من القائمة'),
-            ),
+                  );
+                },
+                icon: const Icon(Icons.people_outline, size: 18),
+                label: const Text('اختيار من القائمة'),
+              ),
           ],
         ),
         const SizedBox(height: 12),
@@ -1228,47 +1576,48 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
   }
 
   Widget _buildItemsSection() {
+    final items = _currentItems;
+    final bool isMaintenance = widget.type == 'صيانة';
+    final bool isQuote = widget.type == 'عرض سعر';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'الأصناف',
-              style: TextStyle(
+            Text(
+              isMaintenance ? 'بنود الصيانة' : 'الأصناف',
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: AppColors.textPrimary,
               ),
             ),
-            Text(
-              widget.type == 'بيع'
-                  ? '${widget.itemsSale.length} صنف'
-                  : widget.type == 'شراء'
-                  ? '${widget.itemsPurchase.length} صنف'
-                  : '',
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
+            if (items.isNotEmpty)
+              Text(
+                '${items.length} ${isMaintenance ? 'بند' : 'صنف'}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
               ),
-            ),
           ],
         ),
         const SizedBox(height: 12),
 
-        if (widget.itemsSale.isEmpty && widget.itemsPurchase.isEmpty)
-          _buildEmptyItemsState()
+        if (items.isEmpty)
+          _buildEmptyItemsState(isMaintenance)
         else
-          _buildItemsList(),
+          _buildItemsList(items, isMaintenance),
 
         const SizedBox(height: 12),
-        _buildAddItemButton(),
+        _buildAddItemButton(isMaintenance, isQuote),
       ],
     );
   }
 
-  Widget _buildEmptyItemsState() {
+  Widget _buildEmptyItemsState(bool isMaintenance) {
     return Center(
       child: Container(
         padding: const EdgeInsets.all(32),
@@ -1280,19 +1629,25 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
         child: Column(
           children: [
             Icon(
-              Icons.inventory_2_outlined,
+              isMaintenance ? Icons.build_outlined : Icons.inventory_2_outlined,
               size: 48,
               color: AppColors.textSecondary.withOpacity(0.5),
             ),
             const SizedBox(height: 12),
-            const Text(
-              'لا توجد أصناف',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 15),
+            Text(
+              isMaintenance ? 'لا توجد بنود صيانة' : 'لا توجد أصناف',
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 15,
+              ),
             ),
             const SizedBox(height: 4),
-            const Text(
-              'أضف أصناف من المخزن',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            Text(
+              isMaintenance ? 'أضف بنود الصيانة' : 'أضف أصناف من المخزن',
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+              ),
             ),
           ],
         ),
@@ -1300,81 +1655,152 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     );
   }
 
-  Widget _buildItemsList() {
+  Widget _buildItemsList(List<Map> items, bool isMaintenance) {
     return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: widget.type == 'بيع'
-          ? widget.itemsSale.length
-          : widget.type == 'شراء'
-          ? widget.itemsPurchase.length
-          : widget.itemsSale.length,
+      itemCount: items.length,
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
-        final item = widget.type == 'بيع'
-            ? widget.itemsSale[index]
-            : widget.type == 'شراء'
-            ? widget.itemsPurchase[index]
-            : widget.itemsSale[index];
+        final item = items[index];
+        final quantity = (item['quantity'] ?? 0).abs();
+        final price = item['price'] ?? 0;
+        final total = quantity * price;
+        final bool isReturn =
+            item['isReturn'] == true || (item['quantity'] ?? 0) < 0;
 
-        final total = (item['quantity'] ?? 0) * (item['price'] ?? 0);
-
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
+        return Dismissible(
+          key: Key('item_$index'),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            color: AppColors.danger,
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.only(left: 16),
+            child: const Icon(Icons.delete, color: Colors.white),
+          ),
+          onDismissed: (_) {
+            setState(() {
+              if (isMaintenance) {
+                maintenanceItems.removeAt(index);
+              } else if (widget.type == 'شراء') {
+                widget.itemsPurchase.removeAt(index);
+              } else {
+                widget.itemsSale.removeAt(index);
+              }
+              _calculateTotals();
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: isReturn
+                        ? AppColors.danger.withOpacity(0.1)
+                        : AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    isMaintenance
+                        ? Icons.build_outlined
+                        : Icons.inventory_2_outlined,
+                    color: isReturn ? AppColors.danger : AppColors.primary,
+                    size: 20,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.inventory_2_outlined,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 3,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item['name'] ?? 'صنف غير معروف',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 3,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item['name'] ?? 'بند غير معروف',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
                       ),
-                    ),
-                    Text(
-                      '${item['quantity']} × ${item['price']?.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
+                      if (!isMaintenance)
+                        Text(
+                          '$quantity × ${price.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-              Text(
-                total.toStringAsFixed(2),
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                  color: AppColors.primary,
+                Text(
+                  total.toStringAsFixed(2),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: isReturn ? AppColors.danger : AppColors.primary,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  Widget _buildAddItemButton() {
+  Widget _buildAddItemButton(bool isMaintenance, bool isQuote) {
+    if (isMaintenance) {
+      return OutlinedButton.icon(
+        onPressed: _addMaintenanceItem,
+        icon: const Icon(Icons.add_circle_outline),
+        label: const Text('إضافة بند صيانة'),
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(double.infinity, 48),
+        ),
+      );
+    }
+
+    if (isQuote) {
+      return Column(
+        children: [
+          OutlinedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => StoreScreen(
+                    groupId: widget.groupId,
+                    isFromInvoice: true,
+                    deletedItems: widget.state.total == 0.0,
+                    invoiceType: widget.type,
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.warehouse_outlined),
+            label: const Text('اختيار من المخزن'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 48),
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () {
+              _showManualItemDialog();
+            },
+            icon: const Icon(Icons.edit_note),
+            label: const Text('إضافة صنف يدوي'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 48),
+            ),
+          ),
+        ],
+      );
+    }
+
     return OutlinedButton.icon(
       onPressed: widget.type == 'بيع'
           ? () {
@@ -1428,10 +1854,91 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
             },
       icon: const Icon(Icons.add_circle_outline),
       label: Text(
-        (widget.type == 'بيع') ? 'إختيـــار صنف من المخزن' : 'إضـــافة صنف',
+        widget.type == 'بيع' ? 'إختيـــار صنف من المخزن' : 'إضـــافة صنف',
       ),
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(double.infinity, 48),
+      ),
+    );
+  }
+
+  void _showManualItemDialog() {
+    final nameController = TextEditingController();
+    final priceController = TextEditingController();
+    final qtyController = TextEditingController(text: '1');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'إضافة صنف يدوي',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              textAlign: TextAlign.right,
+              decoration: InputDecoration(
+                labelText: 'اسم الصنف',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: priceController,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.right,
+              decoration: InputDecoration(
+                labelText: 'السعر',
+                //  suffixText: 'ج.م',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: qtyController,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.right,
+              decoration: InputDecoration(
+                labelText: 'الكمية',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (nameController.text.isNotEmpty &&
+                  priceController.text.isNotEmpty) {
+                setState(() {
+                  widget.itemsSale.add({
+                    'name': nameController.text,
+                    'price': double.tryParse(priceController.text) ?? 0,
+                    'quantity': int.tryParse(qtyController.text) ?? 1,
+                    'isManual': true,
+                  });
+                  _calculateTotals();
+                });
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('إضافة'),
+          ),
+        ],
       ),
     );
   }
@@ -1445,50 +1952,45 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
       ),
       child: Column(
         children: [
-          (!widget.state.showDiscount && !widget.state.showTax)
-              ? SizedBox.shrink()
-              : _buildTotalRow('المجموع الفرعي', widget.state.priceSumItems),
+          if (widget.state.showDiscount || widget.state.showTax)
+            _buildTotalRow('المجموع الفرعي', widget.state.priceSumItems),
           const SizedBox(height: 8),
-          widget.state.showDiscount
-              ? _buildEditableTotalRow(
-                  label: 'الخصم',
-                  controller: discountController,
-                  suffix: '%',
-                  calculatedValue: widget.state.discountValue,
-                  onEdit: () => _showEditDialog(
-                    title: 'تعديل نسبة الخصم',
-                    label: 'نسبة الخصم',
-                    controller: discountController,
-                    keyboardType: TextInputType.number,
-                    suffix: '%',
-                    onSave: _calculateTotals,
-                  ),
-                )
-              : SizedBox.shrink(),
+          if (widget.state.showDiscount)
+            _buildEditableTotalRow(
+              label: 'الخصم',
+              controller: discountController,
+              suffix: '%',
+              calculatedValue: widget.state.discountValue,
+              onEdit: () => _showEditDialog(
+                title: 'تعديل نسبة الخصم',
+                label: 'نسبة الخصم',
+                controller: discountController,
+                keyboardType: TextInputType.number,
+                suffix: '%',
+                onSave: _calculateTotals,
+              ),
+            ),
           const SizedBox(height: 8),
-          widget.state.showTax
-              ? _buildEditableTotalRow(
-                  label: 'الضريبة',
-                  controller: taxController,
-                  suffix: '%',
-                  calculatedValue: widget.state.taxValue,
-                  onEdit: () => _showEditDialog(
-                    title: 'تعديل نسبة الضريبة',
-                    label: 'نسبة الضريبة',
-                    controller: taxController,
-                    keyboardType: TextInputType.number,
-                    suffix: '%',
-                    onSave: _calculateTotals,
-                  ),
-                )
-              : SizedBox.shrink(),
-          (!widget.state.showDiscount && !widget.state.showTax)
-              ? SizedBox.shrink()
-              : const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Divider(),
-                ),
-
+          if (widget.state.showTax)
+            _buildEditableTotalRow(
+              label: 'الضريبة',
+              controller: taxController,
+              suffix: '%',
+              calculatedValue: widget.state.taxValue,
+              onEdit: () => _showEditDialog(
+                title: 'تعديل نسبة الضريبة',
+                label: 'نسبة الضريبة',
+                controller: taxController,
+                keyboardType: TextInputType.number,
+                suffix: '%',
+                onSave: _calculateTotals,
+              ),
+            ),
+          if (widget.state.showDiscount || widget.state.showTax)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Divider(),
+            ),
           _buildTotalRow(
             'الإجمالي الكلي',
             widget.state.total,
@@ -1507,20 +2009,13 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     Color? color,
   }) {
     if (widget.reCalculate) {
-      setState(() {
-        _calculateTotals();
-
-        if (isTotal) {
-          value = widget.state.total;
-        } else {
-          value = widget.state.priceSumItems;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() => _calculateTotals());
         }
       });
     }
 
-    print('xxxxxxxxxxxxxxxxxxxxxxxxx${widget.state.showTax}');
-    print('mmmmmmmmmmmmmmmmmmmmmmmmm${widget.state.total}');
-    print('yyyyyyyyyyyyyyyyyyyyyyyyy${widget.state.taxValue}');
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -1555,11 +2050,6 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     required double calculatedValue,
     required VoidCallback onEdit,
   }) {
-    if (widget.reCalculate) {
-      setState(() {
-        controller;
-      });
-    }
     return InkWell(
       onTap: onEdit,
       borderRadius: BorderRadius.circular(8),
@@ -1639,9 +2129,13 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
   }
 
   Widget _buildSaveButton(double total) {
-    final isValid =
-        widget.itemsSale.isNotEmpty ||
-        widget.itemsPurchase.isNotEmpty; // && nameController.text.isNotEmpty;
+    final bool hasItems = widget.type == 'صيانة'
+        ? maintenanceItems.isNotEmpty
+        : (widget.itemsSale.isNotEmpty || widget.itemsPurchase.isNotEmpty);
+
+    final bool isValid =
+        hasItems &&
+        (widget.type != 'مرتجع' || widget.state.originalInvoiceId != null);
 
     return SizedBox(
       width: double.infinity,
@@ -1649,9 +2143,9 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
       child: ElevatedButton.icon(
         onPressed: isValid ? () => _handleSave(total) : null,
         icon: const Icon(Icons.save_outlined, color: Colors.white),
-        label: const Text(
-          'حفظ وطباعة الفاتورة',
-          style: TextStyle(fontSize: 16, color: Colors.white),
+        label: Text(
+          widget.type == 'عرض سعر' ? 'حفظ عرض السعر' : 'حفظ وطباعة الفاتورة',
+          style: const TextStyle(fontSize: 16, color: Colors.white),
         ),
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.success,
@@ -1662,23 +2156,64 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
   }
 
   Future<void> _handleSave(double total) async {
-    double sum = data.fold(0.0, (sum, item) => sum + item['value']);
-    if (sum != total && selectedPaymentMethod != 'كاش') {
-      AwesomeDialog(
-        context: context,
-        dialogType: DialogType.error,
-        title: 'خطأ',
-        desc: 'لا يمكن ان يكون مجموع الأقساط لا يساوي المجموع الكلي',
-        btnOkText: 'حسنا',
-        btnOkOnPress: () {},
-      ).show();
-      return;
+    if (selectedPaymentMethod != 'كاش' && widget.type != 'عرض سعر') {
+      double sum = paymentScheduleData.fold(
+        0.0,
+        (sum, item) => sum + item['value'],
+      );
+      if (sum != total) {
+        AwesomeDialog(
+          context: context,
+          dialogType: DialogType.error,
+          title: 'خطأ',
+          desc: 'لا يمكن ان يكون مجموع الأقساط لا يساوي المجموع الكلي',
+          btnOkText: 'حسنا',
+          btnOkOnPress: () {},
+        ).show();
+        return;
+      }
     }
+
     try {
-      setState(() {
-        loading = true;
-      });
+      setState(() => loading = true);
       await saveInvoice();
+
+      // Prepare items for PDF
+      List<Map<String, dynamic>> pdfItems = [];
+      if (widget.type == 'صيانة') {
+        pdfItems = maintenanceItems
+            .map(
+              (item) => {
+                'name': item['name'],
+                'quantity': item['quantity'] ?? 1,
+                'price': item['price'] ?? 0,
+                'total': (item['quantity'] ?? 1) * (item['price'] ?? 0),
+              },
+            )
+            .toList();
+      } else if (widget.type == 'شراء') {
+        pdfItems = widget.itemsPurchase
+            .map(
+              (item) => {
+                'name': item['name'] ?? '',
+                'quantity': item['quantity'] ?? 0,
+                'price': item['price'] ?? 0,
+                'total': (item['quantity'] ?? 0) * (item['price'] ?? 0),
+              },
+            )
+            .toList();
+      } else {
+        pdfItems = widget.itemsSale
+            .map(
+              (item) => {
+                'name': item['name'] ?? '',
+                'quantity': (item['quantity'] ?? 0).abs(),
+                'price': item['price'] ?? 0,
+                'total': (item['quantity'] ?? 0).abs() * (item['price'] ?? 0),
+              },
+            )
+            .toList();
+      }
 
       await InvoiceGenerator.generateProfessionalInvoice(
         invoiceType: widget.type,
@@ -1688,29 +2223,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
         clientName: nameController.text,
         clientAddress: addressController.text,
         clientPhone: phoneController.text,
-        items: widget.type == 'بيع'
-            ? widget.itemsSale
-                  .map(
-                    (item) => {
-                      'name': item['name'] ?? '',
-                      'quantity': item['quantity'] ?? 0,
-                      'price': item['price'] ?? 0,
-                      'total': (item['quantity'] ?? 0) * (item['price'] ?? 0),
-                    },
-                  )
-                  .toList()
-            : widget.type == 'شراء'
-            ? widget.itemsPurchase
-                  .map(
-                    (item) => {
-                      'name': item['name'] ?? '',
-                      'quantity': item['quantity'] ?? 0,
-                      'price': item['price'] ?? 0,
-                      'total': (item['quantity'] ?? 0) * (item['price'] ?? 0),
-                    },
-                  )
-                  .toList()
-            : [],
+        items: pdfItems,
         subtotal: widget.state.priceSumItems,
         discount: widget.state.discountValue,
         tax: widget.state.taxValue,
@@ -1723,7 +2236,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
         companyLogoPath: widget.state.companyLogoPath,
         isDue: selectedPaymentMethod == 'آجل',
         isInstallment: selectedPaymentMethod == 'تقسيط',
-        dueDates: data,
+        dueDates: paymentScheduleData,
         showAddress: widget.state.showAddress,
         showEmail: widget.state.showEmail,
         showDiscount: widget.state.showDiscount,
@@ -1731,23 +2244,29 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
         showNotes: widget.state.showNotes,
         showPhone: widget.state.showPhone,
         showTax: widget.state.showTax,
+        isQuote: widget.type == 'عرض سعر',
+        originalInvoiceNumber: widget.state.originalInvoiceNumber,
       );
-      setState(() {
-        loading = false;
-      });
+
+      setState(() => loading = false);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 8),
-                Text('تم حفظ الفاتورة بنجاح'),
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Text(
+                  widget.type == 'عرض سعر'
+                      ? 'تم حفظ عرض السعر'
+                      : 'تم حفظ الفاتورة بنجاح',
+                ),
               ],
             ),
             backgroundColor: AppColors.success,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
+            shape: const RoundedRectangleBorder(
               borderRadius: BorderRadius.all(Radius.circular(12)),
             ),
           ),
@@ -1759,13 +2278,8 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           SnackBar(content: Text('خطأ: $e'), backgroundColor: AppColors.danger),
         );
       }
-      setState(() {
-        loading = false;
-      });
+      setState(() => loading = false);
     }
-    setState(() {
-      loading = false;
-    });
   }
 }
 
@@ -1787,7 +2301,7 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
 
   void editValue(int index) {
     final controller = TextEditingController(
-      text: data[index]['value'].toString(),
+      text: paymentScheduleData[index]['value'].toString(),
     );
     final formKey = GlobalKey<FormState>();
 
@@ -1805,10 +2319,7 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
             controller: controller,
             keyboardType: TextInputType.number,
             textAlign: TextAlign.right,
-            decoration: const InputDecoration(
-              labelText: 'المبلغ',
-              // suffixText: 'ج.م',
-            ),
+            decoration: const InputDecoration(labelText: 'المبلغ'),
             onTap: () {
               controller.selection = TextSelection(
                 baseOffset: 0,
@@ -1834,77 +2345,37 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
               if (formKey.currentState!.validate()) {
                 setState(() {
                   final value = double.tryParse(controller.text) ?? 0;
+                  paymentScheduleData[index]['value'] = value;
+                  paymentScheduleData[index]['valuePicked'] = true;
 
-                  data[index]['value'] = value;
-                  data[index]['valuePicked'] = true;
-                  double sum = data.fold(
-                    0.0,
-                    (sum, item) => sum + item['value'],
-                  );
-                  print(sum);
-                  // Auto-calculate the other row
+                  // Auto-calculate remaining
+                  double sum = paymentScheduleData
+                      .take(index + 1)
+                      .fold(
+                        0.0,
+                        (sum, item) => sum + (item['value'] as num).toDouble(),
+                      );
+                  double remaining = widget.total - sum;
 
-                  List otherIndexes = indexes;
-                  if (index == 0) {
-                    otherIndexes = indexes.where((item) => item != 0).toList();
-                    print(otherIndexes);
-                    for (var i in otherIndexes) {
-                      data[i]['value'] =
-                          (widget.total - value) / otherIndexes.length;
-                      data[i]['valuePicked'] = true;
+                  if (remaining > 0 && index < paymentScheduleData.length - 1) {
+                    for (
+                      int i = index + 1;
+                      i < paymentScheduleData.length;
+                      i++
+                    ) {
+                      if (index == paymentScheduleData.length - 1) {
+                        paymentScheduleData[i]['value'] = remaining;
+                        paymentScheduleData[i]['valuePicked'] = true;
+                      } else {
+                        paymentScheduleData[i]['value'] =
+                            remaining /
+                            (paymentScheduleData.length - index - 1);
+                        paymentScheduleData[i]['valuePicked'] = true;
+                      }
                     }
-                  } else if (index != 0 &&
-                      index != indexes.last - 1 &&
-                      index != indexes.last) {
-                    otherIndexes = indexes
-                        .where((item) => item > index)
-                        .toList();
-                    print(otherIndexes);
-                    double newSum = 0;
-
-                    for (int i = 0; i <= index; i++) {
-                      newSum += data[i]['value'];
-                    }
-                    print(',,,,,,,,,,,,,,,,,,,$newSum');
-                    for (var i in otherIndexes) {
-                      data[i]['value'] =
-                          (widget.total - newSum) / otherIndexes.length;
-                      data[i]['valuePicked'] = true;
-                    }
-                  } else if (index != 0 && index == indexes.last - 1) {
-                    double newSum = 0;
-
-                    for (int i = 0; i <= index; i++) {
-                      newSum += data[i]['value'];
-                    }
-                    data[indexes.last]['value'] = widget.total - newSum;
-                    data[indexes.last]['valuePicked'] = true;
-                  } else if (index != 0 &&
-                      index == indexes.last &&
-                      indexes.length == 2) {
-                    data[0]['value'] = widget.total - data[1]['value'];
-                    data[0]['valuePicked'] = true;
                   }
-
-                  /* else if (index != 0) {
-                    double newSum = 0;
-
-                    for (int i = 0; i <= index; i++) {
-                      newSum += data[i]['value'];
-                    }
-                    if (newSum > widget.total) {
-                      Navigator.pop(context);
-                      AwesomeDialog(
-                        context: context,
-                        title: 'خطأ',
-                        desc: 'لا يمكن ان يكون مجموع الاقساط أكبر من الإجمالي',
-                        btnOkText: 'حسنا',
-                        btnOkOnPress: () {},
-                      ).show();
-                    }
-                    return;
-                  } */
                 });
+                print(widget.total);
                 Navigator.pop(context);
               }
             },
@@ -1918,7 +2389,7 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
   Future<void> pickDate(int index) async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: data[index]['date'],
+      initialDate: paymentScheduleData[index]['date'],
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
       builder: (context, child) => Theme(
@@ -1931,26 +2402,20 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
 
     if (picked != null) {
       setState(() {
-        data[index]['date'] = picked;
-        data[index]['datePicked'] = true;
+        paymentScheduleData[index]['date'] = picked;
+        paymentScheduleData[index]['datePicked'] = true;
       });
     }
-    if (data[0]['datePicked'] = true) {
-      List otherIndexes = indexes;
-      otherIndexes = indexes.where((item) => item != 0).toList();
+    if (paymentScheduleData[0]['datePicked'] == true) {
+      List otherIndexes = paymentIndexes;
+      otherIndexes = paymentIndexes.where((item) => item != 0).toList();
       print(otherIndexes);
       for (var i in otherIndexes) {
         setState(() {
-          data[i]['datePicked'] = true;
+          paymentScheduleData[i]['datePicked'] = true;
         });
       }
     }
-  }
-
-  @override
-  void initState() {
-    // TODO: implement initState
-    super.initState();
   }
 
   @override
@@ -2015,8 +2480,8 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
               ),
 
               // Rows
-              ...List.generate(data.length, (index) {
-                final item = data[index];
+              ...List.generate(paymentScheduleData.length, (index) {
+                final item = paymentScheduleData[index];
                 return Container(
                   decoration: BoxDecoration(
                     border: Border(top: BorderSide(color: AppColors.border)),
@@ -2104,32 +2569,25 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
             ],
           ),
         ),
-        selectedPaymentMethod == 'تقسيط'
-            ? TextButton(
-                onPressed: () async {
-                  setState(() {
-                    data.add({
-                      "type": 'قسط ${data.length}',
-                      "value": 0.0,
-                      "valuePicked": false,
-                      // في السطر 1847 تقريباً، قم بتعديل إضافة التاريخ لتصبح هكذا:
-                      "date": DateTime(
-                        DateTime.now().year,
-                        DateTime.now().month +
-                            data.length, // زيادة عدد الأشهر بناءً على طول القائمة
-                        DateTime.now().day,
-                      ),
-
-                      'datePicked': false,
-                      "status": "!",
-                    });
-                  });
-                  indexes.add(indexes.length);
-                  print(indexes);
-                },
-                child: Text('إضافة قسط'),
-              )
-            : SizedBox.shrink(),
+        if (selectedPaymentMethod == 'تقسيط')
+          TextButton(
+            onPressed: () {
+              setState(() {
+                paymentScheduleData.add({
+                  "type": 'قسط ${paymentScheduleData.length}',
+                  "value": 0.0,
+                  "valuePicked": false,
+                  "date": DateTime.now().add(
+                    Duration(days: 30 * (paymentScheduleData.length)),
+                  ),
+                  'datePicked': false,
+                  "status": "!",
+                });
+              });
+              paymentIndexes.add(paymentIndexes.length);
+            },
+            child: const Text('إضافة قسط'),
+          ),
       ],
     );
   }
@@ -2137,7 +2595,9 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
 
 // ==================== PDF GENERATOR ====================
 
-// ==================== PDF THEME & COLORS ====================
+// ==================== PDF GENERATOR (CORRECTED & REDESIGNED) ====================
+
+// ==================== PDF GENERATOR (CORRECTED & REDESIGNED) ====================
 
 class PdfTheme {
   static const PdfColor primary = PdfColor.fromInt(0xFF2563EB);
@@ -2145,6 +2605,7 @@ class PdfTheme {
   static const PdfColor success = PdfColor.fromInt(0xFF10B981);
   static const PdfColor warning = PdfColor.fromInt(0xFFF59E0B);
   static const PdfColor danger = PdfColor.fromInt(0xFFEF4444);
+  static const PdfColor info = PdfColor.fromInt(0xFF0EA5E9);
   static const PdfColor textPrimary = PdfColor.fromInt(0xFF1E293B);
   static const PdfColor textSecondary = PdfColor.fromInt(0xFF64748B);
   static const PdfColor background = PdfColor.fromInt(0xFFF8FAFC);
@@ -2153,62 +2614,96 @@ class PdfTheme {
   static const PdfColor headerBg = PdfColor.fromInt(0xFF1E293B);
 }
 
-// ==================== INVOICE TYPE STYLING ====================
-
 class InvoiceTypeStyle {
-  final String title;
-  final String titleEnglish;
-  final PdfColor accentColor;
-  final String iconCode;
+  final String titleAr;
+  final String titleEn;
+  final PdfColor primaryColor;
+  final PdfColor lightColor;
+  final String badgeText;
 
   const InvoiceTypeStyle({
-    required this.title,
-    required this.titleEnglish,
-    required this.accentColor,
-    required this.iconCode,
+    required this.titleAr,
+    required this.titleEn,
+    required this.primaryColor,
+    required this.lightColor,
+    required this.badgeText,
   });
 }
 
 class InvoiceTypeStyles {
-  static final Map<String, InvoiceTypeStyle> styles = {
-    'sale': InvoiceTypeStyle(
-      title: 'فاتورة بيع',
-      titleEnglish: 'Sale Invoice',
-      accentColor: PdfTheme.success,
-      iconCode: '🛒',
+  static final Map<String, InvoiceTypeStyle> _styles = {
+    'بيع': InvoiceTypeStyle(
+      titleAr: 'فاتورة بيع',
+      titleEn: 'SALE INVOICE',
+      primaryColor: PdfTheme.success,
+      lightColor: PdfColor.fromInt(0xFFD1FAE5),
+      badgeText: 'SALE',
     ),
-    'purchase': InvoiceTypeStyle(
-      title: 'فاتورة شراء',
-      titleEnglish: 'Purchase Invoice',
-      accentColor: PdfTheme.primary,
-      iconCode: '📦',
+    'شراء': InvoiceTypeStyle(
+      titleAr: 'فاتورة شراء',
+      titleEn: 'PURCHASE INVOICE',
+      primaryColor: PdfTheme.primary,
+      lightColor: PdfColor.fromInt(0xFFDBEAFE),
+      badgeText: 'PURCHASE',
     ),
-    'maintenance': InvoiceTypeStyle(
-      title: 'فاتورة صيانة',
-      titleEnglish: 'Maintenance Invoice',
-      accentColor: PdfTheme.warning,
-      iconCode: '🔧',
+    'صيانة': InvoiceTypeStyle(
+      titleAr: 'فاتورة صيانة',
+      titleEn: 'MAINTENANCE INVOICE',
+      primaryColor: PdfTheme.warning,
+      lightColor: PdfColor.fromInt(0xFFFEF3C7),
+      badgeText: 'MAINTENANCE',
     ),
-    'return': InvoiceTypeStyle(
-      title: 'فاتورة مرتجع',
-      titleEnglish: 'Return Invoice',
-      accentColor: PdfTheme.danger,
-      iconCode: '↩️',
+    'مرتجع': InvoiceTypeStyle(
+      titleAr: 'فاتورة مرتجع',
+      titleEn: 'RETURN INVOICE',
+      primaryColor: PdfTheme.danger,
+      lightColor: PdfColor.fromInt(0xFFFEE2E2),
+      badgeText: 'RETURN',
     ),
-    'quote': InvoiceTypeStyle(
-      title: 'عرض سعر',
-      titleEnglish: 'Quotation',
-      accentColor: PdfColor.fromInt(0xFF0EA5E9),
-      iconCode: '📋',
+    'عرض سعر': InvoiceTypeStyle(
+      titleAr: 'عرض سعر',
+      titleEn: 'QUOTATION',
+      primaryColor: PdfTheme.info,
+      lightColor: PdfColor.fromInt(0xFFE0F2FE),
+      badgeText: 'QUOTE',
     ),
   };
 
   static InvoiceTypeStyle get(String type) {
-    return styles[type.toLowerCase()] ?? styles['sale']!;
+    return _styles[type.toLowerCase()] ?? _styles['بيع']!;
   }
 }
 
-// ==================== ENHANCED INVOICE GENERATOR ====================
+// Helper widget for bullet points (replaces Material Icons)
+pw.Widget _pdfBullet(PdfColor color, {double size = 8}) {
+  return pw.Container(
+    width: size,
+    height: size,
+    decoration: pw.BoxDecoration(
+      color: color,
+      borderRadius: pw.BorderRadius.circular(size / 2),
+    ),
+  );
+}
+
+// Helper widget for small labels (replaces icons with text)
+pw.Widget _pdfIconLabel(String label, PdfColor color, {double fontSize = 8}) {
+  return pw.Container(
+    padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+    decoration: pw.BoxDecoration(
+      color: color,
+      borderRadius: pw.BorderRadius.circular(4),
+    ),
+    child: pw.Text(
+      label,
+      style: pw.TextStyle(
+        fontSize: fontSize,
+        color: PdfColors.white,
+        fontWeight: pw.FontWeight.bold,
+      ),
+    ),
+  );
+}
 
 class InvoiceGenerator {
   static Future<Uint8List> generateProfessionalInvoice({
@@ -2239,13 +2734,14 @@ class InvoiceGenerator {
     bool? showNotes,
     bool? showTax,
     bool? showDiscount,
+    bool isQuote = false,
+    String? originalInvoiceNumber,
   }) async {
     final pdf = pw.Document();
 
     // Load fonts
     final arabicFont = await PdfGoogleFonts.cairoRegular();
     final arabicFontBold = await PdfGoogleFonts.cairoBold();
-    //  final arabicFontLight = await PdfGoogleFonts.cairoLight();
 
     // Load logo
     pw.MemoryImage? logoImage;
@@ -2254,609 +2750,682 @@ class InvoiceGenerator {
       logoImage = pw.MemoryImage(bytes);
     }
 
-    // Get invoice style
+    // Get invoice style based on type
     final style = InvoiceTypeStyles.get(invoiceType);
 
-    // Helper widgets
-    pw.Widget buildHeader() {
-      return pw.Container(
-        padding: const pw.EdgeInsets.all(20),
-        decoration: pw.BoxDecoration(
-          color: PdfTheme.headerBg,
-          borderRadius: const pw.BorderRadius.only(
-            topLeft: pw.Radius.circular(12),
-            topRight: pw.Radius.circular(12),
-          ),
-        ),
-        child: pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            // Company Info
-            pw.Expanded(
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text(
-                    companyName ?? 'اسم الشركة',
-                    style: pw.TextStyle(
-                      fontSize: 24,
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.white,
-                    ),
-                  ),
-                  pw.SizedBox(height: 8),
-                  if (companyAddress != null)
-                    pw.Row(
-                      children: [
-                        pw.Icon(
-                          pw.IconData(0xe0c8),
-                          size: 12,
-                          color: PdfColors.grey300,
-                        ),
-                        pw.SizedBox(width: 4),
-                        pw.Text(
-                          companyAddress,
-                          style: pw.TextStyle(
-                            fontSize: 10,
-                            color: PdfColors.grey300,
-                          ),
-                        ),
-                      ],
-                    ),
-                  pw.SizedBox(height: 4),
-                  if (companyPhone != null)
-                    pw.Row(
-                      children: [
-                        pw.Icon(
-                          pw.IconData(0xe0cd),
-                          size: 12,
-                          color: PdfColors.grey300,
-                        ),
-                        pw.SizedBox(width: 4),
-                        pw.Text(
-                          companyPhone,
-                          style: pw.TextStyle(
-                            fontSize: 10,
-                            color: PdfColors.grey300,
-                          ),
-                        ),
-                      ],
-                    ),
-                  pw.SizedBox(height: 4),
-                  if (companyEmail != null)
-                    pw.Row(
-                      children: [
-                        pw.Icon(
-                          pw.IconData(0xe0be),
-                          size: 12,
-                          color: PdfColors.grey300,
-                        ),
-                        pw.SizedBox(width: 4),
-                        pw.Text(
-                          companyEmail,
-                          style: pw.TextStyle(
-                            fontSize: 10,
-                            color: PdfColors.grey300,
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
-              ),
-            ),
+    // Pre-calculate values
+    final formattedDate =
+        '${invoiceDate.year}-${invoiceDate.month.toString().padLeft(2, '0')}-${invoiceDate.day.toString().padLeft(2, '0')}';
 
-            // Logo
-            if (logoImage != null)
-              pw.Container(
-                width: 80,
-                height: 80,
-                decoration: pw.BoxDecoration(
-                  color: PdfColors.white,
-                  borderRadius: pw.BorderRadius.circular(8),
-                ),
-                padding: const pw.EdgeInsets.all(8),
-                child: pw.Image(logoImage, fit: pw.BoxFit.contain),
-              ),
-          ],
-        ),
+    String paymentStatus;
+    PdfColor paymentColor;
+    if (isQuote) {
+      paymentStatus = 'عرض سعر';
+      paymentColor = PdfTheme.info;
+    } else if (isInstallment) {
+      paymentStatus = 'تقسيط';
+      paymentColor = PdfTheme.warning;
+    } else if (isDue) {
+      paymentStatus = 'آجل';
+      paymentColor = PdfTheme.warning;
+    } else {
+      paymentStatus = 'مدفوع';
+      paymentColor = PdfTheme.success;
+    }
+
+    String clientLabel;
+    if (invoiceType == 'شراء') {
+      clientLabel = 'المورد';
+    } else if (invoiceType == 'صيانة') {
+      clientLabel = 'العميل';
+    } else {
+      clientLabel = 'العميل';
+    }
+
+    String footerText;
+    if (isQuote) {
+      footerText = 'عرض سعر صالح لمدة 15 يوماً';
+    } else if (invoiceType == 'مرتجع') {
+      footerText = 'فاتورة مرتجعة - يتم إعادة الكميات للمخزون';
+    } else {
+      footerText = 'فاتورة إلكترونية - لا تحتاج توقيعاً';
+    }
+
+    // Table setup
+    List<String> headers;
+    Map<int, pw.Alignment> cellAlignments;
+    List<List<dynamic>> tableData;
+
+    if (invoiceType == 'صيانة') {
+      headers = ['الإجمالي', 'السعر', 'البند'];
+      cellAlignments = {
+        0: pw.Alignment.center,
+        1: pw.Alignment.center,
+        2: pw.Alignment.centerRight,
+      };
+    } else {
+      headers = ['الإجمالي', 'السعر', 'الكمية', 'الوصف'];
+      cellAlignments = {
+        0: pw.Alignment.center,
+        1: pw.Alignment.center,
+        2: pw.Alignment.center,
+        3: pw.Alignment.centerRight,
+      };
+    }
+
+    tableData = items.map((item) {
+      final qty = (item['quantity'] ?? 0) as num;
+      final price = (item['price'] ?? 0) as num;
+      final itemTotal = qty * price;
+
+      if (invoiceType == 'صيانة') {
+        return [
+          itemTotal.toStringAsFixed(2),
+          price.toStringAsFixed(2),
+          item['name']?.toString() ?? '',
+        ];
+      }
+      return [
+        itemTotal.toStringAsFixed(2),
+        price.toStringAsFixed(2),
+        qty.toString(),
+        item['name']?.toString() ?? '',
+      ];
+    }).toList();
+
+    // Helper function for consistent text styling
+    pw.TextStyle _textStyle({
+      double fontSize = 10,
+      PdfColor color = PdfTheme.textPrimary,
+      pw.FontWeight fontWeight = pw.FontWeight.normal,
+    }) {
+      return pw.TextStyle(
+        font: arabicFont,
+        fontBold: arabicFontBold,
+        fontSize: fontSize,
+        color: color,
+        fontWeight: fontWeight,
       );
     }
 
-    pw.Widget buildInvoiceBadge() {
-      return pw.Container(
-        padding: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        decoration: pw.BoxDecoration(
-          color: style.accentColor,
-          borderRadius: pw.BorderRadius.circular(8),
-        ),
-        child: pw.Column(
-          children: [
-            pw.Text(
-              style.title,
-              style: pw.TextStyle(
-                fontSize: 20,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.white,
-              ),
-            ),
-            pw.SizedBox(height: 4),
-            pw.Text(
-              style.titleEnglish,
-              style: pw.TextStyle(
-                fontSize: 11,
-                color: PdfColors.white,
-                fontWeight: pw.FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    pw.Widget buildInvoiceMeta() {
-      return pw.Container(
-        padding: const pw.EdgeInsets.all(16),
-        decoration: pw.BoxDecoration(
-          color: PdfTheme.background,
-          borderRadius: pw.BorderRadius.circular(8),
-        ),
-        child: pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text(
-                  'رقم الفاتورة',
-                  style: pw.TextStyle(
-                    fontSize: 9,
-                    color: PdfTheme.textSecondary,
-                  ),
-                ),
-                pw.SizedBox(height: 4),
-                pw.Text(
-                  invoiceNumber,
-                  style: pw.TextStyle(
-                    fontSize: 14,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfTheme.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-            pw.Container(width: 1, height: 30, color: PdfTheme.border),
-            pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text(
-                  'التاريخ',
-                  style: pw.TextStyle(
-                    fontSize: 9,
-                    color: PdfTheme.textSecondary,
-                  ),
-                ),
-                pw.SizedBox(height: 4),
-                pw.Text(
-                  '${invoiceDate.year}-${invoiceDate.month.toString().padLeft(2, '0')}-${invoiceDate.day.toString().padLeft(2, '0')}',
-                  style: pw.TextStyle(
-                    fontSize: 14,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfTheme.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-            pw.Container(width: 1, height: 30, color: PdfTheme.border),
-            pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text(
-                  'حالة الدفع',
-                  style: pw.TextStyle(
-                    fontSize: 9,
-                    color: PdfTheme.textSecondary,
-                  ),
-                ),
-                pw.SizedBox(height: 4),
-                pw.Container(
-                  padding: const pw.EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
-                  ),
-                  decoration: pw.BoxDecoration(
-                    color: isDue ? PdfTheme.warning : PdfTheme.success,
-                    borderRadius: pw.BorderRadius.circular(4),
-                  ),
-                  child: pw.Text(
-                    selectedPaymentMethod!,
-                    style: pw.TextStyle(
-                      fontSize: 11,
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
-    }
-
-    pw.Widget buildClientSection() {
-      return pw.Container(
-        padding: const pw.EdgeInsets.all(16),
-        decoration: pw.BoxDecoration(
-          border: pw.Border.all(color: PdfTheme.border),
-          borderRadius: pw.BorderRadius.circular(8),
-        ),
-        child: pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(
-              'بيانات العميل',
-              style: pw.TextStyle(
-                fontSize: 12,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfTheme.textSecondary,
-              ),
-            ),
-            pw.SizedBox(height: 12),
-            pw.Text(
-              clientName,
-              style: pw.TextStyle(
-                fontSize: 16,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfTheme.textPrimary,
-              ),
-            ),
-            pw.SizedBox(height: 6),
-            pw.Row(
-              children: [
-                pw.Icon(
-                  pw.IconData(0xe0c8),
-                  size: 10,
-                  color: PdfTheme.textSecondary,
-                ),
-                pw.SizedBox(width: 4),
-                pw.Expanded(
-                  child: pw.Text(
-                    clientAddress,
-                    style: pw.TextStyle(
-                      fontSize: 10,
-                      color: PdfTheme.textSecondary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            pw.SizedBox(height: 4),
-            pw.Row(
-              children: [
-                pw.Icon(
-                  pw.IconData(0xe0cd),
-                  size: 10,
-                  color: PdfTheme.textSecondary,
-                ),
-                pw.SizedBox(width: 4),
-                pw.Text(
-                  clientPhone,
-                  style: pw.TextStyle(
-                    fontSize: 10,
-                    color: PdfTheme.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
-    }
-
-    pw.Widget buildItemsTable() {
-      return pw.TableHelper.fromTextArray(
-        headers: ['الإجمالي', 'السعر', 'الكمية', 'الوصف'],
-        headerStyle: pw.TextStyle(
-          fontWeight: pw.FontWeight.bold,
-          color: PdfColors.white,
-          fontSize: 11,
-        ),
-        headerDecoration: pw.BoxDecoration(
-          color: style.accentColor,
-          borderRadius: const pw.BorderRadius.only(
-            topLeft: pw.Radius.circular(8),
-            topRight: pw.Radius.circular(8),
-          ),
-        ),
-        cellAlignment: pw.Alignment.center,
-        cellHeight: 40,
-        cellStyle: pw.TextStyle(fontSize: 10, color: PdfTheme.textPrimary),
-        oddRowDecoration: const pw.BoxDecoration(color: PdfTheme.background),
-        data: items.map((item) {
-          final qty = (item['quantity'] ?? 0) as num;
-          final price = (item['price'] ?? 0) as num;
-          final itemTotal = qty * price;
-          return [
-            itemTotal.toStringAsFixed(2),
-            price.toStringAsFixed(2),
-            qty.toString(),
-            item['name']?.toString() ?? '',
-          ];
-        }).toList(),
-      );
-    }
-
-    pw.Widget _buildSummaryRow(
+    pw.Widget _summaryRow(
       String label,
       double value, {
       bool isTotal = false,
       bool isDiscount = false,
     }) {
-      return pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-        children: [
-          pw.Text(
-            label,
-            style: pw.TextStyle(
-              fontSize: isTotal ? 12 : 10,
-              fontWeight: isTotal ? pw.FontWeight.bold : pw.FontWeight.normal,
-              color: isTotal ? PdfTheme.textPrimary : PdfTheme.textSecondary,
-            ),
-          ),
-          pw.Text(
-            '${value.toStringAsFixed(2)} ',
-            style: pw.TextStyle(
-              fontSize: isTotal ? 14 : 10,
-              fontWeight: isTotal ? pw.FontWeight.bold : pw.FontWeight.normal,
-              color: isDiscount
-                  ? PdfTheme.danger
-                  : (isTotal ? style.accentColor : PdfTheme.textPrimary),
-            ),
-          ),
-        ],
-      );
-    }
-
-    pw.Widget buildSummary() {
-      return pw.Container(
-        width: 240,
-        padding: const pw.EdgeInsets.all(16),
-        decoration: pw.BoxDecoration(
-          color: PdfTheme.background,
-          borderRadius: pw.BorderRadius.circular(8),
-          border: pw.Border.all(color: PdfTheme.border),
-        ),
-        child: pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(
-              'ملخص الفاتورة',
-              style: pw.TextStyle(
-                fontSize: 12,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfTheme.textSecondary,
-              ),
-            ),
-            pw.SizedBox(height: 12),
-            _buildSummaryRow('المجموع الفرعي:', subtotal),
-            pw.SizedBox(height: 8),
-            _buildSummaryRow('الخصم:', discount, isDiscount: true),
-            pw.SizedBox(height: 8),
-            _buildSummaryRow('الضريبة:', tax),
-            pw.Divider(color: PdfTheme.border, height: 20),
-            _buildSummaryRow('الإجمالي الكلي:', total, isTotal: true),
-          ],
-        ),
-      );
-    }
-
-    pw.Widget buildDueDates() {
-      if (!isDue /* || dueDates == null || dueDates.isEmpty || */ &&
-          !isInstallment)
-        return pw.SizedBox();
-
-      return pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.SizedBox(height: 20),
-          pw.Text(
-            'جدولة المدفوعات',
-            style: pw.TextStyle(
-              fontSize: 12,
-              fontWeight: pw.FontWeight.bold,
-              color: PdfTheme.textSecondary,
-            ),
-          ),
-          pw.SizedBox(height: 8),
-          pw.TableHelper.fromTextArray(
-            headers: ['الحالة', 'التاريخ', 'القيمة', 'النوع'],
-            headerStyle: pw.TextStyle(
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.white,
-              fontSize: 10,
-            ),
-            headerDecoration: const pw.BoxDecoration(color: PdfTheme.headerBg),
-            cellAlignment: pw.Alignment.center,
-            cellStyle: pw.TextStyle(fontSize: 9),
-            columnWidths: {
-              0: const pw.FlexColumnWidth(0.8),
-              1: const pw.FlexColumnWidth(1.2),
-              2: const pw.FlexColumnWidth(1),
-              3: const pw.FlexColumnWidth(1),
-            },
-            data: dueDates!.map((item) {
-              final date = item['date'] as DateTime;
-              final status = item['status']?.toString() ?? '';
-              final isPaid = status == 'تم';
-              return [
-                pw.Container(
-                  padding: const pw.EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: pw.BoxDecoration(
-                    color: isPaid ? PdfTheme.success : PdfTheme.warning,
-                    borderRadius: pw.BorderRadius.circular(4),
-                  ),
-                  child: pw.Text(
-                    status,
-                    style: pw.TextStyle(
-                      color: PdfColors.white,
-                      fontSize: 9,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                ),
-                '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
-                '${(item['value'] ?? 0.0).toStringAsFixed(2)} ',
-                item['type']?.toString() ?? '',
-              ];
-            }).toList(),
-          ),
-        ],
-      );
-    }
-
-    pw.Widget buildNotes() {
-      if (notes == null || notes.isEmpty) return pw.SizedBox();
-
-      return pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.SizedBox(height: 20),
-          pw.Container(
-            width: double.infinity,
-            padding: const pw.EdgeInsets.all(12),
-            decoration: pw.BoxDecoration(
-              color: PdfTheme.background,
-              borderRadius: pw.BorderRadius.circular(8),
-              border: pw.Border.all(color: PdfTheme.border),
-            ),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text(
-                  'ملاحظات',
-                  style: pw.TextStyle(
-                    fontSize: 10,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfTheme.textSecondary,
-                  ),
-                ),
-                pw.SizedBox(height: 4),
-                pw.Text(
-                  notes,
-                  style: pw.TextStyle(fontSize: 9, color: PdfTheme.textPrimary),
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
-
-    pw.Widget buildFooter() {
-      return pw.Container(
-        margin: const pw.EdgeInsets.only(top: 30),
-        padding: const pw.EdgeInsets.all(16),
-        decoration: pw.BoxDecoration(
-          color: PdfTheme.background,
-          borderRadius: pw.BorderRadius.circular(8),
-        ),
+      return pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(vertical: 2),
         child: pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
-            pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text(
-                  'شكراً لتعاملكم معنا',
-                  style: pw.TextStyle(
-                    fontSize: 10,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfTheme.textPrimary,
-                  ),
-                ),
-                pw.SizedBox(height: 4),
-                pw.Text(
-                  'هذه الفاتورة صادرة إلكترونياً ولا تحتاج توقيع',
-                  style: pw.TextStyle(
-                    fontSize: 8,
-                    color: PdfTheme.textSecondary,
-                  ),
-                ),
-              ],
+            pw.Text(
+              label,
+              style: _textStyle(
+                fontSize: isTotal ? 10 : 9,
+                color: isTotal ? PdfTheme.textPrimary : PdfTheme.textSecondary,
+                fontWeight: isTotal ? pw.FontWeight.bold : pw.FontWeight.normal,
+              ),
             ),
-            pw.BarcodeWidget(
-              barcode: pw.Barcode.qrCode(),
-              data: invoiceNumber,
-              width: 50,
-              height: 50,
+            pw.Text(
+              value.toStringAsFixed(2),
+              style: _textStyle(
+                fontSize: isTotal ? 12 : 10,
+                color: isDiscount
+                    ? PdfTheme.danger
+                    : (isTotal ? style.primaryColor : PdfTheme.textPrimary),
+                fontWeight: isTotal ? pw.FontWeight.bold : pw.FontWeight.normal,
+              ),
             ),
           ],
         ),
       );
     }
 
-    // Build PDF
+    // ==================== BUILD PDF ====================
     pdf.addPage(
       pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(24),
-        theme: pw.ThemeData.withFont(base: arabicFont, bold: arabicFontBold),
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(16),
+          theme: pw.ThemeData.withFont(base: arabicFont, bold: arabicFontBold),
+          buildBackground: isQuote
+              ? (context) => pw.FullPage(
+                  ignoreMargins: true,
+                  child: pw.Watermark(
+                    angle: 0.5,
+                    child: pw.Opacity(
+                      opacity: 0.06,
+                      child: pw.Text(
+                        'QUOTATION',
+                        style: pw.TextStyle(
+                          fontSize: 70,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfTheme.info,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              : null,
+        ),
         build: (context) => [
           pw.Directionality(
             textDirection: pw.TextDirection.rtl,
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                // Header with company info
-                buildHeader(),
-                pw.SizedBox(height: 20),
+                // ═══ HEADER + BADGE + META في صف واحد ═══
+                pw.Container(
+                  width: double.infinity,
+                  padding: const pw.EdgeInsets.all(16),
+                  decoration: pw.BoxDecoration(
+                    color: PdfTheme.headerBg,
+                    borderRadius: const pw.BorderRadius.only(
+                      topLeft: pw.Radius.circular(12),
+                      topRight: pw.Radius.circular(12),
+                    ),
+                  ),
+                  child: pw.Row(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      // شارة نوع الفاتورة
+                      pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        decoration: pw.BoxDecoration(
+                          color: style.primaryColor,
+                          borderRadius: pw.BorderRadius.circular(8),
+                        ),
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.center,
+                          children: [
+                            pw.Text(
+                              style.titleAr,
+                              style: _textStyle(
+                                fontSize: 14,
+                                color: PdfColors.white,
+                                fontWeight: pw.FontWeight.bold,
+                              ),
+                            ),
+                            pw.Text(
+                              style.titleEn,
+                              style: _textStyle(
+                                fontSize: 8,
+                                color: PdfColors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      pw.SizedBox(width: 12),
+                      // معلومات الشركة والفاتورة
+                      pw.Expanded(
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              companyName ?? 'اسم الشركة',
+                              style: _textStyle(
+                                fontSize: 18,
+                                color: PdfColors.white,
+                                fontWeight: pw.FontWeight.bold,
+                              ),
+                            ),
+                            pw.SizedBox(height: 6),
+                            // بيانات الشركة في سطر واحد
+                            pw.Wrap(
+                              spacing: 12,
+                              children: [
+                                if (companyPhone != null && showPhone != false)
+                                  pw.Text(
+                                    companyPhone,
+                                    style: _textStyle(
+                                      fontSize: 8,
+                                      color: PdfColors.grey400,
+                                    ),
+                                  ),
+                                if (companyAddress != null &&
+                                    showAddress != false)
+                                  pw.Text(
+                                    companyAddress,
+                                    style: _textStyle(
+                                      fontSize: 8,
+                                      color: PdfColors.grey400,
+                                    ),
+                                  ),
+                                if (companyEmail != null && showEmail != false)
+                                  pw.Text(
+                                    companyEmail,
+                                    style: _textStyle(
+                                      fontSize: 8,
+                                      color: PdfColors.grey400,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            pw.SizedBox(height: 6),
+                            // رقم + تاريخ + حالة في سطر واحد
+                            pw.Row(
+                              children: [
+                                if (!isQuote && invoiceType != 'مرتجع')
+                                  pw.Text(
+                                    'رقم: $invoiceNumber',
+                                    style: _textStyle(
+                                      fontSize: 9,
+                                      color: PdfColors.white,
+                                    ),
+                                  ),
+                                pw.SizedBox(width: 12),
 
-                // Invoice badge and meta
-                pw.Row(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Expanded(flex: 2, child: buildInvoiceBadge()),
-                    pw.SizedBox(width: 16),
-                    pw.Expanded(flex: 3, child: buildInvoiceMeta()),
-                  ],
-                ),
-                pw.SizedBox(height: 20),
-
-                // Client info
-                buildClientSection(),
-                pw.SizedBox(height: 24),
-
-                // Items
-                pw.Text(
-                  'تفاصيل الأصناف',
-                  style: pw.TextStyle(
-                    fontSize: 12,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfTheme.textSecondary,
+                                pw.SizedBox(width: 12),
+                                if (!isQuote && invoiceType != 'مرتجع')
+                                  pw.Container(
+                                    padding: const pw.EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: pw.BoxDecoration(
+                                      color: paymentColor,
+                                      borderRadius: pw.BorderRadius.circular(4),
+                                    ),
+                                    child: pw.Text(
+                                      paymentStatus,
+                                      style: _textStyle(
+                                        fontSize: 8,
+                                        color: PdfColors.white,
+                                        fontWeight: pw.FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      // اللوجو
+                      if (logoImage != null && showLogo != false)
+                        pw.Column(
+                          children: [
+                            pw.Container(
+                              width: 50,
+                              height: 50,
+                              decoration: pw.BoxDecoration(
+                                color: PdfColors.white,
+                                borderRadius: pw.BorderRadius.circular(8),
+                                border: pw.Border.all(
+                                  color: PdfTheme.border,
+                                  width: 0.5,
+                                ),
+                              ),
+                              padding: const pw.EdgeInsets.all(4),
+                              child: pw.Image(logoImage, fit: pw.BoxFit.fill),
+                            ),
+                            pw.Text(
+                              'التاريخ: $formattedDate',
+                              style: _textStyle(
+                                fontSize: 9,
+                                color: PdfColors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
                   ),
                 ),
-                pw.SizedBox(height: 8),
-                buildItemsTable(),
-                pw.SizedBox(height: 20),
+                pw.SizedBox(height: 12),
 
-                // Summary aligned right
+                // ═══ CLIENT SECTION (مضغوط في سطر واحد) ═══
+                if (clientName.isNotEmpty)
+                  pw.Container(
+                    width: double.infinity,
+                    padding: const pw.EdgeInsets.all(10),
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border.all(color: PdfTheme.border, width: 1),
+                      borderRadius: pw.BorderRadius.circular(8),
+                    ),
+                    child: pw.Row(
+                      children: [
+                        pw.Container(
+                          padding: const pw.EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: pw.BoxDecoration(
+                            color: style.lightColor,
+                            borderRadius: pw.BorderRadius.circular(4),
+                          ),
+                          child: pw.Text(
+                            clientLabel,
+                            style: _textStyle(
+                              fontSize: 9,
+                              color: style.primaryColor,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        pw.SizedBox(width: 12),
+                        pw.Text(
+                          clientName,
+                          style: _textStyle(
+                            fontSize: 13,
+                            color: PdfTheme.textPrimary,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                        pw.SizedBox(width: 12),
+                        pw.Expanded(
+                          child: pw.Wrap(
+                            spacing: 8,
+                            children: [
+                              if (clientAddress.isNotEmpty)
+                                pw.Text(
+                                  clientAddress,
+                                  style: _textStyle(
+                                    fontSize: 8,
+                                    color: PdfTheme.textSecondary,
+                                  ),
+                                ),
+                              if (clientPhone.isNotEmpty)
+                                pw.Text(
+                                  clientPhone,
+                                  style: _textStyle(
+                                    fontSize: 8,
+                                    color: PdfTheme.textSecondary,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        if (originalInvoiceNumber != null)
+                          pw.Container(
+                            padding: const pw.EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: pw.BoxDecoration(
+                              color: PdfTheme.danger,
+                              borderRadius: pw.BorderRadius.circular(4),
+                            ),
+                            child: pw.Text(
+                              'مرتجع من: $originalInvoiceNumber',
+                              style: _textStyle(
+                                fontSize: 8,
+                                color: PdfColors.white,
+                                fontWeight: pw.FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                pw.SizedBox(height: 12),
+
+                // ═══ ITEMS TABLE (مضغوط) ═══
+                pw.TableHelper.fromTextArray(
+                  headers: headers,
+                  headerStyle: _textStyle(
+                    fontSize: 10,
+                    color: PdfColors.white,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                  headerDecoration: pw.BoxDecoration(
+                    color: style.primaryColor,
+                    borderRadius: const pw.BorderRadius.only(
+                      topLeft: pw.Radius.circular(8),
+                      topRight: pw.Radius.circular(8),
+                    ),
+                  ),
+                  headerHeight: 28,
+                  cellHeight: 32,
+                  cellStyle: _textStyle(
+                    fontSize: 9,
+                    color: PdfTheme.textPrimary,
+                  ),
+                  cellAlignments: cellAlignments,
+                  oddRowDecoration: const pw.BoxDecoration(
+                    color: PdfTheme.background,
+                  ),
+                  border: pw.TableBorder(
+                    horizontalInside: pw.BorderSide(
+                      color: PdfTheme.border,
+                      width: 0.5,
+                    ),
+                  ),
+                  data: tableData,
+                ),
+                pw.SizedBox(height: 12),
+
+                // ═══ SUMMARY (أصغر) ═══
                 pw.Align(
                   alignment: pw.Alignment.centerLeft,
-                  child: buildSummary(),
+                  child: pw.Container(
+                    width: 220,
+                    padding: const pw.EdgeInsets.all(12),
+                    decoration: pw.BoxDecoration(
+                      color: PdfTheme.background,
+                      borderRadius: pw.BorderRadius.circular(8),
+                      border: pw.Border.all(color: PdfTheme.border, width: 1),
+                    ),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'الملخص',
+                          style: _textStyle(
+                            fontSize: 10,
+                            color: PdfTheme.textSecondary,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                        pw.SizedBox(height: 8),
+                        _summaryRow('المجموع:', subtotal),
+                        if (showDiscount != false && discount > 0)
+                          _summaryRow('الخصم:', discount, isDiscount: true),
+                        if (showTax != false && tax > 0)
+                          _summaryRow('الضريبة:', tax),
+                        pw.Divider(
+                          color: PdfTheme.border,
+                          height: 10,
+                          thickness: 0.5,
+                        ),
+                        pw.Container(
+                          padding: const pw.EdgeInsets.all(6),
+                          decoration: pw.BoxDecoration(
+                            color: style.lightColor,
+                            borderRadius: pw.BorderRadius.circular(6),
+                          ),
+                          child: _summaryRow('الإجمالي:', total, isTotal: true),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
 
-                // Due dates
-                buildDueDates(),
+                // Payment schedule (مضغوط)
+                if (dueDates != null &&
+                    dueDates.isNotEmpty &&
+                    (isDue || isInstallment) &&
+                    !isQuote)
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.SizedBox(height: 12),
+                      pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: pw.BoxDecoration(
+                          color: style.lightColor,
+                          borderRadius: pw.BorderRadius.circular(4),
+                        ),
+                        child: pw.Text(
+                          'المدفوعات',
+                          style: _textStyle(
+                            fontSize: 9,
+                            color: style.primaryColor,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      pw.SizedBox(height: 6),
+                      pw.TableHelper.fromTextArray(
+                        headers: ['الحالة', 'التاريخ', 'القيمة', 'النوع'],
+                        headerStyle: _textStyle(
+                          fontSize: 9,
+                          color: PdfColors.white,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                        headerDecoration: const pw.BoxDecoration(
+                          color: PdfTheme.headerBg,
+                        ),
+                        headerHeight: 24,
+                        cellHeight: 26,
+                        headerAlignments: {
+                          0: pw.Alignment.center,
+                          1: pw.Alignment.center,
+                          2: pw.Alignment.center,
+                          3: pw.Alignment.center,
+                        },
+                        cellAlignment: pw.Alignment.center,
+                        cellStyle: _textStyle(
+                          fontSize: 8,
+                          color: PdfTheme.textPrimary,
+                        ),
+                        columnWidths: {
+                          0: const pw.FlexColumnWidth(0.8),
+                          1: const pw.FlexColumnWidth(1.2),
+                          2: const pw.FlexColumnWidth(1),
+                          3: const pw.FlexColumnWidth(1),
+                        },
+                        border: pw.TableBorder(
+                          horizontalInside: pw.BorderSide(
+                            color: PdfTheme.border,
+                            width: 0.5,
+                          ),
+                        ),
+                        data: dueDates.map((item) {
+                          final date = item['date'] as DateTime;
+                          final status = item['status']?.toString() ?? '';
+                          final isPaid = status == 'تم';
+                          return [
+                            pw.Container(
+                              padding: const pw.EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: pw.BoxDecoration(
+                                color: isPaid
+                                    ? PdfTheme.success
+                                    : PdfTheme.warning,
+                                borderRadius: pw.BorderRadius.circular(4),
+                              ),
+                              child: pw.Text(
+                                status,
+                                style: _textStyle(
+                                  fontSize: 8,
+                                  color: PdfColors.white,
+                                  fontWeight: pw.FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+                            '${(item['value'] ?? 0.0).toStringAsFixed(2)}',
+                            item['type']?.toString() ?? '',
+                          ];
+                        }).toList(),
+                      ),
+                    ],
+                  ),
 
-                // Notes
-                buildNotes(),
+                // Notes (مضغوط)
+                if (notes != null && notes.isNotEmpty && showNotes != false)
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.SizedBox(height: 12),
+                      pw.Container(
+                        width: double.infinity,
+                        padding: const pw.EdgeInsets.all(10),
+                        decoration: pw.BoxDecoration(
+                          color: PdfTheme.background,
+                          borderRadius: pw.BorderRadius.circular(8),
+                          border: pw.Border.all(
+                            color: PdfTheme.border,
+                            width: 1,
+                          ),
+                        ),
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              'ملاحظات',
+                              style: _textStyle(
+                                fontSize: 10,
+                                color: PdfTheme.textSecondary,
+                                fontWeight: pw.FontWeight.bold,
+                              ),
+                            ),
+                            pw.SizedBox(height: 4),
+                            pw.Text(
+                              notes,
+                              style: _textStyle(
+                                fontSize: 9,
+                                color: PdfTheme.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
 
-                // Footer
-                buildFooter(),
+                // ═══ FOOTER (مضغوط) ═══
+                pw.Container(
+                  margin: const pw.EdgeInsets.only(top: 16),
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    color: PdfTheme.background,
+                    borderRadius: pw.BorderRadius.circular(8),
+                  ),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Expanded(
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              'شكراً لتعاملكم معنا',
+                              style: _textStyle(
+                                fontSize: 10,
+                                color: PdfTheme.textPrimary,
+                                fontWeight: pw.FontWeight.bold,
+                              ),
+                            ),
+                            pw.SizedBox(height: 2),
+                            pw.Text(
+                              footerText,
+                              style: _textStyle(
+                                fontSize: 7,
+                                color: PdfTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      pw.BarcodeWidget(
+                        barcode: pw.Barcode.qrCode(),
+                        data: invoiceNumber,
+                        width: 40,
+                        height: 40,
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -2866,14 +3435,16 @@ class InvoiceGenerator {
 
     final bytes = await pdf.save();
 
+    // Print
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat format) async => pdf.save(),
-      name: 'فاتورة رقم $invoiceNumber.pdf',
+      name: '${isQuote ? 'عرض_سعر' : 'فاتورة'}_$invoiceNumber.pdf',
     );
 
+    // Share
     await Printing.sharePdf(
       bytes: await pdf.save(),
-      filename: 'فاتورة رقم $invoiceNumber.pdf',
+      filename: '${isQuote ? 'عرض_سعر' : 'فاتورة'}_$invoiceNumber.pdf',
     );
 
     return bytes;

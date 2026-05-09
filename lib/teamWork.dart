@@ -124,7 +124,7 @@ class _TeamScreenState extends State<TeamScreen> {
     );
   }
 
-  getVariables() async {
+  Future<void> getVariables() async {
     final doc = await FirebaseFirestore.instance
         .collection('variables')
         .doc('kotb')
@@ -139,7 +139,7 @@ class _TeamScreenState extends State<TeamScreen> {
     maxMembers = data!['maxMembers'];
   }
 
-  getAdmins() async {
+  Future<void> getAdmins() async {
     admins.clear();
     final doc = await FirebaseFirestore.instance
         .collection('teams')
@@ -568,7 +568,7 @@ void openWhatsApp(String phoneNumber, String message) async {
   }
 }
 
-removeMemberFromGroupAndTeam({
+Future<void> removeMemberFromGroupAndTeam({
   required String groupId,
   required String memberId,
 }) async {
@@ -697,7 +697,7 @@ Future<void> generateTeamMembersPdf(
                           _buildCell(member['name'] ?? "---"),
                         ],
                       );
-                    }).toList(),
+                    }),
                   ],
                 ),
               ],

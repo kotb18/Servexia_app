@@ -17,7 +17,7 @@ List<dynamic> admins = [];
 User? user;
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({Key? key}) : super(key: key);
+  const SplashScreen({super.key});
   static const String screenroute = 'splsh';
 
   @override
@@ -30,7 +30,7 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _animation;
 
   Future<void> checkAndNavigate() async {
-    user = await FirebaseAuth.instance.currentUser;
+    user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       print('kotb');
       await Navigator.pushReplacement(

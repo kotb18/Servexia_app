@@ -766,7 +766,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
 
         return DropdownButtonFormField<String>(
           decoration: _dropdownDecoration('اختر رقم المعدة'),
-          value: selectedAssetId,
+          initialValue: selectedAssetId,
           items: docs.map((doc) {
             return DropdownMenuItem<String>(
               value: doc.id,
@@ -805,7 +805,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   }) {
     return DropdownButtonFormField<String>(
       decoration: _dropdownDecoration(hint),
-      value: value,
+      initialValue: value,
       items: items
           .map((s) => DropdownMenuItem(value: s, child: Text(s)))
           .toList(),

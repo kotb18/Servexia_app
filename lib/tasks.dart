@@ -11,7 +11,7 @@ class TasksScreen extends StatefulWidget {
   final String groupId;
   final bool isAdmin;
 
-  TasksScreen({super.key, required this.groupId, required this.isAdmin});
+  const TasksScreen({super.key, required this.groupId, required this.isAdmin});
 
   static const String screenroute = 'tasks';
 
@@ -287,7 +287,7 @@ class _TasksScreenState extends State<TasksScreen> {
                             SizedBox(width: 10),
                             ElevatedButton.icon(
                               onPressed: () async {
-                                await showComments(task.id);
+                                showComments(task.id);
                               },
                               label: Text('عرض التعليقات'),
                               icon: Icon(Icons.comment_bank),
@@ -412,7 +412,7 @@ class _TasksScreenState extends State<TasksScreen> {
     );
   }
 
-  addComment(String taskId) async {
+  Future<void> addComment(String taskId) async {
     commentController = TextEditingController();
     String? name;
 
@@ -506,7 +506,7 @@ class _TasksScreenState extends State<TasksScreen> {
     );
   }
 
-  showComments(String taskId) {
+  void showComments(String taskId) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,

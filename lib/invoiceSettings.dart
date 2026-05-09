@@ -392,7 +392,7 @@ class _InvoiceSettingsPageState extends State<InvoiceSettingsPage> {
       title: Text(title, style: const TextStyle(fontSize: 16)),
       value: value,
       onChanged: onChanged,
-      activeColor: Colors.blue.shade800,
+      activeThumbColor: Colors.blue.shade800,
     );
   }
 }

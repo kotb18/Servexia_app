@@ -31,7 +31,7 @@ class _CreategroupState extends State<Creategroup> {
   static String _localKey(String uid) => 'face_data_$uid';
   final _formKey = GlobalKey<FormState>();
   final egyptPhoneRegex = RegExp(r'^(?:\+20|0)?1[0125][0-9]{8}$');
-  TextEditingController _areaController = TextEditingController();
+  final TextEditingController _areaController = TextEditingController();
   final _groupNameController = TextEditingController();
   final _purposeController = TextEditingController();
   final _adminController = TextEditingController();
@@ -105,7 +105,7 @@ class _CreategroupState extends State<Creategroup> {
   }
 
   /// 🔹 التحقق من حالة الاشتراك
-  _checkSubscriptionStatus() {
+  void _checkSubscriptionStatus() {
     FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
@@ -174,7 +174,7 @@ class _CreategroupState extends State<Creategroup> {
 
   /// 🔹 معالجة منطق إنشاء المجموعة (الاشتراك + التجربة)
   Future<void> _handleGroupCreation() async {
-    await _checkSubscriptionStatus();
+    _checkSubscriptionStatus();
     setState(() => _loading = true);
 
     try {

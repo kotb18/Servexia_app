@@ -84,7 +84,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
         child: ListView.separated(
           shrinkWrap: true,
           itemCount: units.length,
-          separatorBuilder: (_, __) =>
+          separatorBuilder: (_, _) =>
               Divider(height: 1, color: Colors.grey.shade200),
           itemBuilder: (context, index) {
             final u = units[index];
@@ -167,7 +167,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
         child: ListView.separated(
           shrinkWrap: true,
           itemCount: locations.length,
-          separatorBuilder: (_, __) =>
+          separatorBuilder: (_, _) =>
               Divider(height: 1, color: Colors.grey.shade200),
           itemBuilder: (context, index) {
             final u = locations[index];
@@ -406,7 +406,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                 notesController.clear();
                 priceController.clear();
                 // barcodeController.clear();
-                T? _getDynamicValue<T>(
+                T? getDynamicValue<T>(
                   Map<String, dynamic> data,
                   List<String> keys,
                 ) {
@@ -452,7 +452,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                   if (data is Map<String, dynamic>) {
                     // Try multiple common keys for product name
                     final name =
-                        _getDynamicValue<String>(data, [
+                        getDynamicValue<String>(data, [
                           'name',
                           'title',
                           'product_name',
@@ -460,7 +460,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                         '';
                     // Try multiple common keys for barcode
                     final barcode =
-                        _getDynamicValue<String>(data, [
+                        getDynamicValue<String>(data, [
                           'barcode',
                           'upc',
                           'ean',
@@ -470,7 +470,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                         '';
                     // Try multiple common keys for price
                     final price =
-                        _getDynamicValue<double>(data, [
+                        getDynamicValue<double>(data, [
                           'price',
                           'unit_price',
                           'item_price',

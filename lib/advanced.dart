@@ -7,7 +7,7 @@ import 'services.dart';
 class StatisticsPage extends StatelessWidget {
   final String groupId;
 
-  const StatisticsPage({Key? key, required this.groupId}) : super(key: key);
+  const StatisticsPage({super.key, required this.groupId});
 
   @override
   Widget build(BuildContext context) {
@@ -257,7 +257,7 @@ class StatisticsPage extends StatelessWidget {
 class AdvancedSearchPage extends StatefulWidget {
   final String groupId;
 
-  const AdvancedSearchPage({Key? key, required this.groupId}) : super(key: key);
+  const AdvancedSearchPage({super.key, required this.groupId});
 
   @override
   State<AdvancedSearchPage> createState() => _AdvancedSearchPageState();
@@ -542,8 +542,7 @@ class _AdvancedSearchPageState extends State<AdvancedSearchPage> {
 class ExportInvoicesWidget extends StatelessWidget {
   final List<Invoice> invoices;
 
-  const ExportInvoicesWidget({Key? key, required this.invoices})
-    : super(key: key);
+  const ExportInvoicesWidget({super.key, required this.invoices});
 
   /// تصدير الفواتير إلى CSV
   String _generateCSV() {

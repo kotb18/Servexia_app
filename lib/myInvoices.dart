@@ -8,8 +8,13 @@ import 'services.dart';
 /// صفحة MyInvoices الرئيسية (محدثة مع دعم الأقساط والـ Pagination)
 class MyInvoicesPage extends StatefulWidget {
   final String groupId;
+  final bool isSelectionMode;
 
-  const MyInvoicesPage({Key? key, required this.groupId}) : super(key: key);
+  const MyInvoicesPage({
+    super.key,
+    required this.groupId,
+    required this.isSelectionMode,
+  });
 
   @override
   State<MyInvoicesPage> createState() => _MyInvoicesPageState();
@@ -27,7 +32,7 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
   String _selectedInstallmentStatus = 'الكل';
 
   // للـ Pagination
-  List<Invoice> _allInvoices = [];
+  final List<Invoice> _allInvoices = [];
   DocumentSnapshot? _lastDocument;
   bool _isLoadingMore = false;
   bool _hasMoreData = true;
@@ -460,8 +465,7 @@ class InvoiceCard extends StatelessWidget {
   final Invoice invoice;
   final VoidCallback onTap;
 
-  const InvoiceCard({Key? key, required this.invoice, required this.onTap})
-    : super(key: key);
+  const InvoiceCard({super.key, required this.invoice, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -721,7 +725,7 @@ class FilterPanel extends StatefulWidget {
   final VoidCallback onReset;
 
   const FilterPanel({
-    Key? key,
+    super.key,
     required this.selectedType,
     required this.selectedPaymentMethod,
     required this.selectedInstallmentStatus,
@@ -729,7 +733,7 @@ class FilterPanel extends StatefulWidget {
     required this.endDate,
     required this.onApply,
     required this.onReset,
-  }) : super(key: key);
+  });
 
   @override
   State<FilterPanel> createState() => _FilterPanelState();
@@ -888,7 +892,7 @@ class _FilterPanelState extends State<FilterPanel> {
                   initialDate: _startDate ?? DateTime.now(),
                   firstDate: DateTime(2020),
                   lastDate: DateTime.now(),
-                  locale: const Locale('ar', 'SA'),
+                  // locale: const Locale('ar', 'SA'),
                 );
                 if (date != null) {
                   setState(() {
@@ -938,7 +942,7 @@ class _FilterPanelState extends State<FilterPanel> {
                   initialDate: _endDate ?? DateTime.now(),
                   firstDate: DateTime(2020),
                   lastDate: DateTime.now(),
-                  locale: const Locale('ar', 'SA'),
+                  //  locale: const Locale('ar', 'SA'),
                 );
                 if (date != null) {
                   setState(() {
@@ -1078,10 +1082,10 @@ class InvoiceDetailPage extends StatefulWidget {
   final String groupId;
 
   const InvoiceDetailPage({
-    Key? key,
+    super.key,
     required this.invoice,
     required this.groupId,
-  }) : super(key: key);
+  });
 
   @override
   State<InvoiceDetailPage> createState() => _InvoiceDetailPageState();
@@ -1365,18 +1369,18 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                     const SizedBox(height: 12),
                     _buildSummaryRow(
                       'الإجمالي الفرعي',
-                      '${_currentInvoice.summary.subTotal.toStringAsFixed(2)} ريال',
+                      '${_currentInvoice.summary.subTotal.toStringAsFixed(2)} ',
                     ),
                     if (_currentInvoice.summary.discountValue > 0)
                       _buildSummaryRow(
                         'الخصم (${_currentInvoice.summary.discountPercent.toStringAsFixed(1)}%)',
-                        '-${_currentInvoice.summary.discountValue.toStringAsFixed(2)} ريال',
+                        '-${_currentInvoice.summary.discountValue.toStringAsFixed(2)} ',
                         isDiscount: true,
                       ),
                     if (_currentInvoice.summary.taxValue > 0)
                       _buildSummaryRow(
                         'الضريبة (${_currentInvoice.summary.taxPercent.toStringAsFixed(1)}%)',
-                        '${_currentInvoice.summary.taxValue.toStringAsFixed(2)} ريال',
+                        '${_currentInvoice.summary.taxValue.toStringAsFixed(2)} ',
                       ),
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),

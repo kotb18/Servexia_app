@@ -27,7 +27,7 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
   final assetNumberController = TextEditingController();
 
   bool loading = false;
-  getVariables() async {
+  Future<void> getVariables() async {
     final doc = await FirebaseFirestore.instance
         .collection('variables')
         .doc('kotb')
@@ -42,7 +42,7 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
     maxAssets = data!['maxAssets'];
   }
 
-  getCurrentAssetNumber() async {
+  Future<void> getCurrentAssetNumber() async {
     final snap = await FirebaseFirestore.instance
         .collection('assets')
         .doc(widget.groupId)

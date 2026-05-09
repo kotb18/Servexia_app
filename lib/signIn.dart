@@ -45,10 +45,9 @@ class _LoginState extends State<Login> {
             '840926699694-qslfjros665j55vtofid6rghqe4qsiii.apps.googleusercontent.com',
       );
 
-      final GoogleSignInAccount? googleUser = await googleSignIn.authenticate();
+      final GoogleSignInAccount googleUser = await googleSignIn.authenticate();
 
-      if (googleUser == null) return;
-      final googleAuth = await googleUser.authentication;
+      final googleAuth = googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.idToken,
         idToken: googleAuth.idToken,
@@ -216,7 +215,7 @@ class _LoginState extends State<Login> {
   }
 
   Future<void> getAdmins() async {
-    user = await FirebaseAuth.instance.currentUser;
+    user = FirebaseAuth.instance.currentUser;
     final doc = await FirebaseFirestore.instance
         .collection('admins')
         .doc('masry')

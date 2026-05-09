@@ -94,7 +94,7 @@ class _HomepageState extends State<Homepage>
 
   bool isMainAdmin = false;
   String? token = '';
-  getVariables() async {
+  Future<void> getVariables() async {
     final doc = await FirebaseFirestore.instance
         .collection('variables')
         .doc('kotb')
@@ -136,7 +136,7 @@ class _HomepageState extends State<Homepage>
     _controller.forward();
   }
 
-  getToken() async {
+  Future<void> getToken() async {
     token = await FirebaseMessaging.instance.getToken();
   }
 
@@ -793,12 +793,12 @@ class HexagonImage extends StatelessWidget {
   }
 }
 
-removeMemberFromGroupAndTeam({
+Future<void> removeMemberFromGroupAndTeam({
   required String groupId,
   required String memberId,
 }) async {
   print('ahmed kotb');
-  final firestore = await FirebaseFirestore.instance;
+  final firestore = FirebaseFirestore.instance;
   await firestore
       .collection('faceEmbedding')
       .doc(groupId)
@@ -930,7 +930,7 @@ void _showAboutDialog(BuildContext context) {
     barrierLabel: 'AboutApp',
     barrierColor: Colors.black.withOpacity(0.5),
     transitionDuration: const Duration(milliseconds: 300),
-    pageBuilder: (_, __, ___) {
+    pageBuilder: (_, _, _) {
       return Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
@@ -1068,7 +1068,7 @@ void _showAboutDialog(BuildContext context) {
         ),
       );
     },
-    transitionBuilder: (_, animation, __, child) {
+    transitionBuilder: (_, animation, _, child) {
       return ScaleTransition(
         scale: Tween<double>(begin: 0.95, end: 1.0).animate(
           CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),

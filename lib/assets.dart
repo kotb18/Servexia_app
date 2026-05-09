@@ -204,7 +204,7 @@ class _AssetsScreenState extends State<AssetsScreen>
               filled: true,
               fillColor: Colors.white,
             ),
-            value: selectedSite,
+            initialValue: selectedSite,
             hint: const Text('اختر الموقع'),
             items: sites
                 .map((s) => DropdownMenuItem(value: s, child: Text(s)))
@@ -274,7 +274,7 @@ class _AssetsScreenState extends State<AssetsScreen>
               filled: true,
               fillColor: Colors.white,
             ),
-            value: selectedLocation,
+            initialValue: selectedLocation,
             hint: const Text('اختر المكان'),
             items: locations
                 .map((l) => DropdownMenuItem(value: l, child: Text(l)))
@@ -344,7 +344,7 @@ class _AssetsScreenState extends State<AssetsScreen>
               filled: true,
               fillColor: Colors.white,
             ),
-            value: selectedAssetName,
+            initialValue: selectedAssetName,
             hint: const Text('اختر اسم المعدة'),
             items: names
                 .map((n) => DropdownMenuItem(value: n, child: Text(n)))
@@ -409,7 +409,7 @@ class _AssetsScreenState extends State<AssetsScreen>
               filled: true,
               fillColor: Colors.white,
             ),
-            value: selectedAssetId,
+            initialValue: selectedAssetId,
             hint: const Text('اختر رقم المعدة'),
             items: snap.data!.docs
                 .map(

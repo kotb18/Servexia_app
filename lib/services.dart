@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_pagination/firebase_pagination.dart';
 import 'models.dart';
 
 /// خدمة Firebase للتعامل مع الفواتير مع دعم Pagination

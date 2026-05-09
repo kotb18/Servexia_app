@@ -160,7 +160,7 @@ class _AddReportPageState extends State<AddReportPage> {
             const SizedBox(height: 16),
 
             DropdownButtonFormField<String>(
-              value: selectedPriority,
+              initialValue: selectedPriority,
               decoration: InputDecoration(
                 labelText: "درجة الخطورة",
                 border: OutlineInputBorder(
@@ -303,7 +303,7 @@ class _AddReportPageState extends State<AddReportPage> {
             .toList();
 
         return DropdownButtonFormField<String>(
-          value: selectedSite,
+          initialValue: selectedSite,
           decoration: InputDecoration(
             labelText: "اختر الموقع",
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -353,7 +353,7 @@ class _AddReportPageState extends State<AddReportPage> {
             .toList();
 
         return DropdownButtonFormField<String>(
-          value: selectedLocation,
+          initialValue: selectedLocation,
           decoration: InputDecoration(
             labelText: "اختر المكان",
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -376,8 +376,9 @@ class _AddReportPageState extends State<AddReportPage> {
   }
 
   Widget _buildAssetNameDropdown() {
-    if (selectedSite == null || selectedLocation == null)
+    if (selectedSite == null || selectedLocation == null) {
       return const SizedBox.shrink();
+    }
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('assets')
@@ -404,7 +405,7 @@ class _AddReportPageState extends State<AddReportPage> {
             .toList();
 
         return DropdownButtonFormField<String>(
-          value: selectedAssetName,
+          initialValue: selectedAssetName,
           decoration: InputDecoration(
             labelText: "اختر اسم المعدة",
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -428,8 +429,9 @@ class _AddReportPageState extends State<AddReportPage> {
   Widget _buildAssetNumberDropdown() {
     if (selectedSite == null ||
         selectedLocation == null ||
-        selectedAssetName == null)
+        selectedAssetName == null) {
       return const SizedBox.shrink();
+    }
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('assets')
@@ -452,7 +454,7 @@ class _AddReportPageState extends State<AddReportPage> {
         }
 
         return DropdownButtonFormField<String>(
-          value: selectedAssetId,
+          initialValue: selectedAssetId,
           decoration: InputDecoration(
             labelText: "اختر رقم المعدة",
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

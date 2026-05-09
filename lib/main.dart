@@ -45,21 +45,19 @@ void main() async {
   // Initialize the Gemini Developer API backend service
   // Create a `GenerativeModel` instance with a model that supports your use case
 
-  final FirebaseMessaging _fcm = FirebaseMessaging.instance;
+  final FirebaseMessaging fcm = FirebaseMessaging.instance;
 
-  await _fcm.requestPermission(alert: true, badge: true, sound: true);
+  await fcm.requestPermission(alert: true, badge: true, sound: true);
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     print(message.notification?.title);
     print(message.notification?.body);
   });
-  Future<void> _firebaseMessagingBackgroundHandler(
-    RemoteMessage message,
-  ) async {
+  Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     await Firebase.initializeApp();
     print("Background message: ${message.messageId}");
   }
 
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
   runApp(
     Provider<BillingService>(

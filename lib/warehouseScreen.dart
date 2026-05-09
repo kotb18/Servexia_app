@@ -139,7 +139,11 @@ class _StoreScreenState extends State<StoreScreen> {
               MaterialPageRoute(
                 builder: (_) => InvoicePage(
                   groupId: widget.groupId,
-                  itemsSale: widget.invoiceType == 'بيع' ? items : [],
+                  itemsSale:
+                      (widget.invoiceType == 'بيع' ||
+                          widget.invoiceType == 'عرض سعر')
+                      ? items
+                      : [],
                   itemsPurchase: widget.invoiceType == 'شراء' ? items : [],
                   name: '',
                   phone: '',
@@ -303,7 +307,7 @@ class _StoreScreenState extends State<StoreScreen> {
                                 },
                               ),
                             );
-                          }).toList(),
+                          }),
                         ],
                       ),
                     ),

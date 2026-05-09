@@ -659,7 +659,7 @@ class _InventoryItemDetailsScreenRefactoredState
           );
   }
 
-  _buildPriceDialog(Map<String, dynamic> item) {
+  void _buildPriceDialog(Map<String, dynamic> item) {
     final priceController = TextEditingController(
       text: item['price'] != null ? item['price'].toString() : '',
     );
