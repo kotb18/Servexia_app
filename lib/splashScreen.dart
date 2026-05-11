@@ -33,6 +33,7 @@ class _SplashScreenState extends State<SplashScreen>
     user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       print('kotb');
+      if (!mounted) return;
       await Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => Login()),
@@ -94,8 +95,6 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
 
-    checkAndNavigate();
-
     _controller = AnimationController(
       duration: const Duration(seconds: 3),
       vsync: this,
@@ -107,6 +106,10 @@ class _SplashScreenState extends State<SplashScreen>
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
     _controller.forward();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      checkAndNavigate();
+    });
   }
 
   @override

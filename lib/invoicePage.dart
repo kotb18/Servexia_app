@@ -322,8 +322,16 @@ class _InvoicePageState extends State<InvoicePage>
       }
 
       setState(() {
-        taxController.text = state.showTax ? '14' : '0';
-        discountController.text = state.showDiscount ? '0' : '0';
+        taxController.text = !state.showTax
+            ? '0'
+            : taxController.text.isNotEmpty
+            ? taxController.text
+            : '0';
+        discountController.text = !state.showDiscount
+            ? '0'
+            : discountController.text.isNotEmpty
+            ? discountController.text
+            : '0';
       });
 
       if (widget.isFromWorkSpace) {
@@ -530,7 +538,7 @@ class _InvoicePageState extends State<InvoicePage>
         addressController.clear();
         phoneController.clear();
         notesController.clear();
-        taxController.text = '14';
+        taxController.text = '0';
         discountController.text = '0';
         widget.itemsSale.clear();
         widget.itemsPurchase.clear();
@@ -809,9 +817,11 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     );
     notesController = TextEditingController();
     discountController = TextEditingController(
-      text: !state.showDiscount ? '0' : '0',
+      text: !state.showDiscount ? '0' : discountController.text,
     );
-    taxController = TextEditingController(text: !state.showTax ? '0' : '14');
+    taxController = TextEditingController(
+      text: !state.showTax ? '0' : taxController.text,
+    );
     maintenanceDescController = TextEditingController();
     maintenancePriceController = TextEditingController();
 
@@ -1000,7 +1010,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               addressController.clear();
               phoneController.clear();
               notesController.clear();
-              taxController.text = widget.state.showTax ? '14' : '0';
+              taxController.text = widget.state.showTax ? '0' : '0';
               discountController.text = '0';
               widget.itemsSale.clear();
               widget.itemsPurchase.clear();
