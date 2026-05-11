@@ -136,6 +136,10 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
 
   /// فتح صفحة تفاصيل الفاتورة
   void _openInvoiceDetails(Invoice invoice) {
+    if (widget.isSelectionMode) {
+      Navigator.pop(context, invoice);
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -1463,7 +1467,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '${_currentInvoice.installments.fold<double>(0, (sum, inst) => sum + inst.value).toStringAsFixed(2)} ريال',
+                                '${_currentInvoice.installments.fold<double>(0, (sum, inst) => sum + inst.value).toStringAsFixed(2)} ',
                                 style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,

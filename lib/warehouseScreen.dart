@@ -676,11 +676,22 @@ class _StoreScreenState extends State<StoreScreen> {
                                             ],
                                           ),
                                           const SizedBox(height: 4),
-                                          Text(
-                                            '${data['quantity']} ${data['unit']}',
-                                            style: const TextStyle(
-                                              color: Colors.grey,
-                                            ),
+                                          Row(
+                                            children: [
+                                              Text(
+                                                '${data['quantity']} ${data['unit']}',
+                                                style: const TextStyle(
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
+                                              Text(
+                                                '   -   ${data['price']}',
+                                                style: const TextStyle(
+                                                  color: Colors.blue,
+                                                  fontSize: 16,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ],
                                       ),

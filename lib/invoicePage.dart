@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:maintenance/addAwarehouseItem.dart';
 import 'package:maintenance/customersSuppliers.dart';
 import 'package:maintenance/invoiceSettings.dart';
+import 'package:maintenance/models.dart';
 import 'package:maintenance/myInvoices.dart';
 import 'package:maintenance/warehouseScreen.dart';
 import 'package:maintenance/workSpace.dart';
@@ -16,7 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 bool loading = false;
 bool reCalculate = false;
-
+List<Map> returnItems = [];
 List<Map<String, dynamic>> paymentScheduleData = [
   {
     "type": "مدفوع",
@@ -193,6 +194,7 @@ class InvoicePage extends StatefulWidget {
     required this.isFromWorkSpace,
     required this.itemsPurchase,
     required this.type,
+    this.invoice,
   });
 
   static const String screenroute = 'InvoicePage';
@@ -207,7 +209,7 @@ class InvoicePage extends StatefulWidget {
   final bool isFromConstCustomers;
   final bool isFromWorkSpace;
   final String type;
-
+  final Invoice? invoice;
   @override
   State<InvoicePage> createState() => _InvoicePageState();
 }
@@ -346,7 +348,7 @@ class _InvoicePageState extends State<InvoicePage>
       notesController.clear();
       widget.itemsPurchase.clear();
       widget.itemsSale.clear();
-
+      returnItems.clear();
       // Clear items based on type
       if (newType != 'بيع' && newType != 'عرض سعر') {
         widget.itemsSale.clear();
@@ -387,7 +389,54 @@ class _InvoicePageState extends State<InvoicePage>
   }
 
   Future<void> _selectOriginalInvoice() async {
+    returnItems.clear();
     final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            MyInvoicesPage(groupId: widget.groupId, isSelectionMode: true),
+      ),
+    );
+    if (result != null && result is Invoice) {
+      print('Selected original invoice: ${result.invoiceNumber}');
+      setState(() {
+        state.originalInvoiceId = result.id;
+        state.originalInvoiceNumber = result.invoiceNumber;
+
+        // Auto-fill customer data from original invoice
+        final customer = result.customer;
+
+        nameController.text = customer.name ?? '';
+        phoneController.text = customer.phone ?? '';
+        addressController.text = customer.address ?? '';
+
+        // Copy items for return (with negative quantities)
+
+        widget.itemsSale.clear();
+        final returnItems0 = result.items;
+        for (var item in returnItems0) {
+          returnItems.add({
+            'name': item.name,
+            'quantity': -(item.quantity ?? 0).abs(), // Negative for return
+            'price': item.price ?? 0,
+            'originalItem': true, // Mark as from original invoice
+            //  'id': item.itemId ?? '',
+          });
+        }
+
+        print(
+          '/////////////////////////////$returnItems0/////////////////////////////',
+        );
+        reCalculate = true;
+      });
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('تم اختيار الفاتورة الأصلية: ${result.invoiceNumber}'),
+        backgroundColor: AppColors.success,
+      ),
+    );
+    /*  final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) =>
@@ -431,7 +480,7 @@ class _InvoicePageState extends State<InvoicePage>
           backgroundColor: AppColors.success,
         ),
       );
-    }
+    } */
   }
 
   Color _getBackgroundColor(String type) {
@@ -486,6 +535,7 @@ class _InvoicePageState extends State<InvoicePage>
         widget.itemsSale.clear();
         widget.itemsPurchase.clear();
         selectedPaymentMethod = 'كاش';
+        returnItems.clear();
         Navigator.popUntil(
           context,
           ModalRoute.withName(WorkspaceHomeScreen.screenroute),
@@ -671,6 +721,7 @@ class _InvoicePageState extends State<InvoicePage>
                 state: state,
                 invoiceType: selectedType,
                 reCalculate: reCalculate,
+                returnItems: returnItems,
               ),
             ),
           ],
@@ -682,11 +733,13 @@ class _InvoicePageState extends State<InvoicePage>
 
 // ==================== INVOICE DESIGN ====================
 
+// ignore: must_be_immutable
 class InvoicePageDesign extends StatefulWidget {
   final String type;
   final String groupId;
   final List<Map> itemsSale;
   final List<Map> itemsPurchase;
+  final List<Map> returnItems;
   final String name;
   final String phone;
   final String address;
@@ -694,9 +747,9 @@ class InvoicePageDesign extends StatefulWidget {
   final bool isFromConstCustomers;
   final InvoiceState state;
   final InvoiceTypeModel invoiceType;
-  final bool reCalculate;
+  bool reCalculate;
 
-  const InvoicePageDesign({
+  InvoicePageDesign({
     super.key,
     required this.type,
     required this.groupId,
@@ -710,6 +763,7 @@ class InvoicePageDesign extends StatefulWidget {
     required this.invoiceType,
     required this.reCalculate,
     required this.itemsPurchase,
+    required this.returnItems,
   });
 
   @override
@@ -742,7 +796,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     );
     customerId = widget.isFromConstCustomers ? widget.customerId : customerId;
     print(
-      '/////////////////////////////$customerId/////////////////////////////',
+      '/////////////////////////////$returnItems kkkkkkk/////////////////////////',
     );
 
     addressController = TextEditingController(
@@ -784,7 +838,9 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
       case 'شراء':
         return widget.itemsPurchase;
       case 'بيع':
+        return widget.itemsSale;
       case 'مرتجع':
+        return widget.returnItems;
       case 'عرض سعر':
       default:
         return widget.itemsSale;
@@ -805,11 +861,17 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           0.0,
           (sum, item) => sum + ((item['price'] ?? 0) * (item['quantity'] ?? 1)),
         );
-      } else {
+      } else if (widget.type == 'عرض سعر' || widget.type == 'بيع') {
         sum = widget.itemsSale.fold(
           0.0,
           (sum, item) =>
               sum + ((item['price'] ?? 0) * (item['quantity'] ?? 1).abs()),
+        );
+      } else if (widget.type == 'مرتجع') {
+        sum = widget.returnItems.fold(
+          0.0,
+          (sum, item) =>
+              sum + ((item['price'] ?? 0) * (item['quantity'] ?? 0).abs()),
         );
       }
 
@@ -826,6 +888,9 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           widget.state.priceSumItems +
           widget.state.taxValue -
           widget.state.discountValue;
+    });
+    setState(() {
+      widget.reCalculate = false;
     });
   }
 
@@ -941,6 +1006,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               widget.itemsPurchase.clear();
               selectedPaymentMethod = 'كاش';
               paymentIndexes = [0, 1];
+              returnItems.clear();
               _calculateTotals();
               Navigator.pop(context);
             },
@@ -1565,6 +1631,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
   }) {
     return TextField(
       controller: controller,
+      enabled: widget.type != 'مرتجع',
       keyboardType: keyboardType,
       textAlign: TextAlign.right,
       decoration: InputDecoration(
@@ -1612,7 +1679,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           _buildItemsList(items, isMaintenance),
 
         const SizedBox(height: 12),
-        _buildAddItemButton(isMaintenance, isQuote),
+        if (widget.type != 'مرتجع') _buildAddItemButton(isMaintenance, isQuote),
       ],
     );
   }
@@ -1684,6 +1751,8 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                 maintenanceItems.removeAt(index);
               } else if (widget.type == 'شراء') {
                 widget.itemsPurchase.removeAt(index);
+              } else if (widget.type == 'مرتجع') {
+                widget.returnItems.removeAt(index);
               } else {
                 widget.itemsSale.removeAt(index);
               }
@@ -1961,14 +2030,16 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               controller: discountController,
               suffix: '%',
               calculatedValue: widget.state.discountValue,
-              onEdit: () => _showEditDialog(
-                title: 'تعديل نسبة الخصم',
-                label: 'نسبة الخصم',
-                controller: discountController,
-                keyboardType: TextInputType.number,
-                suffix: '%',
-                onSave: _calculateTotals,
-              ),
+              onEdit: () => widget.type != 'مرتجع'
+                  ? _showEditDialog(
+                      title: 'تعديل نسبة الخصم',
+                      label: 'نسبة الخصم',
+                      controller: discountController,
+                      keyboardType: TextInputType.number,
+                      suffix: '%',
+                      onSave: _calculateTotals,
+                    )
+                  : null,
             ),
           const SizedBox(height: 8),
           if (widget.state.showTax)
@@ -1977,14 +2048,16 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               controller: taxController,
               suffix: '%',
               calculatedValue: widget.state.taxValue,
-              onEdit: () => _showEditDialog(
-                title: 'تعديل نسبة الضريبة',
-                label: 'نسبة الضريبة',
-                controller: taxController,
-                keyboardType: TextInputType.number,
-                suffix: '%',
-                onSave: _calculateTotals,
-              ),
+              onEdit: () => widget.type != 'مرتجع'
+                  ? _showEditDialog(
+                      title: 'تعديل نسبة الضريبة',
+                      label: 'نسبة الضريبة',
+                      controller: taxController,
+                      keyboardType: TextInputType.number,
+                      suffix: '%',
+                      onSave: _calculateTotals,
+                    )
+                  : null,
             ),
           if (widget.state.showDiscount || widget.state.showTax)
             const Padding(
@@ -2249,7 +2322,23 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
       );
 
       setState(() => loading = false);
+      loading = false;
+      nameController.clear();
+      addressController.clear();
+      phoneController.clear();
+      notesController.clear();
+      taxController.text = '0';
+      discountController.text = '0';
+      widget.itemsSale.clear();
+      widget.itemsPurchase.clear();
+      selectedPaymentMethod = 'كاش';
 
+      if (mounted) {
+        Navigator.popUntil(
+          context,
+          ModalRoute.withName(WorkspaceHomeScreen.screenroute),
+        );
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
