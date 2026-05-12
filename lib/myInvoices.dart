@@ -100,6 +100,11 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
           return false;
         }
       }
+      if ((widget.isSelectionMode && invoice.type == 'صيانة') ||
+          (widget.isSelectionMode && invoice.type == 'مرتجع') ||
+          (widget.isSelectionMode && invoice.type == 'عرض سعر')) {
+        return false;
+      }
 
       return true;
     }).toList();
@@ -473,12 +478,19 @@ class InvoiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isSale = invoice.isSale;
-    final typeColor = isSale
+    //  final isSale = invoice.isSale;
+    Color typeColor;
+    String typeLabel;
+    typeLabel = invoice.type;
+    typeColor = invoice.type == 'بيع'
         ? const Color(0xFF10B981)
-        : const Color(0xFFEF4444);
-    final typeLabel = isSale ? 'بيع' : 'شراء';
-
+        : invoice.type == 'شراء'
+        ? Colors.blue
+        : invoice.type == 'صيانة'
+        ? const Color.fromARGB(255, 222, 157, 18)
+        : invoice.type == 'مرتجع'
+        ? Colors.red
+        : const Color(0xFF8B5CF6);
     return GestureDetector(
       onTap: onTap,
       child: Card(
@@ -1140,10 +1152,18 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isSale = _currentInvoice.isSale;
-    final typeColor = isSale
+    Color typeColor;
+    String typeLabel;
+    typeLabel = _currentInvoice.type;
+    typeColor = _currentInvoice.type == 'بيع'
         ? const Color(0xFF10B981)
-        : const Color(0xFFEF4444);
+        : _currentInvoice.type == 'شراء'
+        ? Colors.blue
+        : _currentInvoice.type == 'صيانة'
+        ? const Color.fromARGB(255, 222, 157, 18)
+        : _currentInvoice.type == 'مرتجع'
+        ? Colors.red
+        : const Color(0xFF8B5CF6);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -1159,6 +1179,12 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
           ),
         ),
         centerTitle: true,
+        /*  actions: [   
+          IconButton(
+            icon: const Icon(Icons.edit, color: Colors.white),
+            onPressed: () {},
+          ),
+        ], */
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -1198,7 +1224,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            isSale ? 'بيع' : 'شراء',
+                            typeLabel,
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -1547,7 +1573,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                 ),
               ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 50),
           ],
         ),
       ),

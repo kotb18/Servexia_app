@@ -243,17 +243,6 @@ class _InvoicePageState extends State<InvoicePage>
       requiresOriginalInvoice: false,
     ),
     const InvoiceTypeModel(
-      title: 'فاتورة صيانة',
-      type: 'صيانة',
-      titleEnglish: 'maintenance',
-      icon: Icons.build_outlined,
-      color: AppColors.warning,
-      affectsStock: false,
-      needsWarehouseItems: false,
-      allowsManualItems: true,
-      requiresOriginalInvoice: false,
-    ),
-    const InvoiceTypeModel(
       title: 'مرتجع',
       type: 'مرتجع',
       titleEnglish: 'return',
@@ -264,6 +253,18 @@ class _InvoicePageState extends State<InvoicePage>
       allowsManualItems: false,
       requiresOriginalInvoice: true,
     ),
+    const InvoiceTypeModel(
+      title: 'فاتورة صيانة',
+      type: 'صيانة',
+      titleEnglish: 'maintenance',
+      icon: Icons.build_outlined,
+      color: AppColors.warning,
+      affectsStock: false,
+      needsWarehouseItems: false,
+      allowsManualItems: true,
+      requiresOriginalInvoice: false,
+    ),
+
     const InvoiceTypeModel(
       title: 'عرض سعر',
       type: 'عرض سعر',
@@ -552,13 +553,34 @@ class _InvoicePageState extends State<InvoicePage>
       },
       child: Scaffold(
         backgroundColor: _getBackgroundColor(selectedFilter),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => MyInvoicesPage(
+                  groupId: widget.groupId,
+                  isSelectionMode: false,
+                ),
+              ),
+            );
+          },
+          backgroundColor: const Color.fromARGB(255, 115, 5, 117),
+          foregroundColor: Colors.white,
+          elevation: 6,
+          icon: const Icon(Icons.receipt_long_rounded),
+          label: const Text(
+            'فواتيري',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+        ),
         appBar: AppBar(
           title: const Text(
             'تسجيل فاتورة جديدة',
             style: TextStyle(fontSize: 18),
           ),
           actions: [
-            IconButton(
+            /*   IconButton(
               icon: const Icon(Icons.receipt_long),
               tooltip: 'فواتيري',
               onPressed: () {
@@ -572,7 +594,7 @@ class _InvoicePageState extends State<InvoicePage>
                   ),
                 );
               },
-            ),
+            ),*/
             IconButton(
               onPressed: () async {
                 final result = await Navigator.push(
@@ -700,11 +722,12 @@ class _InvoicePageState extends State<InvoicePage>
                     ),
                     ElevatedButton.icon(
                       onPressed: _selectOriginalInvoice,
-                      icon: const Icon(Icons.search),
+                      icon: const Icon(Icons.search, color: Colors.white),
                       label: Text(
                         state.originalInvoiceId == null
                             ? 'اختيار فاتورة'
                             : 'تغيير',
+                        style: TextStyle(color: Colors.white, fontSize: 16),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.danger,
@@ -1073,6 +1096,32 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           },
         ),
       );
+    } else if (widget.type == 'عرض سعر') {
+      items.addAll(
+        widget.itemsSale.map(
+          (item) => {
+            "name": item['name'],
+            "quantity": item['quantity'] ?? 0,
+            "price": item['price'] ?? 0,
+            "total": (item['quantity'] ?? 0) * (item['price'] ?? 0),
+            "isManual": item['isManual'] ?? false,
+            'itemId': item['id'] ?? '',
+          },
+        ),
+      );
+    } else if (widget.type == 'مرتجع') {
+      items.addAll(
+        widget.returnItems.map(
+          (item) => {
+            "name": item['name'],
+            "quantity": item['quantity'] ?? 0,
+            "price": item['price'] ?? 0,
+            "total": (item['quantity'] ?? 0).abs() * (item['price'] ?? 0),
+            "isReturn": true,
+            'itemId': item['id'] ?? '',
+          },
+        ),
+      );
     } else {
       items.addAll(
         widget.itemsSale.map(
@@ -1334,7 +1383,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 80),
                 ],
               ),
             ),
@@ -2214,7 +2263,9 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
   Widget _buildSaveButton(double total) {
     final bool hasItems = widget.type == 'صيانة'
         ? maintenanceItems.isNotEmpty
-        : (widget.itemsSale.isNotEmpty || widget.itemsPurchase.isNotEmpty);
+        : (widget.itemsSale.isNotEmpty ||
+              widget.itemsPurchase.isNotEmpty ||
+              widget.returnItems.isNotEmpty);
 
     final bool isValid =
         hasItems &&
