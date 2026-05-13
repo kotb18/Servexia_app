@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:maintenance/advanced.dart';
+import 'package:maintenance/invoicePage.dart';
 import 'models.dart';
 import 'services.dart';
 
@@ -140,6 +141,97 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
   }
 
   /// فتح صفحة تفاصيل الفاتورة
+  void _editInvoice(Invoice invoice) {
+    final editItems0 = invoice.items;
+    List<Map<String, dynamic>> editItems = [];
+    for (var item in editItems0) {
+      editItems.add({
+        'name': item.name,
+        'quantity': item.quantity,
+        'price': item.price,
+        'originalItem': true, // Mark as from original invoice
+        //  'id': item.itemId ?? '',
+      });
+    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => InvoicePage(
+          invoice: invoice, // Pass the invoice for editing
+          itemsSale: editItems,
+          itemsPurchase: editItems,
+          groupId: widget.groupId,
+          isEditMode: true,
+          name: invoice.customerName,
+          type: invoice.type,
+          phone: invoice.customerPhone,
+          address: invoice.customerAddress,
+          isFromConstCustomers: true,
+          isFromWorkSpace: false,
+          customerId: invoice.customerId,
+        ),
+      ),
+    );
+  }
+
+  void _deleteInvoice(Invoice invoice) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('تأكيد الحذف'),
+          content: Text(
+            'هل أنت متأكد أنك تريد حذف الفاتورة رقم ${invoice.invoiceNumber}؟',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false), // User cancels
+              child: const Text('إلغاء'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true), // User confirms
+              child: const Text('حذف'),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+            ),
+          ],
+        );
+      },
+    ).then((confirmed) async {
+      if (confirmed != null && confirmed) {
+        if (invoice.id != null) {
+          final success = await _invoiceService.deleteInvoice(
+            widget.groupId,
+            invoice.id!,
+          );
+          if (success) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('تم حذف الفاتورة بنجاح.')),
+            );
+          } else {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('فشل حذف الفاتورة.')));
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('لا يمكن حذف فاتورة بدون معرف.')),
+          );
+        }
+      }
+    });
+  }
+
+  void _printInvoice(Invoice invoice) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'وظيفة الطباعة للفاتورة رقم ${invoice.invoiceNumber} غير مطبقة بعد.',
+        ),
+      ),
+    );
+    // TODO: Implement actual print invoice logic, potentially using a package like 'printing' or 'pdf'
+  }
+
   void _openInvoiceDetails(Invoice invoice) {
     if (widget.isSelectionMode) {
       Navigator.pop(context, invoice);
@@ -199,8 +291,8 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: const Color(0xFF1E3A8A),
-        title: const Text(
-          'فواتيري',
+        title: Text(
+          !widget.isSelectionMode ? 'فواتيري' : 'اختر فاتورة للإرتجاع',
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -217,18 +309,21 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
       ),
       body: Column(
         children: [
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => StatisticsPage(groupId: widget.groupId),
-                ),
-              );
-            },
-            label: const Text('عرض الإحصائيات'),
-            icon: const Icon(Icons.bar_chart_outlined),
-          ),
+          !widget.isSelectionMode
+              ? ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            StatisticsPage(groupId: widget.groupId),
+                      ),
+                    );
+                  },
+                  label: const Text('عرض الإحصائيات'),
+                  icon: const Icon(Icons.bar_chart_outlined),
+                )
+              : SizedBox.shrink(),
           // شريط البحث
           Padding(
             padding: const EdgeInsets.all(16),
@@ -456,7 +551,11 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
                     final invoice = filteredInvoices[index];
                     return InvoiceCard(
                       invoice: invoice,
+                      isSelectionMode: widget.isSelectionMode,
                       onTap: () => _openInvoiceDetails(invoice),
+                      onEdit: () => _editInvoice(invoice),
+                      onDelete: () => _deleteInvoice(invoice),
+                      onPrint: () => _printInvoice(invoice),
                     );
                   },
                 );
@@ -473,15 +572,62 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
 class InvoiceCard extends StatelessWidget {
   final Invoice invoice;
   final VoidCallback onTap;
+  final bool isSelectionMode;
 
-  const InvoiceCard({super.key, required this.invoice, required this.onTap});
+  const InvoiceCard({
+    super.key,
+    required this.invoice,
+    required this.onTap,
+    required this.isSelectionMode,
+    this.onEdit,
+    this.onDelete,
+    this.onPrint,
+  });
+
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+  final VoidCallback? onPrint;
+
+  Widget _actionButton({
+    required String text,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: color.withOpacity(0.12),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 6),
+              Text(
+                text,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     //  final isSale = invoice.isSale;
     Color typeColor;
     String typeLabel;
-    typeLabel = invoice.type;
+    typeLabel = invoice.type == 'مرتجع' ? invoice.returnType : invoice.type;
     typeColor = invoice.type == 'بيع'
         ? const Color(0xFF10B981)
         : invoice.type == 'شراء'
@@ -722,6 +868,52 @@ class InvoiceCard extends StatelessWidget {
                   ),
                 ),
               ],
+              const SizedBox(height: 12),
+              if (!isSelectionMode)
+                Container(
+                  //  margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    spacing: 10,
+                    children: [
+                      if (onEdit != null)
+                        _actionButton(
+                          text: 'تعديل',
+                          icon: Icons.edit_rounded,
+                          color: Colors.blue,
+                          onTap: onEdit!,
+                        ),
+
+                      if (onPrint != null)
+                        _actionButton(
+                          text: 'طباعة',
+                          icon: Icons.print_rounded,
+                          color: Colors.deepPurple,
+                          onTap: onPrint!,
+                        ),
+
+                      if (onDelete != null)
+                        _actionButton(
+                          text: 'مسح',
+                          icon: Icons.delete_rounded,
+                          color: Colors.red,
+                          onTap: onDelete!,
+                        ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),
@@ -1154,7 +1346,9 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
   Widget build(BuildContext context) {
     Color typeColor;
     String typeLabel;
-    typeLabel = _currentInvoice.type;
+    typeLabel = _currentInvoice.type == 'مرتجع'
+        ? _currentInvoice.returnType
+        : _currentInvoice.type;
     typeColor = _currentInvoice.type == 'بيع'
         ? const Color(0xFF10B981)
         : _currentInvoice.type == 'شراء'

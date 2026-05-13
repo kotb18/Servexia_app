@@ -18,6 +18,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 bool loading = false;
 bool reCalculate = false;
 List<Map> returnItems = [];
+String returnType = '';
 List<Map<String, dynamic>> paymentScheduleData = [
   {
     "type": "مدفوع",
@@ -195,6 +196,7 @@ class InvoicePage extends StatefulWidget {
     required this.itemsPurchase,
     required this.type,
     this.invoice,
+    this.isEditMode = false,
   });
 
   static const String screenroute = 'InvoicePage';
@@ -210,6 +212,7 @@ class InvoicePage extends StatefulWidget {
   final bool isFromWorkSpace;
   final String type;
   final Invoice? invoice;
+  final bool isEditMode;
   @override
   State<InvoicePage> createState() => _InvoicePageState();
 }
@@ -418,7 +421,22 @@ class _InvoicePageState extends State<InvoicePage>
         nameController.text = customer.name ?? '';
         phoneController.text = customer.phone ?? '';
         addressController.text = customer.address ?? '';
-
+        returnType = result.type;
+        selectedPaymentMethod = result.paymentMethod;
+        discountController.text = result.summary.discountPercent.toString();
+        taxController.text = result.summary.taxPercent.toString();
+        final paymentScheduleData0 = result.installments;
+        paymentScheduleData.clear();
+        for (var installment in paymentScheduleData0) {
+          paymentScheduleData.add({
+            "type": installment.type,
+            "value": installment.value,
+            'valuePicked': true,
+            "date": installment.date,
+            'datePicked': true,
+            "status": installment.status,
+          });
+        }
         // Copy items for return (with negative quantities)
 
         widget.itemsSale.clear();
@@ -426,8 +444,8 @@ class _InvoicePageState extends State<InvoicePage>
         for (var item in returnItems0) {
           returnItems.add({
             'name': item.name,
-            'quantity': -(item.quantity ?? 0).abs(), // Negative for return
-            'price': item.price ?? 0,
+            'quantity': item.quantity, // Negative for return
+            'price': item.price,
             'originalItem': true, // Mark as from original invoice
             //  'id': item.itemId ?? '',
           });
@@ -553,30 +571,32 @@ class _InvoicePageState extends State<InvoicePage>
       },
       child: Scaffold(
         backgroundColor: _getBackgroundColor(selectedFilter),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => MyInvoicesPage(
-                  groupId: widget.groupId,
-                  isSelectionMode: false,
+        floatingActionButton: !widget.isEditMode
+            ? FloatingActionButton.extended(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MyInvoicesPage(
+                        groupId: widget.groupId,
+                        isSelectionMode: false,
+                      ),
+                    ),
+                  );
+                },
+                backgroundColor: const Color.fromARGB(255, 115, 5, 117),
+                foregroundColor: Colors.white,
+                elevation: 6,
+                icon: const Icon(Icons.receipt_long_rounded),
+                label: const Text(
+                  'فواتيري',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
-              ),
-            );
-          },
-          backgroundColor: const Color.fromARGB(255, 115, 5, 117),
-          foregroundColor: Colors.white,
-          elevation: 6,
-          icon: const Icon(Icons.receipt_long_rounded),
-          label: const Text(
-            'فواتيري',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-        ),
+              )
+            : null,
         appBar: AppBar(
-          title: const Text(
-            'تسجيل فاتورة جديدة',
+          title: Text(
+            !widget.isEditMode ? 'تسجيل فاتورة جديدة' : 'تعديل فاتورة',
             style: TextStyle(fontSize: 18),
           ),
           actions: [
@@ -627,50 +647,58 @@ class _InvoicePageState extends State<InvoicePage>
         body: Column(
           children: [
             // Filter Chips
-            Container(
-              height: 80,
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: invoiceTypes.length,
-                itemBuilder: (context, index) {
-                  final type = invoiceTypes[index];
-                  final isSelected = type.type == selectedFilter;
-
-                  return Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      child: FilterChip(
-                        avatar: Icon(
-                          type.icon,
-                          size: 18,
-                          color: isSelected ? Colors.white : type.color,
-                        ),
-                        label: Text(type.title),
-                        selected: isSelected,
-                        selectedColor: type.color,
-                        checkmarkColor: Colors.white,
-                        labelStyle: TextStyle(
-                          color: isSelected
-                              ? Colors.white
-                              : AppColors.textPrimary,
-                          fontWeight: isSelected
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                        backgroundColor: AppColors.surface,
-                        side: BorderSide(color: AppColors.border, width: 2),
-                        onSelected: (_) => _resetForNewType(type.type),
-                      ),
+            !widget.isEditMode
+                ? Container(
+                    height: 80,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 16,
                     ),
-                  );
-                },
-              ),
-            ),
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: invoiceTypes.length,
+                      itemBuilder: (context, index) {
+                        final type = invoiceTypes[index];
+                        final isSelected = type.type == selectedFilter;
+
+                        return Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            child: FilterChip(
+                              avatar: Icon(
+                                type.icon,
+                                size: 18,
+                                color: isSelected ? Colors.white : type.color,
+                              ),
+                              label: Text(type.title),
+                              selected: isSelected,
+                              selectedColor: type.color,
+                              checkmarkColor: Colors.white,
+                              labelStyle: TextStyle(
+                                color: isSelected
+                                    ? Colors.white
+                                    : AppColors.textPrimary,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                              backgroundColor: AppColors.surface,
+                              side: BorderSide(
+                                color: AppColors.border,
+                                width: 2,
+                              ),
+                              onSelected: (_) => _resetForNewType(type.type),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  )
+                : SizedBox.shrink(),
 
             // Type hint
-            if (_getTypeHint(selectedFilter).isNotEmpty)
+            if (_getTypeHint(selectedFilter).isNotEmpty && !widget.isEditMode)
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -688,7 +716,7 @@ class _InvoicePageState extends State<InvoicePage>
               ),
 
             // Return invoice selector
-            if (selectedFilter == 'مرتجع')
+            if (selectedFilter == 'مرتجع' && !widget.isEditMode)
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 padding: const EdgeInsets.all(12),
@@ -1165,6 +1193,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
       if (widget.type == 'مرتجع') ...{
         'originalInvoiceId': widget.state.originalInvoiceId,
         'originalInvoiceNumber': widget.state.originalInvoiceNumber,
+        'returnType': 'مرتجع $returnType',
       },
       if (widget.type == 'عرض سعر') 'isQuote': true,
     };
@@ -1366,7 +1395,9 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                           _buildTotalsSection(),
                           const Divider(height: 32),
 
-                          if (widget.type == 'بيع' || widget.type == 'شراء')
+                          if (widget.type == 'بيع' ||
+                              widget.type == 'شراء' ||
+                              widget.type == 'مرتجع')
                             _buildPaymentMethod(),
 
                           if ((selectedPaymentMethod == 'آجل' ||
@@ -1419,7 +1450,9 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                 ),
               ),
               Text(
-                '#${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}',
+                widget.type != 'مرتجع'
+                    ? '#${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}'
+                    : 'return-${widget.state.originalInvoiceNumber ?? ''}',
                 style: const TextStyle(
                   fontSize: 13,
                   color: AppColors.textSecondary,
@@ -1560,30 +1593,34 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               final isSelected = selectedPaymentMethod == method;
               return Expanded(
                 child: InkWell(
-                  onTap: () => setState(() {
-                    paymentIndexes = [0, 1];
-                    selectedPaymentMethod = method;
-                    paymentScheduleData = [
-                      {
-                        "type": "مدفوع",
-                        "value": 0.0,
-                        'valuePicked': false,
-                        "date": DateTime.now(),
-                        'datePicked': false,
-                        "status": "تم",
-                      },
-                      {
-                        "type": selectedPaymentMethod == 'آجل'
-                            ? "مستحق"
-                            : 'قسط 1',
-                        "value": 0.0,
-                        "valuePicked": false,
-                        "date": DateTime.now().add(const Duration(days: 30)),
-                        'datePicked': false,
-                        "status": "!",
-                      },
-                    ];
-                  }),
+                  onTap: widget.type == 'مرتجع'
+                      ? null
+                      : () => setState(() {
+                          paymentIndexes = [0, 1];
+                          selectedPaymentMethod = method;
+                          paymentScheduleData = [
+                            {
+                              "type": "مدفوع",
+                              "value": 0.0,
+                              'valuePicked': false,
+                              "date": DateTime.now(),
+                              'datePicked': false,
+                              "status": "تم",
+                            },
+                            {
+                              "type": selectedPaymentMethod == 'آجل'
+                                  ? "مستحق"
+                                  : 'قسط 1',
+                              "value": 0.0,
+                              "valuePicked": false,
+                              "date": DateTime.now().add(
+                                const Duration(days: 30),
+                              ),
+                              'datePicked': false,
+                              "status": "!",
+                            },
+                          ];
+                        }),
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -2088,6 +2125,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               label: 'الخصم',
               controller: discountController,
               suffix: '%',
+              color: Colors.redAccent,
               calculatedValue: widget.state.discountValue,
               onEdit: () => widget.type != 'مرتجع'
                   ? _showEditDialog(
@@ -2107,6 +2145,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               controller: taxController,
               suffix: '%',
               calculatedValue: widget.state.taxValue,
+              color: Colors.black,
               onEdit: () => widget.type != 'مرتجع'
                   ? _showEditDialog(
                       title: 'تعديل نسبة الضريبة',
@@ -2181,6 +2220,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     required String suffix,
     required double calculatedValue,
     required VoidCallback onEdit,
+    required Color color,
   }) {
     return InkWell(
       onTap: onEdit,
@@ -2222,7 +2262,11 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
             ),
             Text(
               calculatedValue.toStringAsFixed(2),
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
             ),
           ],
         ),
@@ -2239,7 +2283,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
-        CustomPaymentsTable(total: widget.state.total),
+        CustomPaymentsTable(total: widget.state.total, type: widget.type),
       ],
     );
   }
@@ -2437,8 +2481,13 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
 
 class CustomPaymentsTable extends StatefulWidget {
   final double total;
+  final String type;
 
-  const CustomPaymentsTable({super.key, required this.total});
+  const CustomPaymentsTable({
+    super.key,
+    required this.total,
+    required this.type,
+  });
 
   @override
   State<CustomPaymentsTable> createState() => _CustomPaymentsTableState();
@@ -2719,7 +2768,7 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
             ],
           ),
         ),
-        if (selectedPaymentMethod == 'تقسيط')
+        if (selectedPaymentMethod == 'تقسيط' && widget.type != 'مرتجع')
           TextButton(
             onPressed: () {
               setState(() {

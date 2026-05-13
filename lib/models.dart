@@ -218,6 +218,7 @@ class Installment {
 class Invoice {
   final String? id; // معرّف Firestore
   final String type; // 'بيع' أو 'شراء'
+  final String returnType; // 'مرتجع بيع' أو 'مرتجع شراء' (للفواتير المرتجعة)
   final Customer customer;
   final List<InvoiceItem> items;
   final InvoiceSummary summary;
@@ -231,6 +232,7 @@ class Invoice {
   Invoice({
     this.id,
     required this.type,
+    required this.returnType,
     required this.customer,
     required this.items,
     required this.summary,
@@ -258,6 +260,7 @@ class Invoice {
     return Invoice(
       id: docId,
       type: json['type'] as String? ?? '',
+      returnType: json['returnType'] as String? ?? '',
       customer: Customer.fromJson(
         json['customer'] as Map<String, dynamic>? ?? {},
       ),
@@ -322,10 +325,12 @@ class Invoice {
     DateTime? createdAt,
     String? paymentMethod,
     List<Installment>? installments,
+    String? returnType,
   }) {
     return Invoice(
       id: id ?? this.id,
       type: type ?? this.type,
+      returnType: returnType ?? this.returnType,
       customer: customer ?? this.customer,
       items: items ?? this.items,
       summary: summary ?? this.summary,
@@ -349,6 +354,8 @@ class Invoice {
 
   /// الحصول على اسم العميل أو النص الافتراضي
   String get customerName => customer.name ?? 'عميل غير محدد';
+
+  String get customerId => customer.id ?? 'عميل غير محدد';
 
   /// الحصول على رقم الهاتف أو النص الافتراضي
   String get customerPhone => customer.phone ?? 'لا يوجد';
