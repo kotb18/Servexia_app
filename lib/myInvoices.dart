@@ -10,11 +10,13 @@ import 'services.dart';
 class MyInvoicesPage extends StatefulWidget {
   final String groupId;
   final bool isSelectionMode;
+  final Function(Invoice)? onInvoiceSelected;
 
   const MyInvoicesPage({
     super.key,
     required this.groupId,
     required this.isSelectionMode,
+    this.onInvoiceSelected,
   });
 
   @override
@@ -141,37 +143,19 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
   }
 
   /// فتح صفحة تفاصيل الفاتورة
-  void _editInvoice(Invoice invoice) {
-    final editItems0 = invoice.items;
-    List<Map<String, dynamic>> editItems = [];
-    for (var item in editItems0) {
-      editItems.add({
-        'name': item.name,
-        'quantity': item.quantity,
-        'price': item.price,
-        'originalItem': true, // Mark as from original invoice
-        //  'id': item.itemId ?? '',
-      });
+  void _editInvoice(Invoice invoice) async {
+    if (widget.onInvoiceSelected != null) {
+      widget.onInvoiceSelected!(invoice);
+      if (!mounted) return;
+      // أرسل البيانات مباشرة
+      Navigator.pop(
+        context,
+        ModalRoute.withName(InvoicePage.screenroute),
+      ); // عد للوجهة مباشرة
+    } else {
+      if (!mounted) return;
+      Navigator.pop(context, invoice); // الوضع العادي
     }
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => InvoicePage(
-          invoice: invoice, // Pass the invoice for editing
-          itemsSale: editItems,
-          itemsPurchase: editItems,
-          groupId: widget.groupId,
-          isEditMode: true,
-          name: invoice.customerName,
-          type: invoice.type,
-          phone: invoice.customerPhone,
-          address: invoice.customerAddress,
-          isFromConstCustomers: true,
-          isFromWorkSpace: false,
-          customerId: invoice.customerId,
-        ),
-      ),
-    );
   }
 
   void _deleteInvoice(Invoice invoice) {

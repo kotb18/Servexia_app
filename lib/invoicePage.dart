@@ -15,33 +15,13 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-bool loading = false;
-bool reCalculate = false;
-List<Map> returnItems = [];
-String returnType = '';
-List<Map<String, dynamic>> paymentScheduleData = [
-  {
-    "type": "مدفوع",
-    "value": 0.0,
-    'valuePicked': false,
-    "date": DateTime.now(),
-    'datePicked': false,
-    "status": "تم",
-  },
-  {
-    "type": "مستحق",
-    "value": 0.0,
-    "valuePicked": false,
-    "date": DateTime.now().add(const Duration(days: 30)),
-    'datePicked': false,
-    "status": "!",
-  },
-];
-List<int> paymentIndexes = [0, 1];
-
-// ==================== CONSTANTS & THEME ====================
+// ═══════════════════════════════════════════════════════════════════════════════
+// ═══ SECTION 1: CONSTANTS & THEME ══════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 
 class AppColors {
+  const AppColors._();
+
   static const Color primary = Color(0xFF2563EB);
   static const Color primaryDark = Color(0xFF1D4ED8);
   static const Color secondary = Color(0xFF0EA5E9);
@@ -57,6 +37,8 @@ class AppColors {
 }
 
 class AppTheme {
+  const AppTheme._();
+
   static ThemeData get light => ThemeData(
     useMaterial3: true,
     fontFamily: 'Cairo',
@@ -125,7 +107,9 @@ class AppTheme {
   );
 }
 
-// ==================== INVOICE TYPE MODEL ====================
+// ═══════════════════════════════════════════════════════════════════════════════
+// ═══ SECTION 2: INVOICE TYPE MODEL ═════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 
 class InvoiceTypeModel {
   final String title;
@@ -151,36 +135,115 @@ class InvoiceTypeModel {
   });
 }
 
-// ==================== GLOBAL STATE ====================
+// ═══════════════════════════════════════════════════════════════════════════════
+// ═══ SECTION 3: GLOBAL STATE (FIXED - Encapsulated in ChangeNotifier) ══════════
+// ═══════════════════════════════════════════════════════════════════════════════
 
-class InvoiceState {
-  static DateTime selectedDate = DateTime.now();
-  late int lastInvoiceNumber = 0;
+class InvoiceState extends ChangeNotifier {
+  DateTime selectedDate = DateTime.now();
+  int lastInvoiceNumber = 0;
   double priceSumItems = 0.0;
-  late double discountValue = 0.0;
-  late double taxValue = 0.14;
-  late double total = 0.0;
+  double discountValue = 0.0;
+  double taxValue = 0.0;
+  double total = 0.0;
+
   String? companyName;
   String? companyAddress;
   String? companyPhone;
   String? companyEmail;
   String? companyLogoPath;
+
   double? amountPaid;
   double? amountDue;
-  late bool showLogo = true;
-  late bool showAddress = true;
-  late bool showPhone = true;
-  late bool showEmail = true;
-  late bool showNotes = true;
-  late bool showTax = true;
-  late bool showDiscount = true;
+
+  bool showLogo = true;
+  bool showAddress = true;
+  bool showPhone = true;
+  bool showEmail = true;
+  bool showNotes = true;
+  bool showTax = true;
+  bool showDiscount = true;
 
   // For return invoices
   String? originalInvoiceId;
   String? originalInvoiceNumber;
+
+  // Payment schedule
+  List<Map<String, dynamic>> paymentScheduleData = [
+    {
+      "type": "مدفوع",
+      "value": 0.0,
+      'valuePicked': false,
+      "date": DateTime.now(),
+      'datePicked': false,
+      "status": "تم",
+    },
+    {
+      "type": "مستحق",
+      "value": 0.0,
+      "valuePicked": false,
+      "date": DateTime.now().add(const Duration(days: 30)),
+      'datePicked': false,
+      "status": "!",
+    },
+  ];
+  List<int> paymentIndexes = [0, 1];
+
+  // Loading state
+  bool _loading = false;
+  bool get loading => _loading;
+  set loading(bool value) {
+    _loading = value;
+    notifyListeners();
+  }
+
+  // Recalculate flag
+  bool _reCalculate = false;
+  bool get reCalculate => _reCalculate;
+  set reCalculate(bool value) {
+    _reCalculate = value;
+    notifyListeners();
+  }
+
+  void resetPaymentSchedule() {
+    paymentScheduleData = [
+      {
+        "type": "مدفوع",
+        "value": 0.0,
+        'valuePicked': false,
+        "date": DateTime.now(),
+        'datePicked': false,
+        "status": "تم",
+      },
+      {
+        "type": "مستحق",
+        "value": 0.0,
+        "valuePicked": false,
+        "date": DateTime.now().add(const Duration(days: 30)),
+        'datePicked': false,
+        "status": "!",
+      },
+    ];
+    paymentIndexes = [0, 1];
+    notifyListeners();
+  }
+
+  void reset() {
+    selectedDate = DateTime.now();
+    priceSumItems = 0.0;
+    discountValue = 0.0;
+    taxValue = 0.0;
+    total = 0.0;
+    originalInvoiceId = null;
+    originalInvoiceNumber = null;
+    resetPaymentSchedule();
+    notifyListeners();
+  }
 }
 
-// ==================== MAIN PAGE ====================
+// ═══════════════════════════════════════════════════════════════════════════════
+// ═══ SECTION 4: MAIN PAGE ══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 
 class InvoicePage extends StatefulWidget {
   const InvoicePage({
@@ -213,6 +276,7 @@ class InvoicePage extends StatefulWidget {
   final String type;
   final Invoice? invoice;
   final bool isEditMode;
+
   @override
   State<InvoicePage> createState() => _InvoicePageState();
 }
@@ -267,7 +331,6 @@ class _InvoicePageState extends State<InvoicePage>
       allowsManualItems: true,
       requiresOriginalInvoice: false,
     ),
-
     const InvoiceTypeModel(
       title: 'عرض سعر',
       type: 'عرض سعر',
@@ -280,13 +343,14 @@ class _InvoicePageState extends State<InvoicePage>
       requiresOriginalInvoice: false,
     ),
   ];
-
-  InvoiceState state = InvoiceState();
+  Invoice? result;
+  late InvoiceState state;
 
   @override
   void initState() {
     super.initState();
     selectedFilter = widget.type;
+    state = InvoiceState();
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -297,6 +361,7 @@ class _InvoicePageState extends State<InvoicePage>
   @override
   void dispose() {
     _animationController.dispose();
+    state.dispose();
     super.dispose();
   }
 
@@ -325,25 +390,6 @@ class _InvoicePageState extends State<InvoicePage>
         });
       }
 
-      setState(() {
-        taxController.text = !state.showTax
-            ? '0'
-            : taxController.text.isNotEmpty
-            ? taxController.text
-            : '0';
-        discountController.text = !state.showDiscount
-            ? '0'
-            : discountController.text.isNotEmpty
-            ? discountController.text
-            : '0';
-      });
-
-      if (widget.isFromWorkSpace) {
-        setState(() => reCalculate = false);
-      } else {
-        setState(() => reCalculate = true);
-      }
-
       final prefs = await SharedPreferences.getInstance();
       state.companyLogoPath = prefs.getString('logoPath${widget.groupId}');
     } catch (e) {
@@ -354,13 +400,18 @@ class _InvoicePageState extends State<InvoicePage>
   void _resetForNewType(String newType) {
     setState(() {
       selectedFilter = newType;
-      nameController.clear();
-      addressController.clear();
-      phoneController.clear();
-      notesController.clear();
+      state.reset();
       widget.itemsPurchase.clear();
       widget.itemsSale.clear();
       returnItems.clear();
+      returnType = '';
+      selectedPaymentMethod = 'كاش';
+      taxController.text = '0.0';
+      discountController.text = '0.0';
+      nameController.clear();
+      phoneController.clear();
+      addressController.clear();
+
       // Clear items based on type
       if (newType != 'بيع' && newType != 'عرض سعر') {
         widget.itemsSale.clear();
@@ -368,67 +419,42 @@ class _InvoicePageState extends State<InvoicePage>
       if (newType != 'شراء' && newType != 'عرض سعر') {
         widget.itemsPurchase.clear();
       }
-
-      // Reset return-specific data
-      if (newType != 'مرتجع') {
-        state.originalInvoiceId = null;
-        state.originalInvoiceNumber = null;
-      }
-
-      selectedPaymentMethod = 'كاش';
-      paymentScheduleData = [
-        {
-          "type": "مدفوع",
-          "value": 0.0,
-          'valuePicked': false,
-          "date": DateTime.now(),
-          'datePicked': false,
-          "status": "تم",
-        },
-        {
-          "type": "مستحق",
-          "value": 0.0,
-          "valuePicked": false,
-          "date": DateTime.now().add(const Duration(days: 30)),
-          'datePicked': false,
-          "status": "!",
-        },
-      ];
-      paymentIndexes = [0, 1];
     });
     _animationController.forward(from: 0);
-    setState(() => reCalculate = true);
+    setState(() => state.reCalculate = true);
   }
 
-  Future<void> _selectOriginalInvoice() async {
+  Future<void> _selectOriginalInvoice(bool isSelectionMode) async {
     returnItems.clear();
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            MyInvoicesPage(groupId: widget.groupId, isSelectionMode: true),
+        builder: (_) => MyInvoicesPage(
+          groupId: widget.groupId,
+          isSelectionMode: isSelectionMode,
+        ),
       ),
     );
     if (result != null && result is Invoice) {
-      print('Selected original invoice: ${result.invoiceNumber}');
+      debugPrint('Selected original invoice: ${result.invoiceNumber}');
       setState(() {
         state.originalInvoiceId = result.id;
         state.originalInvoiceNumber = result.invoiceNumber;
 
         // Auto-fill customer data from original invoice
         final customer = result.customer;
-
         nameController.text = customer.name ?? '';
         phoneController.text = customer.phone ?? '';
         addressController.text = customer.address ?? '';
-        returnType = result.type;
+        selectedFilter = result.type;
         selectedPaymentMethod = result.paymentMethod;
         discountController.text = result.summary.discountPercent.toString();
         taxController.text = result.summary.taxPercent.toString();
-        final paymentScheduleData0 = result.installments;
-        paymentScheduleData.clear();
-        for (var installment in paymentScheduleData0) {
-          paymentScheduleData.add({
+
+        // Copy payment schedule
+        state.paymentScheduleData.clear();
+        for (var installment in result.installments) {
+          state.paymentScheduleData.add({
             "type": installment.type,
             "value": installment.value,
             'valuePicked': true,
@@ -437,77 +463,140 @@ class _InvoicePageState extends State<InvoicePage>
             "status": installment.status,
           });
         }
-        // Copy items for return (with negative quantities)
 
+        // Copy items for return (preserve item IDs for stock restoration)
         widget.itemsSale.clear();
-        final returnItems0 = result.items;
-        for (var item in returnItems0) {
+        widget.itemsPurchase.clear();
+        for (var item in result.items) {
           returnItems.add({
             'name': item.name,
-            'quantity': item.quantity, // Negative for return
+            'quantity': item.quantity,
             'price': item.price,
-            'originalItem': true, // Mark as from original invoice
-            //  'id': item.itemId ?? '',
+            'originalItem': true,
+            /*  'id':
+                item.itemId ??
+                '', */
+            // FIX: Preserve item ID for stock restoration
           });
         }
 
-        print(
-          '/////////////////////////////$returnItems0/////////////////////////////',
-        );
-        reCalculate = true;
+        state.reCalculate = true;
       });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'تم اختيار الفاتورة الأصلية: ${result.invoiceNumber}',
+            ),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('تم اختيار الفاتورة الأصلية: ${result.invoiceNumber}'),
-        backgroundColor: AppColors.success,
-      ),
-    );
-    /*  final result = await Navigator.push(
+  }
+
+  Future<void> _selectOriginalInvoice2(bool isSelectionMode) async {
+    returnItems.clear();
+    late Invoice? result;
+    if (!mounted) return;
+    await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            MyInvoicesPage(groupId: widget.groupId, isSelectionMode: true),
+        builder: (context) => MyInvoicesPage(
+          groupId: widget.groupId,
+          isSelectionMode: isSelectionMode,
+          onInvoiceSelected: (invoice) {
+            result = invoice; // استلم الفاتورة المختارة
+            // هنا تستلم البيانات في الصفحة البعيدة مباشرة
+            print("تم استلام الفاتورة: ${invoice.invoiceNumber}");
+          },
+        ),
+        // settings: RouteSettings(name: '/MyInvoices'), // اختياري لتسمية المسار
       ),
     );
-
-    if (result != null && result is Map<String, dynamic>) {
+    if (result != null && result is Invoice) {
+      debugPrint('Selected original invoice: ${result!.invoiceNumber}');
       setState(() {
-        state.originalInvoiceId = result['id'];
-        state.originalInvoiceNumber = result['invoiceNumber'];
+        print('sssssssssssssssssssssssssssssssssssssssssss${result!.type}');
+        state.originalInvoiceId = result!.id;
+        state.originalInvoiceNumber = result!.invoiceNumber;
 
         // Auto-fill customer data from original invoice
-        final customer = result['customer'] as Map<String, dynamic>?;
-        if (customer != null) {
-          nameController.text = customer['name'] ?? '';
-          phoneController.text = customer['phone'] ?? '';
-          addressController.text = customer['address'] ?? '';
-        }
+        final customer = result!.customer;
+        nameController.text = customer.name ?? '';
+        phoneController.text = customer.phone ?? '';
+        addressController.text = customer.address ?? '';
+        selectedFilter = result!.type;
+        selectedPaymentMethod = result!.paymentMethod;
+        discountController.text = result!.summary.discountPercent.toString();
+        taxController.text = result!.summary.taxPercent.toString();
 
-        // Copy items for return (with negative quantities)
-        final items = result['items'] as List<dynamic>? ?? [];
-        widget.itemsSale.clear();
-        for (var item in items) {
-          widget.itemsSale.add({
-            'name': item['name'],
-            'quantity': -(item['quantity'] ?? 0).abs(), // Negative for return
-            'price': item['price'] ?? 0,
-            'originalItem': true, // Mark as from original invoice
+        // Copy payment schedule
+        state.paymentScheduleData.clear();
+        for (var installment in result!.installments) {
+          state.paymentScheduleData.add({
+            "type": installment.type,
+            "value": installment.value,
+            'valuePicked': true,
+            "date": installment.date,
+            'datePicked': true,
+            "status": installment.status,
           });
         }
 
-        reCalculate = true;
+        // Copy items for return (preserve item IDs for stock restoration)
+        widget.itemsSale.clear();
+        widget.itemsPurchase.clear();
+        for (var item in result!.items) {
+          result!.type == 'بيع'
+              ? widget.itemsSale.add({
+                  'name': item.name,
+                  'quantity': item.quantity,
+                  'price': item.price,
+                  'originalItem': true,
+                  /*  'id':
+                item.itemId ??
+                '', */
+                  // FIX: Preserve item ID for stock restoration
+                })
+              : result!.type == 'شراء'
+              ? widget.itemsPurchase.add({
+                  'name': item.name,
+                  'quantity': item.quantity,
+                  'price': item.price,
+                  'originalItem': true,
+                  /*  'id':
+                item.itemId ??
+                '', */
+                  // FIX: Preserve item ID for stock restoration
+                })
+              : widget.itemsSale.add({
+                  'name': item.name,
+                  'quantity': item.quantity,
+                  'price': item.price,
+                  'originalItem': true,
+                  /*  'id':
+                item.itemId ??
+                '', */
+                  // FIX: Preserve item ID for stock restoration
+                });
+        }
+
+        state.reCalculate = true;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'تم اختيار الفاتورة الأصلية: ${result['invoiceNumber']}',
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'تم اختيار الفاتورة الأصلية: ${result!.invoiceNumber}',
+            ),
+            backgroundColor: AppColors.success,
           ),
-          backgroundColor: AppColors.success,
-        ),
-      );
-    } */
+        );
+      }
+    }
   }
 
   Color _getBackgroundColor(String type) {
@@ -552,7 +641,7 @@ class _InvoicePageState extends State<InvoicePage>
 
     return WillPopScope(
       onWillPop: () async {
-        loading = false;
+        state.loading = false;
         nameController.clear();
         addressController.clear();
         phoneController.clear();
@@ -573,16 +662,10 @@ class _InvoicePageState extends State<InvoicePage>
         backgroundColor: _getBackgroundColor(selectedFilter),
         floatingActionButton: !widget.isEditMode
             ? FloatingActionButton.extended(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => MyInvoicesPage(
-                        groupId: widget.groupId,
-                        isSelectionMode: false,
-                      ),
-                    ),
-                  );
+                onPressed: () async {
+                  _resetForNewType('بيع');
+
+                  _selectOriginalInvoice2(false);
                 },
                 backgroundColor: const Color.fromARGB(255, 115, 5, 117),
                 foregroundColor: Colors.white,
@@ -597,24 +680,9 @@ class _InvoicePageState extends State<InvoicePage>
         appBar: AppBar(
           title: Text(
             !widget.isEditMode ? 'تسجيل فاتورة جديدة' : 'تعديل فاتورة',
-            style: TextStyle(fontSize: 18),
+            style: const TextStyle(fontSize: 18),
           ),
           actions: [
-            /*   IconButton(
-              icon: const Icon(Icons.receipt_long),
-              tooltip: 'فواتيري',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => MyInvoicesPage(
-                      groupId: widget.groupId,
-                      isSelectionMode: false,
-                    ),
-                  ),
-                );
-              },
-            ),*/
             IconButton(
               onPressed: () async {
                 final result = await Navigator.push(
@@ -647,55 +715,54 @@ class _InvoicePageState extends State<InvoicePage>
         body: Column(
           children: [
             // Filter Chips
-            !widget.isEditMode
-                ? Container(
-                    height: 80,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 12,
-                      horizontal: 16,
-                    ),
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: invoiceTypes.length,
-                      itemBuilder: (context, index) {
-                        final type = invoiceTypes[index];
-                        final isSelected = type.type == selectedFilter;
+            if (!widget.isEditMode)
+              Container(
+                height: 80,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 16,
+                ),
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: invoiceTypes.length,
+                  itemBuilder: (context, index) {
+                    final type = invoiceTypes[index];
+                    final isSelected = type.type == selectedFilter;
 
-                        return Padding(
-                          padding: const EdgeInsets.only(left: 8),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            child: FilterChip(
-                              avatar: Icon(
-                                type.icon,
-                                size: 18,
-                                color: isSelected ? Colors.white : type.color,
-                              ),
-                              label: Text(type.title),
-                              selected: isSelected,
-                              selectedColor: type.color,
-                              checkmarkColor: Colors.white,
-                              labelStyle: TextStyle(
-                                color: isSelected
-                                    ? Colors.white
-                                    : AppColors.textPrimary,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                              ),
-                              backgroundColor: AppColors.surface,
-                              side: BorderSide(
-                                color: AppColors.border,
-                                width: 2,
-                              ),
-                              onSelected: (_) => _resetForNewType(type.type),
-                            ),
+                    return Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        child: FilterChip(
+                          avatar: Icon(
+                            type.icon,
+                            size: 18,
+                            color: isSelected ? Colors.white : type.color,
                           ),
-                        );
-                      },
-                    ),
-                  )
-                : SizedBox.shrink(),
+                          label: Text(type.title),
+                          selected: isSelected,
+                          selectedColor: type.color,
+                          checkmarkColor: Colors.white,
+                          labelStyle: TextStyle(
+                            color: isSelected
+                                ? Colors.white
+                                : AppColors.textPrimary,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                          backgroundColor: AppColors.surface,
+                          side: const BorderSide(
+                            color: AppColors.border,
+                            width: 2,
+                          ),
+                          onSelected: (_) => _resetForNewType(type.type),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
 
             // Type hint
             if (_getTypeHint(selectedFilter).isNotEmpty && !widget.isEditMode)
@@ -706,7 +773,7 @@ class _InvoicePageState extends State<InvoicePage>
                 ),
                 child: Text(
                   _getTypeHint(selectedFilter),
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
@@ -730,7 +797,7 @@ class _InvoicePageState extends State<InvoicePage>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             'الفاتورة الأصلية',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
@@ -740,7 +807,7 @@ class _InvoicePageState extends State<InvoicePage>
                           if (state.originalInvoiceNumber != null)
                             Text(
                               state.originalInvoiceNumber!,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 color: AppColors.textSecondary,
                                 fontSize: 12,
                               ),
@@ -749,13 +816,18 @@ class _InvoicePageState extends State<InvoicePage>
                       ),
                     ),
                     ElevatedButton.icon(
-                      onPressed: _selectOriginalInvoice,
+                      onPressed: () {
+                        _selectOriginalInvoice(true);
+                      },
                       icon: const Icon(Icons.search, color: Colors.white),
                       label: Text(
                         state.originalInvoiceId == null
                             ? 'اختيار فاتورة'
                             : 'تغيير',
-                        style: TextStyle(color: Colors.white, fontSize: 16),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                        ),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.danger,
@@ -779,8 +851,7 @@ class _InvoicePageState extends State<InvoicePage>
                 isFromConstCustomers: widget.isFromConstCustomers,
                 state: state,
                 invoiceType: selectedType,
-                reCalculate: reCalculate,
-                returnItems: returnItems,
+                isEditMode: widget.isEditMode,
               ),
             ),
           ],
@@ -790,15 +861,31 @@ class _InvoicePageState extends State<InvoicePage>
   }
 }
 
-// ==================== INVOICE DESIGN ====================
+// ═══════════════════════════════════════════════════════════════════════════════
+// ═══ SECTION 5: INVOICE DESIGN (Content Widget) ══════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// ignore: must_be_immutable
+// Global controllers - scoped to file for shared access between widgets
+TextEditingController nameController = TextEditingController();
+TextEditingController addressController = TextEditingController();
+TextEditingController phoneController = TextEditingController();
+TextEditingController notesController = TextEditingController();
+TextEditingController taxController = TextEditingController(text: '0');
+TextEditingController discountController = TextEditingController(text: '0');
+String? selectedPaymentMethod = 'كاش';
+List<Map> returnItems = [];
+String returnType = '';
+
+// For maintenance items (manual entry)
+List<Map<String, dynamic>> maintenanceItems = [];
+TextEditingController maintenanceDescController = TextEditingController();
+TextEditingController maintenancePriceController = TextEditingController();
+
 class InvoicePageDesign extends StatefulWidget {
   final String type;
   final String groupId;
   final List<Map> itemsSale;
   final List<Map> itemsPurchase;
-  final List<Map> returnItems;
   final String name;
   final String phone;
   final String address;
@@ -806,9 +893,9 @@ class InvoicePageDesign extends StatefulWidget {
   final bool isFromConstCustomers;
   final InvoiceState state;
   final InvoiceTypeModel invoiceType;
-  bool reCalculate;
+  final bool isEditMode;
 
-  InvoicePageDesign({
+  const InvoicePageDesign({
     super.key,
     required this.type,
     required this.groupId,
@@ -820,29 +907,13 @@ class InvoicePageDesign extends StatefulWidget {
     required this.isFromConstCustomers,
     required this.state,
     required this.invoiceType,
-    required this.reCalculate,
     required this.itemsPurchase,
-    required this.returnItems,
+    required this.isEditMode,
   });
 
   @override
   State<InvoicePageDesign> createState() => _InvoicePageDesignState();
 }
-
-InvoiceState state = InvoiceState();
-TextEditingController nameController = TextEditingController();
-TextEditingController addressController = TextEditingController();
-TextEditingController phoneController = TextEditingController();
-TextEditingController notesController = TextEditingController();
-TextEditingController taxController = TextEditingController();
-TextEditingController discountController = TextEditingController();
-String? selectedPaymentMethod = 'كاش';
-
-// For maintenance items (manual entry)
-List<Map<String, dynamic>> maintenanceItems = [];
-TextEditingController maintenanceDescController = TextEditingController();
-TextEditingController maintenancePriceController = TextEditingController();
-String? customerId;
 
 class _InvoicePageDesignState extends State<InvoicePageDesign> {
   final List<String> paymentMethods = ['كاش', 'آجل', 'تقسيط'];
@@ -850,48 +921,33 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
   @override
   void initState() {
     super.initState();
-    nameController = TextEditingController(
-      text: widget.isFromConstCustomers ? widget.name : nameController.text,
-    );
-    customerId = widget.isFromConstCustomers ? widget.customerId : customerId;
-    print(
-      '/////////////////////////////$returnItems kkkkkkk/////////////////////////',
-    );
+    // Initialize controllers with customer data if coming from customers list
+    if (widget.isFromConstCustomers) {
+      nameController.text = widget.name;
+      phoneController.text = widget.phone;
+      addressController.text = widget.address;
+    }
 
-    addressController = TextEditingController(
-      text: widget.isFromConstCustomers
-          ? widget.address
-          : addressController.text,
-    );
-    phoneController = TextEditingController(
-      text: widget.isFromConstCustomers ? widget.phone : phoneController.text,
-    );
-    notesController = TextEditingController();
-    discountController = TextEditingController(
-      text: !state.showDiscount ? '0' : discountController.text,
-    );
-    taxController = TextEditingController(
-      text: !state.showTax ? '0' : taxController.text,
-    );
-    maintenanceDescController = TextEditingController();
-    maintenancePriceController = TextEditingController();
+    // Initialize tax/discount from settings
+    taxController.text = !widget.state.showTax ? '0' : taxController.text;
+    discountController.text = !widget.state.showDiscount
+        ? '0'
+        : discountController.text;
 
-    // _calculateTotals();
+    // Trigger initial calculation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _calculateTotals();
+    });
   }
 
   @override
   void dispose() {
-    nameController.dispose();
-    addressController.dispose();
-    phoneController.dispose();
-    notesController.dispose();
-    taxController.dispose();
-    discountController.dispose();
-    maintenanceDescController.dispose();
-    maintenancePriceController.dispose();
+    // Note: Global controllers are NOT disposed here to preserve state across rebuilds
+    // They are reset in WillPopScope when leaving the page
     super.dispose();
   }
 
+  /// Get current items list based on invoice type
   List<Map> get _currentItems {
     switch (widget.type) {
       case 'صيانة':
@@ -901,39 +957,50 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
       case 'بيع':
         return widget.itemsSale;
       case 'مرتجع':
-        return widget.returnItems;
+        return returnItems;
       case 'عرض سعر':
       default:
         return widget.itemsSale;
     }
   }
 
+  /// Calculate all financial totals
   void _calculateTotals() {
+    if (!mounted) return;
+
     setState(() {
       double sum = 0.0;
 
-      if (widget.type == 'صيانة') {
-        sum = maintenanceItems.fold(
-          0.0,
-          (sum, item) => sum + ((item['price'] ?? 0) * (item['quantity'] ?? 1)),
-        );
-      } else if (widget.type == 'شراء') {
-        sum = widget.itemsPurchase.fold(
-          0.0,
-          (sum, item) => sum + ((item['price'] ?? 0) * (item['quantity'] ?? 1)),
-        );
-      } else if (widget.type == 'عرض سعر' || widget.type == 'بيع') {
-        sum = widget.itemsSale.fold(
-          0.0,
-          (sum, item) =>
-              sum + ((item['price'] ?? 0) * (item['quantity'] ?? 1).abs()),
-        );
-      } else if (widget.type == 'مرتجع') {
-        sum = widget.returnItems.fold(
-          0.0,
-          (sum, item) =>
-              sum + ((item['price'] ?? 0) * (item['quantity'] ?? 0).abs()),
-        );
+      switch (widget.type) {
+        case 'صيانة':
+          sum = maintenanceItems.fold(
+            0.0,
+            (sum, item) =>
+                sum + ((item['price'] ?? 0) * (item['quantity'] ?? 1)),
+          );
+          break;
+        case 'شراء':
+          sum = widget.itemsPurchase.fold(
+            0.0,
+            (sum, item) =>
+                sum + ((item['price'] ?? 0) * (item['quantity'] ?? 1)),
+          );
+          break;
+        case 'عرض سعر':
+        case 'بيع':
+          sum = widget.itemsSale.fold(
+            0.0,
+            (sum, item) =>
+                sum + ((item['price'] ?? 0) * (item['quantity'] ?? 1).abs()),
+          );
+          break;
+        case 'مرتجع':
+          sum = returnItems.fold(
+            0.0,
+            (sum, item) =>
+                sum + ((item['price'] ?? 0) * (item['quantity'] ?? 0).abs()),
+          );
+          break;
       }
 
       widget.state.priceSumItems = sum;
@@ -949,12 +1016,11 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           widget.state.priceSumItems +
           widget.state.taxValue -
           widget.state.discountValue;
-    });
-    setState(() {
-      widget.reCalculate = false;
+      widget.state.reCalculate = false;
     });
   }
 
+  /// Show edit dialog for numeric fields
   void _showEditDialog({
     required String title,
     required String label,
@@ -1014,6 +1080,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     );
   }
 
+  /// Reset all invoice data
   void _resetInvoice() {
     showDialog(
       context: context,
@@ -1037,24 +1104,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           ElevatedButton(
             onPressed: () {
               setState(() {
-                paymentScheduleData = [
-                  {
-                    "type": "مدفوع",
-                    "value": 0.0,
-                    'valuePicked': false,
-                    "date": DateTime.now(),
-                    'datePicked': false,
-                    "status": "تم",
-                  },
-                  {
-                    "type": "مستحق",
-                    "value": 0.0,
-                    "valuePicked": false,
-                    "date": DateTime.now().add(const Duration(days: 30)),
-                    'datePicked': false,
-                    "status": "!",
-                  },
-                ];
+                widget.state.resetPaymentSchedule();
                 maintenanceItems.clear();
               });
               nameController.clear();
@@ -1066,7 +1116,6 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               widget.itemsSale.clear();
               widget.itemsPurchase.clear();
               selectedPaymentMethod = 'كاش';
-              paymentIndexes = [0, 1];
               returnItems.clear();
               _calculateTotals();
               Navigator.pop(context);
@@ -1079,6 +1128,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     );
   }
 
+  /// Get English title for invoice number generation
   String _getTitleEnglish(String type) {
     switch (type) {
       case 'بيع':
@@ -1096,79 +1146,85 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     }
   }
 
+  /// Build invoice data map for Firestore
   Map<String, dynamic> buildInvoiceData() {
     final List<Map<String, dynamic>> items = [];
 
-    if (widget.type == 'صيانة') {
-      items.addAll(
-        maintenanceItems.map(
-          (item) => {
-            "name": item['name'],
-            "quantity": item['quantity'] ?? 1,
-            "price": item['price'] ?? 0,
-            "total": (item['quantity'] ?? 1) * (item['price'] ?? 0),
-            "isManual": true,
-            'itemId': item['id'] ?? '',
-          },
-        ),
-      );
-    } else if (widget.type == 'شراء') {
-      items.addAll(
-        widget.itemsPurchase.map(
-          (item) => {
-            "name": item['name'],
-            "quantity": item['quantity'] ?? 0,
-            "price": item['price'] ?? 0,
-            "total": (item['quantity'] ?? 0) * (item['price'] ?? 0),
-            'itemId': item['id'] ?? '',
-          },
-        ),
-      );
-    } else if (widget.type == 'عرض سعر') {
-      items.addAll(
-        widget.itemsSale.map(
-          (item) => {
-            "name": item['name'],
-            "quantity": item['quantity'] ?? 0,
-            "price": item['price'] ?? 0,
-            "total": (item['quantity'] ?? 0) * (item['price'] ?? 0),
-            "isManual": item['isManual'] ?? false,
-            'itemId': item['id'] ?? '',
-          },
-        ),
-      );
-    } else if (widget.type == 'مرتجع') {
-      items.addAll(
-        widget.returnItems.map(
-          (item) => {
-            "name": item['name'],
-            "quantity": item['quantity'] ?? 0,
-            "price": item['price'] ?? 0,
-            "total": (item['quantity'] ?? 0).abs() * (item['price'] ?? 0),
-            "isReturn": true,
-            'itemId': item['id'] ?? '',
-          },
-        ),
-      );
-    } else {
-      items.addAll(
-        widget.itemsSale.map(
-          (item) => {
-            "name": item['name'],
-            "quantity": item['quantity'] ?? 0,
-            "price": item['price'] ?? 0,
-            "total": (item['quantity'] ?? 0).abs() * (item['price'] ?? 0),
-            "isReturn": widget.type == 'مرتجع',
-            'itemId': item['id'] ?? '',
-          },
-        ),
-      );
+    switch (widget.type) {
+      case 'صيانة':
+        items.addAll(
+          maintenanceItems.map(
+            (item) => {
+              "name": item['name'],
+              "quantity": item['quantity'] ?? 1,
+              "price": item['price'] ?? 0,
+              "total": (item['quantity'] ?? 1) * (item['price'] ?? 0),
+              "isManual": true,
+              'itemId': item['id'] ?? '',
+            },
+          ),
+        );
+        break;
+      case 'شراء':
+        items.addAll(
+          widget.itemsPurchase.map(
+            (item) => {
+              "name": item['name'],
+              "quantity": item['quantity'] ?? 0,
+              "price": item['price'] ?? 0,
+              "total": (item['quantity'] ?? 0) * (item['price'] ?? 0),
+              'itemId': item['id'] ?? '',
+            },
+          ),
+        );
+        break;
+      case 'عرض سعر':
+        items.addAll(
+          widget.itemsSale.map(
+            (item) => {
+              "name": item['name'],
+              "quantity": item['quantity'] ?? 0,
+              "price": item['price'] ?? 0,
+              "total": (item['quantity'] ?? 0) * (item['price'] ?? 0),
+              "isManual": item['isManual'] ?? false,
+              'itemId': item['id'] ?? '',
+            },
+          ),
+        );
+        break;
+      case 'مرتجع':
+        items.addAll(
+          returnItems.map(
+            (item) => {
+              "name": item['name'],
+              "quantity": item['quantity'] ?? 0,
+              "price": item['price'] ?? 0,
+              "total": (item['quantity'] ?? 0).abs() * (item['price'] ?? 0),
+              "isReturn": true,
+              'itemId':
+                  item['id'] ?? '', // FIX: Include itemId for stock restoration
+            },
+          ),
+        );
+        break;
+      default: // 'بيع'
+        items.addAll(
+          widget.itemsSale.map(
+            (item) => {
+              "name": item['name'],
+              "quantity": item['quantity'] ?? 0,
+              "price": item['price'] ?? 0,
+              "total": (item['quantity'] ?? 0).abs() * (item['price'] ?? 0),
+              'itemId': item['id'] ?? '',
+            },
+          ),
+        );
     }
 
     return {
       "type": widget.type,
       "customer": {
-        "id": customerId ?? '',
+        "id": widget.customerId,
         "name": nameController.text.isNotEmpty ? nameController.text : null,
         "phone": phoneController.text.isNotEmpty ? phoneController.text : null,
         "address": addressController.text.isNotEmpty
@@ -1185,9 +1241,10 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
         "total": widget.state.total,
       },
       "notes": notesController.text.isNotEmpty ? notesController.text : null,
-      "date": InvoiceState.selectedDate.toIso8601String(),
-      "invoiceNumber":
-          "${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}",
+      "date": widget.state.selectedDate.toIso8601String(),
+      "invoiceNumber": widget.type != 'مرتجع'
+          ? "${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}"
+          : 'return-${widget.state.originalInvoiceNumber ?? ''}',
       "createdAt": DateTime.now().toIso8601String(),
       'paymentMethod': selectedPaymentMethod,
       if (widget.type == 'مرتجع') ...{
@@ -1199,16 +1256,19 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     };
   }
 
+  /// Save invoice to Firestore and update stock
   Future<void> saveInvoice() async {
     final dataFinal = buildInvoiceData();
 
+    // Add payment schedule for non-cash payments
     if (selectedPaymentMethod != 'كاش') {
-      for (int i = 0; i < paymentScheduleData.length; i++) {
+      for (int i = 0; i < widget.state.paymentScheduleData.length; i++) {
         dataFinal['payment${i + 1}'] = {
-          "type": paymentScheduleData[i]['type'],
-          "value": paymentScheduleData[i]['value'],
-          "date": paymentScheduleData[i]['date'].toIso8601String(),
-          "status": paymentScheduleData[i]['status'],
+          "type": widget.state.paymentScheduleData[i]['type'],
+          "value": widget.state.paymentScheduleData[i]['value'],
+          "date": (widget.state.paymentScheduleData[i]['date'] as DateTime)
+              .toIso8601String(),
+          "status": widget.state.paymentScheduleData[i]['status'],
         };
       }
     }
@@ -1234,6 +1294,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     }
   }
 
+  /// Update stock for sale/purchase invoices
   Future<void> _updateStock() async {
     final items = widget.type == 'شراء'
         ? widget.itemsPurchase
@@ -1241,50 +1302,55 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     final batch = FirebaseFirestore.instance.batch();
 
     for (var item in items) {
-      if (item['id'] != null) {
-        final ref = FirebaseFirestore.instance
-            .collection('inventory')
-            .doc(widget.groupId)
-            .collection('items')
-            .doc(item['id']);
+      final itemId = item['id'] as String?;
+      if (itemId == null || itemId.isEmpty) continue;
 
-        final doc = await ref.get();
-        if (doc.exists) {
-          final currentQty = (doc.data()?['quantity'] ?? 0) as num;
-          final newQty = widget.type == 'شراء'
-              ? currentQty + (item['quantity'] ?? 0)
-              : currentQty - (item['quantity'] ?? 0);
-          batch.update(ref, {'quantity': newQty});
-        }
+      final ref = FirebaseFirestore.instance
+          .collection('inventory')
+          .doc(widget.groupId)
+          .collection('items')
+          .doc(itemId);
+
+      final doc = await ref.get();
+      if (doc.exists) {
+        final currentQty = (doc.data()?['quantity'] ?? 0) as num;
+        final newQty = widget.type == 'شراء'
+            ? currentQty + (item['quantity'] ?? 0)
+            : currentQty - (item['quantity'] ?? 0);
+        batch.update(ref, {'quantity': newQty});
       }
     }
 
     await batch.commit();
   }
 
+  /// Restore stock for return invoices - FIX: Uses returnItems instead of itemsSale
   Future<void> _restoreStock() async {
     final batch = FirebaseFirestore.instance.batch();
 
-    for (var item in widget.itemsSale) {
-      if (item['id'] != null) {
-        final ref = FirebaseFirestore.instance
-            .collection('inventory')
-            .doc(widget.groupId)
-            .collection('items')
-            .doc(item['id']);
+    // FIX: Use returnItems instead of widget.itemsSale
+    for (var item in returnItems) {
+      final itemId = item['id'] as String?;
+      if (itemId == null || itemId.isEmpty) continue;
 
-        final doc = await ref.get();
-        if (doc.exists) {
-          final currentQty = (doc.data()?['quantity'] ?? 0) as num;
-          final returnedQty = (item['quantity'] ?? 0).abs();
-          batch.update(ref, {'quantity': currentQty + returnedQty});
-        }
+      final ref = FirebaseFirestore.instance
+          .collection('inventory')
+          .doc(widget.groupId)
+          .collection('items')
+          .doc(itemId);
+
+      final doc = await ref.get();
+      if (doc.exists) {
+        final currentQty = (doc.data()?['quantity'] ?? 0) as num;
+        final returnedQty = (item['quantity'] ?? 0).abs();
+        batch.update(ref, {'quantity': currentQty + returnedQty});
       }
     }
 
     await batch.commit();
   }
 
+  /// Get customer label based on invoice type
   String _getCustomerLabel() {
     switch (widget.type) {
       case 'شراء':
@@ -1296,6 +1362,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     }
   }
 
+  /// Add maintenance item dialog
   void _addMaintenanceItem() {
     showDialog(
       context: context,
@@ -1363,9 +1430,89 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     );
   }
 
+  /// Show dialog for manual item entry
+  void _showManualItemDialog() {
+    final nameCtrl = TextEditingController();
+    final priceCtrl = TextEditingController();
+    final qtyCtrl = TextEditingController(text: '1');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'إضافة صنف يدوي',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              textAlign: TextAlign.right,
+              decoration: InputDecoration(
+                labelText: 'اسم الصنف',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: priceCtrl,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.right,
+              decoration: InputDecoration(
+                labelText: 'السعر',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: qtyCtrl,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.right,
+              decoration: InputDecoration(
+                labelText: 'الكمية',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (nameCtrl.text.isNotEmpty && priceCtrl.text.isNotEmpty) {
+                setState(() {
+                  widget.itemsSale.add({
+                    'name': nameCtrl.text,
+                    'price': double.tryParse(priceCtrl.text) ?? 0,
+                    'quantity': int.tryParse(qtyCtrl.text) ?? 1,
+                    'isManual': true,
+                  });
+                  _calculateTotals();
+                });
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('إضافة'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return loading
+    return widget.state.loading
         ? const Center(
             child: CircularProgressIndicator(
               strokeWidth: 4,
@@ -1409,7 +1556,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
 
                           _buildNotesSection(),
                           const SizedBox(height: 24),
-                          _buildSaveButton(widget.state.total),
+                          _buildSaveButton(),
                         ],
                       ),
                     ),
@@ -1420,6 +1567,8 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
             ),
           );
   }
+
+  // ─── UI BUILDERS ───
 
   Widget _buildHeader() {
     return Row(
@@ -1442,9 +1591,11 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                widget.invoiceType.title,
+                widget.type != 'مرتجع'
+                    ? widget.invoiceType.title
+                    : 'return-${widget.state.originalInvoiceNumber ?? ''}',
                 style: const TextStyle(
-                  fontSize: 22,
+                  // fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
                 ),
@@ -1452,7 +1603,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               Text(
                 widget.type != 'مرتجع'
                     ? '#${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}'
-                    : 'return-${widget.state.originalInvoiceNumber ?? ''}',
+                    : '',
                 style: const TextStyle(
                   fontSize: 13,
                   color: AppColors.textSecondary,
@@ -1472,9 +1623,9 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
 
   Widget _buildInvoiceInfo() {
     final formattedDate =
-        '${InvoiceState.selectedDate.year}-'
-        '${InvoiceState.selectedDate.month.toString().padLeft(2, '0')}-'
-        '${InvoiceState.selectedDate.day.toString().padLeft(2, '0')}';
+        '${widget.state.selectedDate.year}-'
+        '${widget.state.selectedDate.month.toString().padLeft(2, '0')}-'
+        '${widget.state.selectedDate.day.toString().padLeft(2, '0')}';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1492,7 +1643,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               onTap: () async {
                 final picked = await showDatePicker(
                   context: context,
-                  initialDate: InvoiceState.selectedDate,
+                  initialDate: widget.state.selectedDate,
                   firstDate: DateTime(2000),
                   lastDate: DateTime(2100),
                   builder: (context, child) => Theme(
@@ -1505,7 +1656,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                   ),
                 );
                 if (picked != null) {
-                  setState(() => InvoiceState.selectedDate = picked);
+                  setState(() => widget.state.selectedDate = picked);
                 }
               },
             ),
@@ -1596,9 +1747,10 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                   onTap: widget.type == 'مرتجع'
                       ? null
                       : () => setState(() {
-                          paymentIndexes = [0, 1];
+                          widget.state.resetPaymentSchedule();
                           selectedPaymentMethod = method;
-                          paymentScheduleData = [
+                          // Reset payment schedule for new method
+                          widget.state.paymentScheduleData = [
                             {
                               "type": "مدفوع",
                               "value": 0.0,
@@ -1697,7 +1849,6 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           controller: nameController,
           label: 'الاسم',
           icon: Icons.person_outline,
-          onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 12),
         _buildTextField(
@@ -1705,14 +1856,12 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           label: 'رقم الهاتف',
           icon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
-          onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 12),
         _buildTextField(
           controller: addressController,
           label: 'العنوان',
           icon: Icons.location_on_outlined,
-          onChanged: (_) => setState(() {}),
         ),
       ],
     );
@@ -1723,7 +1872,6 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     required String label,
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
-    ValueChanged<String>? onChanged,
   }) {
     return TextField(
       controller: controller,
@@ -1734,7 +1882,6 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
         labelText: label,
         prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 20),
       ),
-      onChanged: (value) => onChanged?.call(value),
     );
   }
 
@@ -1848,7 +1995,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               } else if (widget.type == 'شراء') {
                 widget.itemsPurchase.removeAt(index);
               } else if (widget.type == 'مرتجع') {
-                widget.returnItems.removeAt(index);
+                returnItems.removeAt(index);
               } else {
                 widget.itemsSale.removeAt(index);
               }
@@ -1953,9 +2100,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
-            onPressed: () {
-              _showManualItemDialog();
-            },
+            onPressed: _showManualItemDialog,
             icon: const Icon(Icons.edit_note),
             label: const Text('إضافة صنف يدوي'),
             style: OutlinedButton.styleFrom(
@@ -2027,87 +2172,6 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     );
   }
 
-  void _showManualItemDialog() {
-    final nameController = TextEditingController();
-    final priceController = TextEditingController();
-    final qtyController = TextEditingController(text: '1');
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'إضافة صنف يدوي',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              textAlign: TextAlign.right,
-              decoration: InputDecoration(
-                labelText: 'اسم الصنف',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: priceController,
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.right,
-              decoration: InputDecoration(
-                labelText: 'السعر',
-                //  suffixText: 'ج.م',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: qtyController,
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.right,
-              decoration: InputDecoration(
-                labelText: 'الكمية',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (nameController.text.isNotEmpty &&
-                  priceController.text.isNotEmpty) {
-                setState(() {
-                  widget.itemsSale.add({
-                    'name': nameController.text,
-                    'price': double.tryParse(priceController.text) ?? 0,
-                    'quantity': int.tryParse(qtyController.text) ?? 1,
-                    'isManual': true,
-                  });
-                  _calculateTotals();
-                });
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('إضافة'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildTotalsSection() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -2125,8 +2189,8 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               label: 'الخصم',
               controller: discountController,
               suffix: '%',
-              color: Colors.redAccent,
               calculatedValue: widget.state.discountValue,
+              color: Colors.redAccent,
               onEdit: () => widget.type != 'مرتجع'
                   ? _showEditDialog(
                       title: 'تعديل نسبة الخصم',
@@ -2179,7 +2243,8 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     bool isTotal = false,
     Color? color,
   }) {
-    if (widget.reCalculate) {
+    // FIX: Use post-frame callback safely with mounted check
+    if (widget.state.reCalculate) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           setState(() => _calculateTotals());
@@ -2219,7 +2284,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     required TextEditingController controller,
     required String suffix,
     required double calculatedValue,
-    required VoidCallback onEdit,
+    required VoidCallback? onEdit,
     required Color color,
   }) {
     return InkWell(
@@ -2283,7 +2348,13 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
-        CustomPaymentsTable(total: widget.state.total, type: widget.type),
+        CustomPaymentsTable(
+          total: widget.state.total,
+          paymentScheduleData: widget.state.paymentScheduleData,
+          paymentIndexes: widget.state.paymentIndexes,
+          paymentMethod: selectedPaymentMethod,
+          onDataChanged: () => setState(() {}),
+        ),
       ],
     );
   }
@@ -2304,12 +2375,12 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     );
   }
 
-  Widget _buildSaveButton(double total) {
+  Widget _buildSaveButton() {
     final bool hasItems = widget.type == 'صيانة'
         ? maintenanceItems.isNotEmpty
         : (widget.itemsSale.isNotEmpty ||
               widget.itemsPurchase.isNotEmpty ||
-              widget.returnItems.isNotEmpty);
+              returnItems.isNotEmpty);
 
     final bool isValid =
         hasItems &&
@@ -2319,7 +2390,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
       width: double.infinity,
       height: 52,
       child: ElevatedButton.icon(
-        onPressed: isValid ? () => _handleSave(total) : null,
+        onPressed: isValid ? () => _handleSave() : null,
         icon: const Icon(Icons.save_outlined, color: Colors.white),
         label: Text(
           widget.type == 'عرض سعر' ? 'حفظ عرض السعر' : 'حفظ وطباعة الفاتورة',
@@ -2333,13 +2404,14 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     );
   }
 
-  Future<void> _handleSave(double total) async {
+  Future<void> _handleSave() async {
+    // Validate payment schedule sums
     if (selectedPaymentMethod != 'كاش' && widget.type != 'عرض سعر') {
-      double sum = paymentScheduleData.fold(
+      double sum = widget.state.paymentScheduleData.fold(
         0.0,
-        (sum, item) => sum + item['value'],
+        (sum, item) => sum + ((item['value'] ?? 0.0) as num).toDouble(),
       );
-      if (sum != total) {
+      if (sum != widget.state.total) {
         AwesomeDialog(
           context: context,
           dialogType: DialogType.error,
@@ -2353,7 +2425,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     }
 
     try {
-      setState(() => loading = true);
+      setState(() => widget.state.loading = true);
       await saveInvoice();
 
       // Prepare items for PDF
@@ -2380,6 +2452,18 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               },
             )
             .toList();
+      } else if (widget.type == 'مرتجع') {
+        // FIX: Use returnItems for PDF generation
+        pdfItems = returnItems
+            .map(
+              (item) => {
+                'name': item['name'] ?? '',
+                'quantity': (item['quantity'] ?? 0).abs(),
+                'price': item['price'] ?? 0,
+                'total': (item['quantity'] ?? 0).abs() * (item['price'] ?? 0),
+              },
+            )
+            .toList();
       } else {
         pdfItems = widget.itemsSale
             .map(
@@ -2397,7 +2481,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
         invoiceType: widget.type,
         invoiceNumber:
             "${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}",
-        invoiceDate: InvoiceState.selectedDate,
+        invoiceDate: widget.state.selectedDate,
         clientName: nameController.text,
         clientAddress: addressController.text,
         clientPhone: phoneController.text,
@@ -2414,7 +2498,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
         companyLogoPath: widget.state.companyLogoPath,
         isDue: selectedPaymentMethod == 'آجل',
         isInstallment: selectedPaymentMethod == 'تقسيط',
-        dueDates: paymentScheduleData,
+        dueDates: widget.state.paymentScheduleData,
         showAddress: widget.state.showAddress,
         showEmail: widget.state.showEmail,
         showDiscount: widget.state.showDiscount,
@@ -2426,8 +2510,9 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
         originalInvoiceNumber: widget.state.originalInvoiceNumber,
       );
 
-      setState(() => loading = false);
-      loading = false;
+      setState(() => widget.state.loading = false);
+
+      // Reset controllers
       nameController.clear();
       addressController.clear();
       phoneController.clear();
@@ -2437,14 +2522,13 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
       widget.itemsSale.clear();
       widget.itemsPurchase.clear();
       selectedPaymentMethod = 'كاش';
+      returnItems.clear();
 
       if (mounted) {
         Navigator.popUntil(
           context,
           ModalRoute.withName(WorkspaceHomeScreen.screenroute),
         );
-      }
-      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -2472,21 +2556,29 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           SnackBar(content: Text('خطأ: $e'), backgroundColor: AppColors.danger),
         );
       }
-      setState(() => loading = false);
+      setState(() => widget.state.loading = false);
     }
   }
 }
 
-// ==================== PAYMENTS TABLE ====================
+// ═══════════════════════════════════════════════════════════════════════════════
+// ═══ SECTION 6: PAYMENTS TABLE (Refactored with proper data flow) ════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 
 class CustomPaymentsTable extends StatefulWidget {
   final double total;
-  final String type;
+  final List<Map<String, dynamic>> paymentScheduleData;
+  final List<int> paymentIndexes;
+  final String? paymentMethod;
+  final VoidCallback onDataChanged;
 
   const CustomPaymentsTable({
     super.key,
     required this.total,
-    required this.type,
+    required this.paymentScheduleData,
+    required this.paymentIndexes,
+    required this.paymentMethod,
+    required this.onDataChanged,
   });
 
   @override
@@ -2500,7 +2592,7 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
 
   void editValue(int index) {
     final controller = TextEditingController(
-      text: paymentScheduleData[index]['value'].toString(),
+      text: widget.paymentScheduleData[index]['value'].toString(),
     );
     final formKey = GlobalKey<FormState>();
 
@@ -2544,11 +2636,11 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
               if (formKey.currentState!.validate()) {
                 setState(() {
                   final value = double.tryParse(controller.text) ?? 0;
-                  paymentScheduleData[index]['value'] = value;
-                  paymentScheduleData[index]['valuePicked'] = true;
+                  widget.paymentScheduleData[index]['value'] = value;
+                  widget.paymentScheduleData[index]['valuePicked'] = true;
 
                   // Auto-calculate remaining
-                  double sum = paymentScheduleData
+                  double sum = widget.paymentScheduleData
                       .take(index + 1)
                       .fold(
                         0.0,
@@ -2556,25 +2648,21 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
                       );
                   double remaining = widget.total - sum;
 
-                  if (remaining > 0 && index < paymentScheduleData.length - 1) {
+                  if (remaining > 0 &&
+                      index < widget.paymentScheduleData.length - 1) {
                     for (
                       int i = index + 1;
-                      i < paymentScheduleData.length;
+                      i < widget.paymentScheduleData.length;
                       i++
                     ) {
-                      if (index == paymentScheduleData.length - 1) {
-                        paymentScheduleData[i]['value'] = remaining;
-                        paymentScheduleData[i]['valuePicked'] = true;
-                      } else {
-                        paymentScheduleData[i]['value'] =
-                            remaining /
-                            (paymentScheduleData.length - index - 1);
-                        paymentScheduleData[i]['valuePicked'] = true;
-                      }
+                      widget.paymentScheduleData[i]['value'] =
+                          remaining /
+                          (widget.paymentScheduleData.length - index - 1);
+                      widget.paymentScheduleData[i]['valuePicked'] = true;
                     }
                   }
                 });
-                print(widget.total);
+                widget.onDataChanged();
                 Navigator.pop(context);
               }
             },
@@ -2588,7 +2676,7 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
   Future<void> pickDate(int index) async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: paymentScheduleData[index]['date'],
+      initialDate: widget.paymentScheduleData[index]['date'] as DateTime,
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
       builder: (context, child) => Theme(
@@ -2601,19 +2689,21 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
 
     if (picked != null) {
       setState(() {
-        paymentScheduleData[index]['date'] = picked;
-        paymentScheduleData[index]['datePicked'] = true;
+        widget.paymentScheduleData[index]['date'] = picked;
+        widget.paymentScheduleData[index]['datePicked'] = true;
       });
-    }
-    if (paymentScheduleData[0]['datePicked'] == true) {
-      List otherIndexes = paymentIndexes;
-      otherIndexes = paymentIndexes.where((item) => item != 0).toList();
-      print(otherIndexes);
-      for (var i in otherIndexes) {
-        setState(() {
-          paymentScheduleData[i]['datePicked'] = true;
-        });
+
+      if (widget.paymentScheduleData[0]['datePicked'] == true) {
+        final otherIndexes = widget.paymentIndexes
+            .where((item) => item != 0)
+            .toList();
+        for (var i in otherIndexes) {
+          setState(() {
+            widget.paymentScheduleData[i]['datePicked'] = true;
+          });
+        }
       }
+      widget.onDataChanged();
     }
   }
 
@@ -2679,8 +2769,8 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
               ),
 
               // Rows
-              ...List.generate(paymentScheduleData.length, (index) {
-                final item = paymentScheduleData[index];
+              ...List.generate(widget.paymentScheduleData.length, (index) {
+                final item = widget.paymentScheduleData[index];
                 return Container(
                   decoration: BoxDecoration(
                     border: Border(top: BorderSide(color: AppColors.border)),
@@ -2708,7 +2798,7 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
                                 : AppColors.primary.withOpacity(0.05),
                             child: Text(
                               item['valuePicked']
-                                  ? item['value'].toStringAsFixed(2)
+                                  ? (item['value'] as double).toStringAsFixed(2)
                                   : 'تعديل',
                               textAlign: TextAlign.center,
                               style: TextStyle(
@@ -2734,7 +2824,7 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
                                 : AppColors.primary.withOpacity(0.05),
                             child: Text(
                               item['datePicked']
-                                  ? formatDate(item['date'])
+                                  ? formatDate(item['date'] as DateTime)
                                   : 'تعديل',
                               textAlign: TextAlign.center,
                               style: TextStyle(
@@ -2768,22 +2858,23 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
             ],
           ),
         ),
-        if (selectedPaymentMethod == 'تقسيط' && widget.type != 'مرتجع')
+        if (widget.paymentMethod == 'تقسيط')
           TextButton(
             onPressed: () {
               setState(() {
-                paymentScheduleData.add({
-                  "type": 'قسط ${paymentScheduleData.length}',
+                widget.paymentScheduleData.add({
+                  "type": 'قسط ${widget.paymentScheduleData.length}',
                   "value": 0.0,
                   "valuePicked": false,
                   "date": DateTime.now().add(
-                    Duration(days: 30 * (paymentScheduleData.length)),
+                    Duration(days: 30 * (widget.paymentScheduleData.length)),
                   ),
                   'datePicked': false,
                   "status": "!",
                 });
               });
-              paymentIndexes.add(paymentIndexes.length);
+              widget.paymentIndexes.add(widget.paymentIndexes.length);
+              widget.onDataChanged();
             },
             child: const Text('إضافة قسط'),
           ),
@@ -2792,13 +2883,13 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
   }
 }
 
-// ==================== PDF GENERATOR ====================
-
-// ==================== PDF GENERATOR (CORRECTED & REDESIGNED) ====================
-
-// ==================== PDF GENERATOR (CORRECTED & REDESIGNED) ====================
+// ═══════════════════════════════════════════════════════════════════════════════
+// ═══ SECTION 7: PDF GENERATOR (Corrected & Optimized) ════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
 
 class PdfTheme {
+  const PdfTheme._();
+
   static const PdfColor primary = PdfColor.fromInt(0xFF2563EB);
   static const PdfColor primaryDark = PdfColor.fromInt(0xFF1D4ED8);
   static const PdfColor success = PdfColor.fromInt(0xFF10B981);
@@ -2830,50 +2921,52 @@ class InvoiceTypeStyle {
 }
 
 class InvoiceTypeStyles {
+  const InvoiceTypeStyles._();
+
   static final Map<String, InvoiceTypeStyle> _styles = {
     'بيع': InvoiceTypeStyle(
       titleAr: 'فاتورة بيع',
       titleEn: 'SALE INVOICE',
       primaryColor: PdfTheme.success,
-      lightColor: PdfColor.fromInt(0xFFD1FAE5),
+      lightColor: const PdfColor.fromInt(0xFFD1FAE5),
       badgeText: 'SALE',
     ),
     'شراء': InvoiceTypeStyle(
       titleAr: 'فاتورة شراء',
       titleEn: 'PURCHASE INVOICE',
       primaryColor: PdfTheme.primary,
-      lightColor: PdfColor.fromInt(0xFFDBEAFE),
+      lightColor: const PdfColor.fromInt(0xFFDBEAFE),
       badgeText: 'PURCHASE',
     ),
     'صيانة': InvoiceTypeStyle(
       titleAr: 'فاتورة صيانة',
       titleEn: 'MAINTENANCE INVOICE',
       primaryColor: PdfTheme.warning,
-      lightColor: PdfColor.fromInt(0xFFFEF3C7),
+      lightColor: const PdfColor.fromInt(0xFFFEF3C7),
       badgeText: 'MAINTENANCE',
     ),
     'مرتجع': InvoiceTypeStyle(
       titleAr: 'فاتورة مرتجع',
       titleEn: 'RETURN INVOICE',
       primaryColor: PdfTheme.danger,
-      lightColor: PdfColor.fromInt(0xFFFEE2E2),
+      lightColor: const PdfColor.fromInt(0xFFFEE2E2),
       badgeText: 'RETURN',
     ),
     'عرض سعر': InvoiceTypeStyle(
       titleAr: 'عرض سعر',
       titleEn: 'QUOTATION',
       primaryColor: PdfTheme.info,
-      lightColor: PdfColor.fromInt(0xFFE0F2FE),
+      lightColor: const PdfColor.fromInt(0xFFE0F2FE),
       badgeText: 'QUOTE',
     ),
   };
 
   static InvoiceTypeStyle get(String type) {
-    return _styles[type.toLowerCase()] ?? _styles['بيع']!;
+    return _styles[type] ?? _styles['بيع']!;
   }
 }
 
-// Helper widget for bullet points (replaces Material Icons)
+// Helper widget for bullet points
 pw.Widget _pdfBullet(PdfColor color, {double size = 8}) {
   return pw.Container(
     width: size,
@@ -2885,7 +2978,7 @@ pw.Widget _pdfBullet(PdfColor color, {double size = 8}) {
   );
 }
 
-// Helper widget for small labels (replaces icons with text)
+// Helper widget for small labels
 pw.Widget _pdfIconLabel(String label, PdfColor color, {double fontSize = 8}) {
   return pw.Container(
     padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -2905,6 +2998,8 @@ pw.Widget _pdfIconLabel(String label, PdfColor color, {double fontSize = 8}) {
 }
 
 class InvoiceGenerator {
+  const InvoiceGenerator._();
+
   static Future<Uint8List> generateProfessionalInvoice({
     required String invoiceType,
     required String invoiceNumber,
@@ -2975,8 +3070,6 @@ class InvoiceGenerator {
     String clientLabel;
     if (invoiceType == 'شراء') {
       clientLabel = 'المورد';
-    } else if (invoiceType == 'صيانة') {
-      clientLabel = 'العميل';
     } else {
       clientLabel = 'العميل';
     }
@@ -3114,7 +3207,7 @@ class InvoiceGenerator {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                // ═══ HEADER + BADGE + META في صف واحد ═══
+                // ═══ HEADER + BADGE + META ═══
                 pw.Container(
                   width: double.infinity,
                   padding: const pw.EdgeInsets.all(16),
@@ -3128,7 +3221,7 @@ class InvoiceGenerator {
                   child: pw.Row(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      // شارة نوع الفاتورة
+                      // Invoice type badge
                       pw.Container(
                         padding: const pw.EdgeInsets.symmetric(
                           horizontal: 14,
@@ -3160,7 +3253,7 @@ class InvoiceGenerator {
                         ),
                       ),
                       pw.SizedBox(width: 12),
-                      // معلومات الشركة والفاتورة
+                      // Company info
                       pw.Expanded(
                         child: pw.Column(
                           crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -3174,7 +3267,6 @@ class InvoiceGenerator {
                               ),
                             ),
                             pw.SizedBox(height: 6),
-                            // بيانات الشركة في سطر واحد
                             pw.Wrap(
                               spacing: 12,
                               children: [
@@ -3206,7 +3298,6 @@ class InvoiceGenerator {
                               ],
                             ),
                             pw.SizedBox(height: 6),
-                            // رقم + تاريخ + حالة في سطر واحد
                             pw.Row(
                               children: [
                                 if (!isQuote && invoiceType != 'مرتجع')
@@ -3217,8 +3308,6 @@ class InvoiceGenerator {
                                       color: PdfColors.white,
                                     ),
                                   ),
-                                pw.SizedBox(width: 12),
-
                                 pw.SizedBox(width: 12),
                                 if (!isQuote && invoiceType != 'مرتجع')
                                   pw.Container(
@@ -3244,7 +3333,7 @@ class InvoiceGenerator {
                           ],
                         ),
                       ),
-                      // اللوجو
+                      // Logo
                       if (logoImage != null && showLogo != false)
                         pw.Column(
                           children: [
@@ -3276,7 +3365,7 @@ class InvoiceGenerator {
                 ),
                 pw.SizedBox(height: 12),
 
-                // ═══ CLIENT SECTION (مضغوط في سطر واحد) ═══
+                // ═══ CLIENT SECTION ═══
                 if (clientName.isNotEmpty)
                   pw.Container(
                     width: double.infinity,
@@ -3362,7 +3451,7 @@ class InvoiceGenerator {
                   ),
                 pw.SizedBox(height: 12),
 
-                // ═══ ITEMS TABLE (مضغوط) ═══
+                // ═══ ITEMS TABLE ═══
                 pw.TableHelper.fromTextArray(
                   headers: headers,
                   headerStyle: _textStyle(
@@ -3397,7 +3486,7 @@ class InvoiceGenerator {
                 ),
                 pw.SizedBox(height: 12),
 
-                // ═══ SUMMARY (أصغر) ═══
+                // ═══ SUMMARY ═══
                 pw.Align(
                   alignment: pw.Alignment.centerLeft,
                   child: pw.Container(
@@ -3443,7 +3532,7 @@ class InvoiceGenerator {
                   ),
                 ),
 
-                // Payment schedule (مضغوط)
+                // Payment schedule
                 if (dueDates != null &&
                     dueDates.isNotEmpty &&
                     (isDue || isInstallment) &&
@@ -3507,7 +3596,9 @@ class InvoiceGenerator {
                           ),
                         ),
                         data: dueDates.map((item) {
-                          final date = item['date'] as DateTime;
+                          final date = item['date'] is DateTime
+                              ? item['date'] as DateTime
+                              : DateTime.parse(item['date'].toString());
                           final status = item['status']?.toString() ?? '';
                           final isPaid = status == 'تم';
                           return [
@@ -3540,7 +3631,7 @@ class InvoiceGenerator {
                     ],
                   ),
 
-                // Notes (مضغوط)
+                // Notes
                 if (notes != null && notes.isNotEmpty && showNotes != false)
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -3582,7 +3673,7 @@ class InvoiceGenerator {
                     ],
                   ),
 
-                // ═══ FOOTER (مضغوط) ═══
+                // ═══ FOOTER ═══
                 pw.Container(
                   margin: const pw.EdgeInsets.only(top: 16),
                   padding: const pw.EdgeInsets.all(10),
