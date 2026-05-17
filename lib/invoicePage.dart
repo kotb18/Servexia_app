@@ -446,7 +446,7 @@ class _InvoicePageState extends State<InvoicePage>
         nameController.text = customer.name ?? '';
         phoneController.text = customer.phone ?? '';
         addressController.text = customer.address ?? '';
-        selectedFilter = result.type;
+        returnType = result.type;
         selectedPaymentMethod = result.paymentMethod;
         discountController.text = result.summary.discountPercent.toString();
         taxController.text = result.summary.taxPercent.toString();
@@ -927,7 +927,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
       phoneController.text = widget.phone;
       addressController.text = widget.address;
     }
-
+    selectedPaymentMethod = 'كاش';
     // Initialize tax/discount from settings
     taxController.text = !widget.state.showTax ? '0' : taxController.text;
     discountController.text = !widget.state.showDiscount
@@ -1392,7 +1392,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               textAlign: TextAlign.right,
               decoration: InputDecoration(
                 labelText: 'السعر',
-                suffixText: 'ج.م',
+                // suffixText: 'ج.م',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),

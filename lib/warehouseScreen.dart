@@ -10,10 +10,10 @@ import 'package:intl/intl.dart';
 
 List<Map<String, dynamic>> itemsList = [];
 String buttonText = '';
-
 List<Map> items = [];
 bool isSelected = false;
 List<int> selectedIndex = [];
+List<double> counters = [];
 
 class StoreScreen extends StatefulWidget {
   final String groupId;
@@ -103,6 +103,7 @@ class _StoreScreenState extends State<StoreScreen> {
   void initState() {
     // TODO: implement initState
     super.initState();
+    counters = List.generate(20, (_) => 0);
     if (widget.deletedItems) {
       items.clear();
       selectedIndex.clear();
@@ -125,7 +126,8 @@ class _StoreScreenState extends State<StoreScreen> {
     itemPriceController.dispose();
     itemBuyController.dispose();
     selectedIndex.clear();
-    items.clear();
+    // items.clear();
+    counters.clear();
   }
 
   @override
@@ -378,13 +380,75 @@ class _StoreScreenState extends State<StoreScreen> {
                         itemsList.add(data);
                         final id = doc.id;
                         isSelected = selectedIndex.contains(index);
-
+                        if (items.isNotEmpty) {
+                          items.where((item) => item['id'] == id).forEach((
+                            item,
+                          ) {
+                            counters[index] = item['quantity'];
+                          });
+                        }
+                        double selectedQuantity = 0.0;
+                        selectedQuantity = counters[index];
                         return Stack(
                           children: [
                             GestureDetector(
                               onTap: () async {
-                                if (widget.isFromInvoice &&
-                                    !selectedIndex.contains(index)) {
+                                if (widget.isFromInvoice) {
+                                  setState(() {
+                                    if (!selectedIndex.contains(index)) {
+                                      items.add({
+                                        'id': id,
+                                        'isInventoryItem': true,
+                                        'name': data['name'],
+                                        'quantity': counters[index] > 0
+                                            ? counters[index]
+                                            : 1.0,
+                                        'unit': data['unit'],
+                                        'sku': data['sku'] ?? '',
+                                        'price': data['price'] ?? 0,
+                                        'location': data['location'],
+                                        'notes': data['notes'],
+                                        'createdAt':
+                                            FieldValue.serverTimestamp(),
+                                        'deleted': false,
+
+                                        'coast':
+                                            itemBuyController.text.isNotEmpty
+                                            ? double.tryParse(
+                                                itemBuyController.text,
+                                              )
+                                            : 0.0,
+                                      });
+                                      selectedIndex.add(index);
+                                      buttonText =
+                                          ' اضافة ${selectedIndex.length} عنصر';
+                                    }
+
+                                    counters[index]++;
+                                    items
+                                        .where((item) => item['id'] == id)
+                                        .forEach((item) {
+                                          item['quantity'] = counters[index] > 0
+                                              ? counters[index]
+                                              : 1;
+                                        });
+                                  });
+                                } else {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          InventoryItemDetailsScreenRefactored(
+                                            groupId: widget.groupId,
+                                            itemId: id,
+                                            deletedItems: deletedItems,
+                                          ),
+                                    ),
+                                  );
+                                }
+                              },
+                              onLongPress: () async {
+                                if (widget.isFromInvoice) {
                                   itemQuantityController =
                                       TextEditingController(text: '1');
                                   itemPriceController = TextEditingController(
@@ -530,6 +594,15 @@ class _StoreScreenState extends State<StoreScreen> {
                                               if (_formKey.currentState!
                                                   .validate()) {
                                                 setState(() {
+                                                  if (selectedIndex.contains(
+                                                    index,
+                                                  )) {
+                                                    items.removeWhere(
+                                                      (item) =>
+                                                          item['id'] == id,
+                                                    );
+                                                    selectedIndex.remove(index);
+                                                  }
                                                   selectedIndex.add(index);
                                                   buttonText =
                                                       ' اضافة ${selectedIndex.length} عنصر';
@@ -539,11 +612,14 @@ class _StoreScreenState extends State<StoreScreen> {
                                                   'isInventoryItem': true,
                                                   'name': data['name'],
                                                   'quantity':
-                                                      int.tryParse(
-                                                        itemQuantityController
-                                                            .text,
-                                                      ) ??
-                                                      1,
+                                                      itemQuantityController
+                                                          .text
+                                                          .isNotEmpty
+                                                      ? double.tryParse(
+                                                          itemQuantityController
+                                                              .text,
+                                                        )
+                                                      : 1,
                                                   'unit': data['unit'],
                                                   'sku': data['sku'] ?? '',
                                                   'price':
@@ -569,6 +645,24 @@ class _StoreScreenState extends State<StoreScreen> {
                                                         )
                                                       : 0.0,
                                                 });
+                                                setState(() {
+                                                  items
+                                                      .where(
+                                                        (item) =>
+                                                            item['id'] == id,
+                                                      )
+                                                      .forEach((item) {
+                                                        item['quantity'] =
+                                                            itemQuantityController
+                                                                .text
+                                                                .isNotEmpty
+                                                            ? double.tryParse(
+                                                                itemQuantityController
+                                                                    .text,
+                                                              )
+                                                            : 1.0;
+                                                      });
+                                                });
                                                 Navigator.pop(context);
                                               }
                                             },
@@ -585,28 +679,6 @@ class _StoreScreenState extends State<StoreScreen> {
                                     'unit': data['unit'],
                                     'sku': data['sku'] ?? '',
                                   }); */
-                                } else if (widget.isFromInvoice &&
-                                    selectedIndex.contains(index)) {
-                                  items.removeWhere((item) => item['id'] == id);
-                                  print('Before removal: $items');
-                                  setState(() {
-                                    selectedIndex.remove(index);
-                                    buttonText =
-                                        ' اضافة ${selectedIndex.length} عنصر';
-                                  });
-                                  // Handle the case when the item is from an invoice
-                                } else {
-                                  await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          InventoryItemDetailsScreenRefactored(
-                                            groupId: widget.groupId,
-                                            itemId: id,
-                                            deletedItems: deletedItems,
-                                          ),
-                                    ),
-                                  );
                                 }
                               },
                               child: Container(
@@ -719,20 +791,38 @@ class _StoreScreenState extends State<StoreScreen> {
                                 ),
                               ),
                             ),
-                            if (isSelected && widget.isFromInvoice)
+                            if (selectedQuantity > 0 && widget.isFromInvoice)
                               Positioned(
                                 top: 0,
                                 left: 0,
-                                child: Container(
-                                  decoration: const BoxDecoration(
-                                    color: Colors.blue,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  padding: const EdgeInsets.all(4),
-                                  child: const Icon(
-                                    Icons.check,
-                                    size: 14,
-                                    color: Colors.white,
+                                child: InkWell(
+                                  onTap: () {
+                                    setState(() {
+                                      selectedIndex.remove(index);
+
+                                      items.removeWhere(
+                                        (item) => item['id'] == id,
+                                      );
+
+                                      buttonText =
+                                          ' اضافة ${selectedIndex.length} عنصر';
+
+                                      counters[index] = 0;
+                                    });
+                                  },
+                                  child: Container(
+                                    decoration: const BoxDecoration(
+                                      color: Colors.blue,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    padding: const EdgeInsets.all(6),
+                                    child: Text(
+                                      '${selectedQuantity > 0 ? selectedQuantity : 1}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
