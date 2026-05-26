@@ -39,23 +39,38 @@ class _LoginState extends State<Login> {
     try {
       setState(() => isLoading = true);
 
-      final GoogleSignIn googleSignIn = GoogleSignIn.instance;
-      await googleSignIn.initialize(
-        serverClientId:
-            '840926699694-qslfjros665j55vtofid6rghqe4qsiii.apps.googleusercontent.com',
-      );
+      if (kIsWeb) {
+        // --- منطق الويب (Web) ---
+        // الطريقة الأكثر استقراراً للويب هي استخدام Firebase مباشرة
+        GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        await FirebaseAuth.instance.signInWithPopup(googleProvider);
+      } else {
+        // --- منطق الموبايل (Android / iOS) - متوافق مع v7.x ---
+        final GoogleSignIn googleSignIn = GoogleSignIn.instance;
 
-      final GoogleSignInAccount googleUser = await googleSignIn.authenticate();
+        // تهيئة المعرف
+        await googleSignIn.initialize(
+          serverClientId:
+              '840926699694-qslfjros665j55vtofid6rghqe4qsiii.apps.googleusercontent.com',
+        );
 
-      final googleAuth = googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.idToken,
-        idToken: googleAuth.idToken,
-      );
+        // في v7.x نستخدم authenticate() بدلاً من signIn()
+        final GoogleSignInAccount googleUser = await googleSignIn
+            .authenticate();
 
-      await FirebaseAuth.instance.signInWithCredential(credential);
+        // الحصول على الـ idToken (في الإصدار الجديد accessToken لم يعد موجوداً/مطلوباً هنا)
+        final googleAuth = await googleUser.authentication;
 
+        final credential = GoogleAuthProvider.credential(
+          idToken: googleAuth.idToken,
+        );
+
+        await FirebaseAuth.instance.signInWithCredential(credential);
+      }
+
+      // --- التكملة بعد النجاح ---
       await getAdmins();
+
       if (versionNumber != 1) {
         Navigator.pushReplacement(
           context,
@@ -65,18 +80,24 @@ class _LoginState extends State<Login> {
         );
         return;
       }
+
       await subscribeToNotifications();
+
       if (!mounted) return;
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => Homepage(isAdmin: isAdmin)),
       );
     } catch (e) {
+      print("Google Auth Error: $e");
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('حدث خطأ: $e')));
     } finally {
-      if (mounted) setState(() => isLoading = false);
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
 

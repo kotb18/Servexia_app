@@ -12,6 +12,7 @@ import 'package:maintenance/admin/mainAdmin.dart';
 import 'package:maintenance/assets.dart';
 import 'package:maintenance/attendance.dart';
 import 'package:maintenance/createGroup.dart' hide billingService;
+import 'package:maintenance/firebase_options.dart';
 import 'package:maintenance/homePage.dart';
 import 'package:maintenance/invoiceSettings.dart';
 import 'package:maintenance/joinReq.dart';
@@ -33,17 +34,7 @@ import 'package:provider/provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: const FirebaseOptions(
-      apiKey: "AIzaSyA-l6i06vfoBsz9C6BuLDMoqGY6h7AXmIQ",
-      appId: "1:840926699694:android:d94b4af2bcaf2145314d3f",
-      messagingSenderId: "840926699694",
-      projectId: "maintenance-b7282",
-      storageBucket: "maintenance-b7282.firebasestorage.app",
-    ),
-  );
-  // Initialize the Gemini Developer API backend service
-  // Create a `GenerativeModel` instance with a model that supports your use case
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   final FirebaseMessaging fcm = FirebaseMessaging.instance;
 
@@ -124,12 +115,14 @@ class MyApp extends StatelessWidget {
           groupId: '',
           isFromInvoice: false,
           invoiceType: '',
+          customerId: '',
         ),
         StoreScreen.screenroute: (context) => StoreScreen(
           groupId: '',
           isFromInvoice: false,
           deletedItems: false,
           invoiceType: '',
+          customerId: '',
         ),
         InventoryItemDetailsScreenRefactored.screenroute: (context) =>
             InventoryItemDetailsScreenRefactored(

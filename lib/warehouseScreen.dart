@@ -20,12 +20,14 @@ class StoreScreen extends StatefulWidget {
   final bool isFromInvoice;
   final bool deletedItems;
   final String invoiceType;
+  final String customerId;
   const StoreScreen({
     super.key,
     required this.groupId,
     required this.isFromInvoice,
     required this.deletedItems,
     required this.invoiceType,
+    required this.customerId,
   });
   static const String screenroute = 'StoreScreen';
 
@@ -150,7 +152,7 @@ class _StoreScreenState extends State<StoreScreen> {
                   name: '',
                   phone: '',
                   address: '',
-                  customerId: '',
+                  customerId: widget.customerId,
                   isFromConstCustomers: false,
                   isFromWorkSpace: false,
                   type: widget.invoiceType,

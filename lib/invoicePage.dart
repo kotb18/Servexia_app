@@ -285,6 +285,9 @@ class _InvoicePageState extends State<InvoicePage>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   String selectedFilter = 'بيع';
+  late double totalBeforeReturn = 0.0;
+  late double totalPaidInstallments = 0.0;
+  late String paymentMethodReturn = '';
 
   final List<InvoiceTypeModel> invoiceTypes = [
     const InvoiceTypeModel(
@@ -432,6 +435,9 @@ class _InvoicePageState extends State<InvoicePage>
         builder: (_) => MyInvoicesPage(
           groupId: widget.groupId,
           isSelectionMode: isSelectionMode,
+          customerId: widget.customerId,
+          customerName: widget.name,
+          isFromCustomerScreen: false,
         ),
       ),
     );
@@ -450,7 +456,20 @@ class _InvoicePageState extends State<InvoicePage>
         selectedPaymentMethod = result.paymentMethod;
         discountController.text = result.summary.discountPercent.toString();
         taxController.text = result.summary.taxPercent.toString();
-
+        totalBeforeReturn = double.parse(
+          result.summary.total.toStringAsFixed(2),
+        );
+        paymentMethodReturn = result.paymentMethod;
+        if (paymentMethodReturn == 'كاش') {
+          totalPaidInstallments = double.parse(
+            result.summary.total.toStringAsFixed(2),
+          );
+        } else {
+          totalPaidInstallments = double.parse(
+            (result.totalPaidInstallments.toStringAsFixed(2)),
+          );
+        }
+        print('sssssssssssssssssssssssssssssssssssssssssss$totalBeforeReturn');
         // Copy payment schedule
         state.paymentScheduleData.clear();
         for (var installment in result.installments) {
@@ -473,9 +492,7 @@ class _InvoicePageState extends State<InvoicePage>
             'quantity': item.quantity,
             'price': item.price,
             'originalItem': true,
-            /*  'id':
-                item.itemId ??
-                '', */
+            'id': item.itemId ?? '',
             // FIX: Preserve item ID for stock restoration
           });
         }
@@ -506,6 +523,9 @@ class _InvoicePageState extends State<InvoicePage>
         builder: (context) => MyInvoicesPage(
           groupId: widget.groupId,
           isSelectionMode: isSelectionMode,
+          customerId: widget.customerId,
+          customerName: widget.name,
+          isFromCustomerScreen: false,
           onInvoiceSelected: (invoice) {
             result = invoice; // استلم الفاتورة المختارة
             // هنا تستلم البيانات في الصفحة البعيدة مباشرة
@@ -518,7 +538,6 @@ class _InvoicePageState extends State<InvoicePage>
     if (result != null && result is Invoice) {
       debugPrint('Selected original invoice: ${result!.invoiceNumber}');
       setState(() {
-        print('sssssssssssssssssssssssssssssssssssssssssss${result!.type}');
         state.originalInvoiceId = result!.id;
         state.originalInvoiceNumber = result!.invoiceNumber;
 
@@ -531,7 +550,6 @@ class _InvoicePageState extends State<InvoicePage>
         selectedPaymentMethod = result!.paymentMethod;
         discountController.text = result!.summary.discountPercent.toString();
         taxController.text = result!.summary.taxPercent.toString();
-
         // Copy payment schedule
         state.paymentScheduleData.clear();
         for (var installment in result!.installments) {
@@ -830,7 +848,12 @@ class _InvoicePageState extends State<InvoicePage>
                         ),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.danger,
+                        backgroundColor: const Color.fromARGB(
+                          255,
+                          12,
+                          150,
+                          155,
+                        ),
                       ),
                     ),
                   ],
@@ -839,20 +862,26 @@ class _InvoicePageState extends State<InvoicePage>
 
             // Invoice Content
             Expanded(
-              child: InvoicePageDesign(
-                type: selectedFilter,
-                groupId: widget.groupId,
-                itemsSale: widget.itemsSale,
-                itemsPurchase: widget.itemsPurchase,
-                name: widget.name,
-                phone: widget.phone,
-                address: widget.address,
-                customerId: widget.customerId,
-                isFromConstCustomers: widget.isFromConstCustomers,
-                state: state,
-                invoiceType: selectedType,
-                isEditMode: widget.isEditMode,
-              ),
+              child:
+                  selectedFilter == 'مرتجع' &&
+                      state.originalInvoiceNumber == null
+                  ? SizedBox.shrink()
+                  : InvoicePageDesign(
+                      type: selectedFilter,
+                      groupId: widget.groupId,
+                      itemsSale: widget.itemsSale,
+                      itemsPurchase: widget.itemsPurchase,
+                      name: widget.name,
+                      phone: widget.phone,
+                      address: widget.address,
+                      customerId: widget.customerId,
+                      isFromConstCustomers: widget.isFromConstCustomers,
+                      state: state,
+                      invoiceType: selectedType,
+                      isEditMode: widget.isEditMode,
+                      totalBeforeReturn: totalBeforeReturn,
+                      totalPaidInstallments: totalPaidInstallments,
+                    ),
             ),
           ],
         ),
@@ -894,6 +923,8 @@ class InvoicePageDesign extends StatefulWidget {
   final InvoiceState state;
   final InvoiceTypeModel invoiceType;
   final bool isEditMode;
+  final double totalBeforeReturn;
+  final double totalPaidInstallments;
 
   const InvoicePageDesign({
     super.key,
@@ -909,6 +940,8 @@ class InvoicePageDesign extends StatefulWidget {
     required this.invoiceType,
     required this.itemsPurchase,
     required this.isEditMode,
+    required this.totalBeforeReturn,
+    required this.totalPaidInstallments,
   });
 
   @override
@@ -917,7 +950,7 @@ class InvoicePageDesign extends StatefulWidget {
 
 class _InvoicePageDesignState extends State<InvoicePageDesign> {
   final List<String> paymentMethods = ['كاش', 'آجل', 'تقسيط'];
-
+  late double netTotal = 0.0;
   @override
   void initState() {
     super.initState();
@@ -1000,6 +1033,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
             (sum, item) =>
                 sum + ((item['price'] ?? 0) * (item['quantity'] ?? 0).abs()),
           );
+
           break;
       }
 
@@ -1010,12 +1044,25 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           widget.state.priceSumItems * discountPercent / 100;
 
       final taxPercent = double.tryParse(taxController.text) ?? 0;
-      widget.state.taxValue = widget.state.priceSumItems * taxPercent / 100;
+      widget.state.taxValue =
+          (widget.state.priceSumItems - widget.state.discountValue) *
+          taxPercent /
+          100;
 
-      widget.state.total =
-          widget.state.priceSumItems +
-          widget.state.taxValue -
-          widget.state.discountValue;
+      widget.state.total = double.parse(
+        (widget.state.priceSumItems +
+                widget.state.taxValue -
+                widget.state.discountValue)
+            .toStringAsFixed(2),
+      );
+      setState(() {
+        netTotal = double.parse(
+          (widget.totalBeforeReturn -
+                  widget.totalPaidInstallments -
+                  widget.state.total)
+              .toStringAsFixed(2),
+        );
+      });
       widget.state.reCalculate = false;
     });
   }
@@ -1147,7 +1194,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
   }
 
   /// Build invoice data map for Firestore
-  Map<String, dynamic> buildInvoiceData() {
+  Map<String, dynamic> buildInvoiceData(String? reInvoiceId) {
     final List<Map<String, dynamic>> items = [];
 
     switch (widget.type) {
@@ -1222,6 +1269,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     }
 
     return {
+      'reInvoiceId': reInvoiceId ?? '', // Include ID for edit mode
       "type": widget.type,
       "customer": {
         "id": widget.customerId,
@@ -1247,10 +1295,17 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           : 'return-${widget.state.originalInvoiceNumber ?? ''}',
       "createdAt": DateTime.now().toIso8601String(),
       'paymentMethod': selectedPaymentMethod,
+      'thereIsReturn': false,
       if (widget.type == 'مرتجع') ...{
         'originalInvoiceId': widget.state.originalInvoiceId,
         'originalInvoiceNumber': widget.state.originalInvoiceNumber,
         'returnType': 'مرتجع $returnType',
+        'returnSummary': {
+          'totalBeforeReturn': widget.totalBeforeReturn,
+          'totalPaidInstallments': widget.totalPaidInstallments,
+          "total": widget.state.total,
+          'netTotal': netTotal,
+        },
       },
       if (widget.type == 'عرض سعر') 'isQuote': true,
     };
@@ -1258,9 +1313,19 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
 
   /// Save invoice to Firestore and update stock
   Future<void> saveInvoice() async {
-    final dataFinal = buildInvoiceData();
+    final firestore = FirebaseFirestore.instance;
 
-    // Add payment schedule for non-cash payments
+    final invoiceDocRef = firestore
+        .collection('invoices')
+        .doc(widget.groupId)
+        .collection('items')
+        .doc();
+
+    final String reInvoiceId = invoiceDocRef.id;
+
+    final dataFinal = buildInvoiceData(reInvoiceId);
+
+    // إضافة جدول الدفع
     if (selectedPaymentMethod != 'كاش') {
       for (int i = 0; i < widget.state.paymentScheduleData.length; i++) {
         dataFinal['payment${i + 1}'] = {
@@ -1273,25 +1338,42 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
       }
     }
 
-    // Save to Firestore
-    await FirebaseFirestore.instance
-        .collection('invoices')
-        .doc(widget.groupId)
-        .collection('items')
-        .add(dataFinal);
+    final batch = firestore.batch();
 
-    // Update last invoice number
-    await FirebaseFirestore.instance
-        .collection('invoices')
-        .doc(widget.groupId)
-        .update({'lastInvoiceNumber': widget.state.lastInvoiceNumber + 1});
+    // حفظ الفاتورة
+    batch.set(invoiceDocRef, dataFinal);
 
-    // Update stock if needed
-    if (widget.invoiceType.affectsStock && widget.type != 'مرتجع') {
+    // تحديث الفاتورة الأصلية لو مرتجع
+    if (widget.type == 'مرتجع') {
+      final originalInvoiceRef = firestore
+          .collection('invoices')
+          .doc(widget.groupId)
+          .collection('items')
+          .doc(widget.state.originalInvoiceId);
+
+      batch.update(originalInvoiceRef, {
+        'thereIsReturn': true,
+        'reInvoiceId': reInvoiceId,
+      });
+    }
+
+    // تحديث رقم آخر فاتورة
+    final invoiceMainRef = firestore.collection('invoices').doc(widget.groupId);
+
+    batch.update(invoiceMainRef, {
+      'lastInvoiceNumber': widget.state.lastInvoiceNumber + 1,
+    });
+
+    // تحديث المخزون
+    if (widget.invoiceType.affectsStock &&
+        (widget.type == 'بيع' || widget.type == 'شراء')) {
       await _updateStock();
     } else if (widget.type == 'مرتجع') {
       await _restoreStock();
     }
+
+    // تنفيذ كل العمليات مرة واحدة
+    await batch.commit();
   }
 
   /// Update stock for sale/purchase invoices
@@ -1310,15 +1392,22 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           .doc(widget.groupId)
           .collection('items')
           .doc(itemId);
-
-      final doc = await ref.get();
-      if (doc.exists) {
-        final currentQty = (doc.data()?['quantity'] ?? 0) as num;
-        final newQty = widget.type == 'شراء'
-            ? currentQty + (item['quantity'] ?? 0)
-            : currentQty - (item['quantity'] ?? 0);
-        batch.update(ref, {'quantity': newQty});
-      }
+      final ref2 = ref.collection('movements').doc();
+      batch.set(ref2, {
+        'type': widget.type == 'شراء' ? 'in' : 'out',
+        'qty': item['quantity'],
+        'unit': 'unit',
+        'note': widget.type == 'شراء'
+            ? 'تمت الإضافة عن طريق فاتورة الشراء رقم ${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}'
+            : 'تم الصرف عن طريق فاتورة البيع رقم ${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}',
+        'createdBy': 'currentUser',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      batch.update(ref, {
+        'quantity': FieldValue.increment(
+          widget.type == 'شراء' ? item['quantity'] : -item['quantity'],
+        ), // زيادة 5
+      });
     }
 
     await batch.commit();
@@ -1343,7 +1432,11 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
       if (doc.exists) {
         final currentQty = (doc.data()?['quantity'] ?? 0) as num;
         final returnedQty = (item['quantity'] ?? 0).abs();
-        batch.update(ref, {'quantity': currentQty + returnedQty});
+        if (returnType == 'بيع') {
+          batch.update(ref, {'quantity': currentQty + returnedQty});
+        } else if (returnType == 'شراء') {
+          batch.update(ref, {'quantity': currentQty - returnedQty});
+        }
       }
     }
 
@@ -1522,7 +1615,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
         : Directionality(
             textDirection: TextDirection.rtl,
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(8),
               child: Column(
                 children: [
                   Card(
@@ -1541,7 +1634,8 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                           const Divider(height: 32),
                           _buildTotalsSection(),
                           const Divider(height: 32),
-
+                          if (widget.type == 'مرتجع') _buildTable(),
+                          const Divider(height: 32),
                           if (widget.type == 'بيع' ||
                               widget.type == 'شراء' ||
                               widget.type == 'مرتجع')
@@ -1602,7 +1696,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               ),
               Text(
                 widget.type != 'مرتجع'
-                    ? '#${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}'
+                    ? '${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}'
                     : '',
                 style: const TextStyle(
                   fontSize: 13,
@@ -1744,35 +1838,31 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               final isSelected = selectedPaymentMethod == method;
               return Expanded(
                 child: InkWell(
-                  onTap: widget.type == 'مرتجع'
-                      ? null
-                      : () => setState(() {
-                          widget.state.resetPaymentSchedule();
-                          selectedPaymentMethod = method;
-                          // Reset payment schedule for new method
-                          widget.state.paymentScheduleData = [
-                            {
-                              "type": "مدفوع",
-                              "value": 0.0,
-                              'valuePicked': false,
-                              "date": DateTime.now(),
-                              'datePicked': false,
-                              "status": "تم",
-                            },
-                            {
-                              "type": selectedPaymentMethod == 'آجل'
-                                  ? "مستحق"
-                                  : 'قسط 1',
-                              "value": 0.0,
-                              "valuePicked": false,
-                              "date": DateTime.now().add(
-                                const Duration(days: 30),
-                              ),
-                              'datePicked': false,
-                              "status": "!",
-                            },
-                          ];
-                        }),
+                  onTap: () => setState(() {
+                    widget.state.resetPaymentSchedule();
+                    selectedPaymentMethod = method;
+                    // Reset payment schedule for new method
+                    widget.state.paymentScheduleData = [
+                      {
+                        "type": "مدفوع",
+                        "value": 0.0,
+                        'valuePicked': false,
+                        "date": DateTime.now(),
+                        'datePicked': false,
+                        "status": "تم",
+                      },
+                      {
+                        "type": selectedPaymentMethod == 'آجل'
+                            ? "مستحق"
+                            : 'قسط 1',
+                        "value": 0.0,
+                        "valuePicked": false,
+                        "date": DateTime.now().add(const Duration(days: 30)),
+                        'datePicked': false,
+                        "status": "!",
+                      },
+                    ];
+                  }),
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1897,11 +1987,17 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              isMaintenance ? 'بنود الصيانة' : 'الأصناف',
-              style: const TextStyle(
+              isMaintenance
+                  ? 'بنود الصيانة'
+                  : widget.type == 'مرتجع'
+                  ? 'الأصناف المرتجعة'
+                  : 'الأصناف',
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: widget.type == 'مرتجع'
+                    ? Colors.red
+                    : AppColors.textPrimary,
               ),
             ),
             if (items.isNotEmpty)
@@ -1980,7 +2076,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
             item['isReturn'] == true || (item['quantity'] ?? 0) < 0;
 
         return Dismissible(
-          key: Key('item_$index'),
+          key: Key(item['id']?.toString() ?? '$index'),
           direction: DismissDirection.endToStart,
           background: Container(
             color: AppColors.danger,
@@ -2088,6 +2184,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                     isFromInvoice: true,
                     deletedItems: widget.state.total == 0.0,
                     invoiceType: widget.type,
+                    customerId: widget.customerId,
                   ),
                 ),
               );
@@ -2122,6 +2219,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                     isFromInvoice: true,
                     deletedItems: widget.state.total == 0.0,
                     invoiceType: widget.type,
+                    customerId: widget.customerId,
                   ),
                 ),
               );
@@ -2144,6 +2242,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                         isFromInvoice: true,
                         deletedItems: widget.state.total == 0.0,
                         invoiceType: widget.type,
+                        customerId: widget.customerId,
                       ),
                     ),
                   );
@@ -2156,6 +2255,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                         groupId: widget.groupId,
                         invoiceType: widget.type,
                         isFromInvoice: true,
+                        customerId: widget.customerId,
                       ),
                     ),
                   );
@@ -2279,6 +2379,83 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     );
   }
 
+  Widget _buildTable() {
+    return Table(
+      border: TableBorder.all(
+        color: Colors.grey.shade300,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      columnWidths: const {0: FlexColumnWidth(2), 1: FlexColumnWidth(1.5)},
+      children: [
+        // عنوان الجدول
+        TableRow(
+          decoration: BoxDecoration(color: Colors.blue.shade50),
+          children: [
+            _tableCell('البيان', isHeader: true),
+            _tableCell('القيمة', isHeader: true),
+          ],
+        ),
+
+        // الإجمالي الأصلي
+        TableRow(
+          children: [
+            _tableCell('إجمالي الفاتورة الأصلية'),
+            _tableCell('${widget.totalBeforeReturn} ', color: Colors.green),
+          ],
+        ),
+        // إجمالي المدفوع في الفاتورة الأصلية
+        TableRow(
+          children: [
+            _tableCell('إجمالي المدفوع في الفاتورة الأصلية'),
+            _tableCell('${widget.totalPaidInstallments} ', color: Colors.red),
+          ],
+        ),
+        // إجمالي المرتجع
+        TableRow(
+          children: [
+            _tableCell('إجمالي المرتجع'),
+            _tableCell('${widget.state.total} ', color: Colors.red),
+          ],
+        ),
+
+        // الصافي بعد المرتجع
+        TableRow(
+          decoration: BoxDecoration(color: Colors.green.shade50),
+          children: [
+            _tableCell('الصافي بعد المرتجع', isBold: true),
+            _tableCell(
+              '$netTotal ',
+              isBold: true,
+              color: netTotal < 0.0
+                  ? const Color.fromARGB(255, 175, 28, 112)
+                  : const Color.fromARGB(255, 6, 88, 9),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _tableCell(
+    String text, {
+    bool isHeader = false,
+    bool isBold = false,
+    Color? color,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: isHeader ? 16 : 14,
+          fontWeight: isHeader || isBold ? FontWeight.bold : FontWeight.w500,
+          color: color ?? Colors.black87,
+        ),
+      ),
+    );
+  }
+
   Widget _buildEditableTotalRow({
     required String label,
     required TextEditingController controller,
@@ -2349,7 +2526,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
         ),
         const SizedBox(height: 12),
         CustomPaymentsTable(
-          total: widget.state.total,
+          total: widget.type == 'مرتجع' ? netTotal : widget.state.total,
           paymentScheduleData: widget.state.paymentScheduleData,
           paymentIndexes: widget.state.paymentIndexes,
           paymentMethod: selectedPaymentMethod,

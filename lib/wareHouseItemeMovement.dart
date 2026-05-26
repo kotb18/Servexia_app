@@ -12,7 +12,7 @@ import 'package:printing/printing.dart';
 
 class Movement {
   final String type; // 'in' or 'out'
-  final int qty;
+  final double qty;
   final String unit;
   final String note;
   final String createdBy;
@@ -57,7 +57,7 @@ class InventoryService {
   }
 
   Future<void> addMovement({
-    required int qty,
+    required double qty,
     required String type,
     String? note,
     required String currentUser,
@@ -246,7 +246,7 @@ class MovementHistoryScreen extends StatelessWidget {
 // 3.2. حوار الحركة (كـ StatelessWidget)
 class MovementDialog extends StatelessWidget {
   final String type;
-  final Function(int qty, String? note) onSave;
+  final Function(double qty, String? note) onSave;
 
   const MovementDialog({super.key, required this.type, required this.onSave});
 
@@ -285,7 +285,7 @@ class MovementDialog extends StatelessWidget {
         ),
         ElevatedButton(
           onPressed: () {
-            final qty = int.tryParse(qtyController.text) ?? 0;
+            final qty = double.tryParse(qtyController.text) ?? 0;
             if (qty <= 0) return;
 
             Navigator.pop(context);
@@ -334,7 +334,7 @@ class _InventoryItemDetailsScreenRefactoredState
     _service = InventoryService(groupId: widget.groupId, itemId: widget.itemId);
   }
 
-  Future<void> _handleMovement(String type, int qty, String? note) async {
+  Future<void> _handleMovement(String type, double qty, String? note) async {
     setState(() => _loading = true);
     try {
       await _service.addMovement(
@@ -448,7 +448,7 @@ class _InventoryItemDetailsScreenRefactoredState
                                     ),
                                     IconButton(
                                       onPressed: () async {
-                                        final confirm = await showDialog<bool>(
+                                        await showDialog<bool>(
                                           context: context,
                                           builder: (context) => AlertDialog(
                                             title: const Text('تأكيد الحذف'),
@@ -465,15 +465,40 @@ class _InventoryItemDetailsScreenRefactoredState
                                               ),
                                               ElevatedButton(
                                                 onPressed: () async {
-                                                  await FirebaseFirestore
-                                                      .instance
-                                                      .collection('inventory')
-                                                      .doc(widget.groupId)
-                                                      .collection('items')
-                                                      .doc(widget.itemId)
-                                                      .update({
-                                                        'deleted': true,
-                                                      });
+                                                  final snapshot =
+                                                      await FirebaseFirestore
+                                                          .instance
+                                                          .collection(
+                                                            'inventory',
+                                                          )
+                                                          .doc(widget.groupId)
+                                                          .collection('items')
+                                                          .doc(widget.itemId)
+                                                          .collection(
+                                                            'movements',
+                                                          )
+                                                          .get();
+
+                                                  final batch =
+                                                      FirebaseFirestore.instance
+                                                          .batch();
+
+                                                  for (var doc
+                                                      in snapshot.docs) {
+                                                    batch.delete(doc.reference);
+                                                  }
+                                                  final ref =
+                                                      await FirebaseFirestore
+                                                          .instance
+                                                          .collection(
+                                                            'inventory',
+                                                          )
+                                                          .doc(widget.groupId)
+                                                          .collection('items')
+                                                          .doc(widget.itemId);
+                                                  batch.delete(ref);
+                                                  await batch.commit();
+
                                                   Navigator.pop(context, true);
                                                 },
                                                 style: ElevatedButton.styleFrom(
@@ -484,51 +509,15 @@ class _InventoryItemDetailsScreenRefactoredState
                                             ],
                                           ),
                                         );
-                                        if (confirm == true) {
-                                          try {
-                                            await FirebaseFirestore.instance
-                                                .collection('inventory')
-                                                .doc(widget.groupId)
-                                                .collection('items')
-                                                .doc(widget.itemId)
-                                                .update({'deleted': true});
-                                            await FirebaseFirestore.instance
-                                                .collection('inventory')
-                                                .doc(widget.groupId)
-                                                .collection('items')
-                                                .doc(widget.itemId)
-                                                .collection('movements')
-                                                .add({
-                                                  'type': 'delete',
-                                                  'qty': currentQuantity,
-                                                  'unit': unit,
-                                                  'note': 'حذف الصنف بالكامل',
-                                                  'createdBy': _currentUser,
-                                                  'createdAt':
-                                                      FieldValue.serverTimestamp(),
-                                                });
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  'تم حذف الصنف بنجاح.',
-                                                ),
-                                              ),
-                                            );
-                                            Navigator.pop(context);
-                                          } catch (e) {
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  'خطأ في الحذف: $e',
-                                                ),
-                                              ),
-                                            );
-                                          }
-                                        }
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'تم حذف الصنف بنجاح.',
+                                            ),
+                                          ),
+                                        );
                                       },
                                       icon: Icon(
                                         Icons.delete,

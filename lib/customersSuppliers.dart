@@ -1,12 +1,8 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:maintenance/invoicePage.dart';
 import 'package:maintenance/myInvoices.dart';
-import 'package:maintenance/services.dart';
-
-import 'models.dart';
 
 enum PartyType { customer, supplier }
 
@@ -271,10 +267,13 @@ class _CustomersSuppliersState extends State<CustomersSuppliers> {
         } else {
           await Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => CustomerInvoicesPage(
+              builder: (_) => MyInvoicesPage(
                 customerId: item.id,
                 customerName: item.name,
                 groupId: widget.groupId,
+                isSelectionMode: false,
+                onInvoiceSelected: null,
+                isFromCustomerScreen: true,
               ),
             ),
           );
@@ -406,255 +405,6 @@ class _CustomersSuppliersState extends State<CustomersSuppliers> {
           ],
         ),
       ),
-    );
-  }
-}
-
-class CustomerInvoicesPage extends StatefulWidget {
-  final String customerId; // This will be the customer or supplier ID
-  final String customerName; // To display the customer/supplier name
-  final String
-  groupId; // To filter invoices by group (as per your initial structure)
-
-  const CustomerInvoicesPage({
-    Key? key,
-    required this.customerId,
-    required this.groupId,
-    required this.customerName,
-  }) : super(key: key);
-
-  @override
-  State<CustomerInvoicesPage> createState() => _CustomerInvoicesPageState();
-}
-
-class _CustomerInvoicesPageState extends State<CustomerInvoicesPage> {
-  final InvoiceService _invoiceService = InvoiceService();
-
-  void _openInvoiceDetails(Invoice invoice) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) =>
-            InvoiceDetailPage(invoice: invoice, groupId: widget.groupId),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'فواتير: ${widget.customerName}',
-          style: theme.textTheme.titleLarge?.copyWith(color: Colors.white),
-        ),
-        backgroundColor: theme.primaryColor, // Use primary color for AppBar
-        elevation: 4, // Add a subtle shadow
-        iconTheme: IconThemeData(color: Colors.white), // White back arrow
-      ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('invoices')
-            .doc(widget.groupId) // The document ID for the group
-            .collection(
-              'items',
-            ) // The subcollection containing the actual invoice items
-            .where('customer.id', isEqualTo: widget.customerId)
-            .orderBy(
-              'createdAt',
-              descending: true,
-            ) // Filter by customer.id within the items subcollection
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                'حدث خطأ: ${snapshot.error}',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.error,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            );
-          }
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(
-              child: CircularProgressIndicator(color: theme.primaryColor),
-            );
-          }
-
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.receipt_long, size: 80, color: Colors.grey[400]),
-                  SizedBox(height: 16),
-                  Text(
-                    'لا توجد فواتير لهذا العميل/المورد حتى الآن.',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: Colors.grey[600],
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(8.0),
-            itemCount: snapshot.data!.docs.length,
-            itemBuilder: (context, index) {
-              var invoiceData =
-                  snapshot.data!.docs[index].data() as Map<String, dynamic>;
-              // String invoiceId = snapshot.data!.docs[index].id; // The ID of the item within the subcollection
-
-              // Extract data for display
-              String invoiceNumber =
-                  invoiceData['invoiceNumber'] ?? 'غير متوفر';
-              String dateString = invoiceData['date'] ?? '';
-              String type = invoiceData['type'] ?? 'غير محدد';
-              double total =
-                  (invoiceData['summary']?['total'] as num?)?.toDouble() ?? 0.0;
-              String invoiceId = snapshot.data!.docs[index].id;
-
-              // Format date
-              String formattedDate = 'غير متوفر';
-              try {
-                if (dateString.isNotEmpty) {
-                  // Assuming dateString is in ISO 8601 format
-                  DateTime dateTime = DateTime.parse(dateString);
-                  formattedDate = DateFormat(
-                    'yyyy-MM-dd HH:mm',
-                  ).format(dateTime);
-                }
-              } catch (e) {
-                print('Error parsing date: $e');
-              }
-
-              // Determine icon and color based on invoice type
-              IconData typeIcon = Icons.info_outline;
-              Color typeColor = Colors.grey;
-              if (type == 'بيع') {
-                typeIcon = Icons.shopping_cart_outlined;
-                typeColor = Colors.green;
-              } else if (type == 'شراء') {
-                typeIcon = Icons.add_shopping_cart_outlined;
-                typeColor = Colors.blue;
-              }
-              return InkWell(
-                onTap: () async {
-                  final Invoice? invoice = await _invoiceService.getInvoice(
-                    widget.groupId,
-                    invoiceId,
-                  );
-                  if (invoice != null) {
-                    _openInvoiceDetails(invoice);
-                  }
-                },
-                child: Card(
-                  elevation: 3, // More pronounced shadow
-                  margin: const EdgeInsets.symmetric(
-                    vertical: 8.0,
-                    horizontal: 4.0,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12.0),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'فاتورة رقم: $invoiceNumber',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: const Color.fromARGB(221, 142, 6, 140),
-                              ),
-                            ),
-                            Icon(typeIcon, color: typeColor, size: 24),
-                          ],
-                        ),
-                        Divider(
-                          height: 20,
-                          thickness: 1,
-                          color: Colors.grey[300],
-                        ),
-                        SizedBox(height: 8),
-                        _buildInvoiceDetailRow(
-                          context,
-                          Icons.calendar_today,
-                          'التاريخ:',
-                          formattedDate,
-                        ),
-                        SizedBox(height: 8),
-                        _buildInvoiceDetailRow(
-                          context,
-                          Icons.receipt,
-                          'النوع:',
-                          type,
-                        ),
-                        SizedBox(height: 8),
-                        _buildInvoiceDetailRow(
-                          context,
-                          Icons.attach_money,
-                          'الإجمالي:',
-                          '${total.toStringAsFixed(2)} جنيه',
-                          valueStyle: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: typeColor,
-                          ),
-                        ),
-                        // Add more details as needed
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildInvoiceDetailRow(
-    BuildContext context,
-    IconData icon,
-    String label,
-    String value, {
-    TextStyle? valueStyle,
-  }) {
-    final ThemeData theme = Theme.of(context);
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: theme.primaryColorLight),
-        SizedBox(width: 12),
-        Text(
-          label,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: Colors.grey[700],
-          ),
-        ),
-        SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            value,
-            style: valueStyle ?? theme.textTheme.bodyMedium,
-            textAlign: TextAlign.end,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
     );
   }
 }

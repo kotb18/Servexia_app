@@ -17,11 +17,13 @@ class AddInventoryItemScreen extends StatefulWidget {
   final String groupId;
   final bool isFromInvoice;
   final String invoiceType;
+  final String customerId;
   const AddInventoryItemScreen({
     super.key,
     required this.groupId,
     required this.isFromInvoice,
     required this.invoiceType,
+    required this.customerId,
   });
   static const String screenroute = 'addInventoryItem';
 
@@ -296,7 +298,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
             name: '',
             phone: '',
             address: '',
-            customerId: '',
+            customerId: widget.customerId,
             isFromConstCustomers: false,
             isFromWorkSpace: false,
             type: widget.invoiceType,
@@ -342,7 +344,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
 
       await docRef.collection('movements').add({
         'type': 'in',
-        'qty': int.parse(qtyController.text),
+        'qty': double.parse(qtyController.text),
         'unit': unitController.text.trim(),
         'note': notesController.text.trim(),
         'createdBy':

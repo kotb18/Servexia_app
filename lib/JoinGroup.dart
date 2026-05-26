@@ -10,8 +10,8 @@ import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:image/image.dart' as img;
+import 'package:maintenance/ai/ai_service.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 String? intPhone;
@@ -368,6 +368,7 @@ class _FaceRegisterScreenState extends State<FaceRegisterScreen> {
     await Future.delayed(const Duration(seconds: 2));
 
     final picture = await _cameraController.takePicture();
+
     final file = File(picture.path);
 
     final inputImage = InputImage.fromFile(file);
@@ -383,13 +384,17 @@ class _FaceRegisterScreenState extends State<FaceRegisterScreen> {
 
     if (faces.isEmpty) {
       faceDetector.close();
+
       _showError("لم يتم اكتشاف أي وجه");
+
       return;
     }
 
     if (faces.length > 1) {
       faceDetector.close();
+
       _showError("يجب أن يكون هناك شخص واحد فقط أمام الكاميرا");
+
       return;
     }
 
@@ -399,6 +404,7 @@ class _FaceRegisterScreenState extends State<FaceRegisterScreen> {
     );
 
     faceDetector.close();
+
     await _cameraController.dispose();
 
     if (mounted) {
@@ -410,28 +416,40 @@ class _FaceRegisterScreenState extends State<FaceRegisterScreen> {
     required String imagePath,
     required Face face,
   }) async {
-    final interpreter = await Interpreter.fromAsset('assets/face_model.tflite');
+    final interpreter = await AIService.loadModel();
 
     final bytes = await File(imagePath).readAsBytes();
+
     final img.Image original = img.decodeImage(bytes)!;
 
     final rect = face.boundingBox;
 
     final img.Image cropped = img.copyCrop(
       original,
-      x: rect.left.toInt().clamp(0, original.width),
-      y: rect.top.toInt().clamp(0, original.height),
-      width: rect.width.toInt().clamp(0, original.width),
-      height: rect.height.toInt().clamp(0, original.height),
+      x: rect.left.toInt().clamp(0, original.width - 1),
+      y: rect.top.toInt().clamp(0, original.height - 1),
+      width: rect.width.toInt().clamp(1, original.width),
+      height: rect.height.toInt().clamp(1, original.height),
     );
 
     final img.Image resized = img.copyResize(cropped, width: 112, height: 112);
 
     final input = _imageToFloat32(resized);
 
+    final reshapedInput = [
+      List.generate(
+        112,
+        (y) => List.generate(112, (x) {
+          final index = (y * 112 * 3) + (x * 3);
+
+          return [input[index], input[index + 1], input[index + 2]];
+        }),
+      ),
+    ];
+
     final output = List.generate(1, (_) => List.filled(192, 0.0));
 
-    interpreter.run(input.reshape([1, 112, 112, 3]), output);
+    interpreter.run(reshapedInput, output);
 
     interpreter.close();
 
@@ -447,12 +465,16 @@ class _FaceRegisterScreenState extends State<FaceRegisterScreen> {
       for (int x = 0; x < 112; x++) {
         final pixel = image.getPixel(x, y);
 
-        final r = pixel.r;
-        final g = pixel.g;
-        final b = pixel.b;
+        final r = pixel.r.toDouble();
+
+        final g = pixel.g.toDouble();
+
+        final b = pixel.b.toDouble();
 
         convertedBytes[pixelIndex++] = (r - 127.5) / 127.5;
+
         convertedBytes[pixelIndex++] = (g - 127.5) / 127.5;
+
         convertedBytes[pixelIndex++] = (b - 127.5) / 127.5;
       }
     }

@@ -40,33 +40,42 @@ class Customer {
 /// نموذج صنف الفاتورة
 class InvoiceItem {
   final String name;
-  final int quantity;
+  final double quantity;
   final double price;
   final double total;
+  final String? itemId; // معرّف الصنف (اختياري، يستخدم لاستعادة المخزون)
 
   InvoiceItem({
     required this.name,
     required this.quantity,
     required this.price,
     required this.total,
+    required this.itemId,
   });
 
   factory InvoiceItem.fromJson(Map<String, dynamic> json) {
     return InvoiceItem(
       name: json['name'] as String? ?? '',
-      quantity: json['quantity'] as int? ?? 0,
+      quantity: json['quantity'] as double? ?? 0.0,
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       total: (json['total'] as num?)?.toDouble() ?? 0.0,
+      itemId: '${json['itemId'] ?? ''}',
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {'name': name, 'quantity': quantity, 'price': price, 'total': total};
+    return {
+      'name': name,
+      'quantity': quantity,
+      'price': price,
+      'total': total,
+      'itemId': itemId,
+    };
   }
 
   InvoiceItem copyWith({
     String? name,
-    int? quantity,
+    double? quantity,
     double? price,
     double? total,
   }) {
@@ -75,6 +84,7 @@ class InvoiceItem {
       quantity: quantity ?? this.quantity,
       price: price ?? this.price,
       total: total ?? this.total,
+      itemId: itemId ?? '',
     );
   }
 }
@@ -134,6 +144,54 @@ class InvoiceSummary {
       taxPercent: taxPercent ?? this.taxPercent,
       taxValue: taxValue ?? this.taxValue,
       total: total ?? this.total,
+    );
+  }
+}
+
+class ReturnSummary {
+  final double totalBeforeReturn;
+  final double totalPaidInstallments;
+  final double total;
+  final double netTotal;
+
+  ReturnSummary({
+    required this.totalBeforeReturn,
+    required this.totalPaidInstallments,
+    required this.total,
+    required this.netTotal,
+  });
+
+  factory ReturnSummary.fromJson(Map<String, dynamic> json) {
+    return ReturnSummary(
+      totalBeforeReturn: (json['totalBeforeReturn'] as num?)?.toDouble() ?? 0.0,
+      totalPaidInstallments:
+          (json['totalPaidInstallments'] as num?)?.toDouble() ?? 0.0,
+      total: (json['total'] as num?)?.toDouble() ?? 0.0,
+      netTotal: (json['netTotal'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'totalBeforeReturn': totalBeforeReturn,
+      'totalPaidInstallments': totalPaidInstallments,
+      'total': total,
+      'netTotal': netTotal,
+    };
+  }
+
+  ReturnSummary copyWith({
+    double? totalBeforeReturn,
+    double? totalPaidInstallments,
+    double? total,
+    double? netTotal,
+  }) {
+    return ReturnSummary(
+      totalBeforeReturn: totalBeforeReturn ?? this.totalBeforeReturn,
+      totalPaidInstallments:
+          totalPaidInstallments ?? this.totalPaidInstallments,
+      total: total ?? this.total,
+      netTotal: netTotal ?? this.netTotal,
     );
   }
 }
@@ -227,7 +285,13 @@ class Invoice {
   final String invoiceNumber;
   final DateTime createdAt;
   final String paymentMethod; // 'كاش', 'شيك', 'تحويل بنكي', إلخ
+  final String originalInvoiceId;
   final List<Installment> installments; // الأقساط (إذا كانت موجودة)
+  final bool
+  thereIsReturn; // هل هناك فاتورة مرتجعة مرتبطة بهذه الفاتورة (للفواتير الأصلية)
+  final String reInvoiceId; // معرّف الفاتورة الأصلية (للفواتير المرتجعة)
+  // معرّف الفاتورة المرتجعة (للفواتير الأصلية)
+  final ReturnSummary? returnSummary;
 
   Invoice({
     this.id,
@@ -242,6 +306,10 @@ class Invoice {
     required this.createdAt,
     required this.paymentMethod,
     this.installments = const [],
+    required this.thereIsReturn,
+    required this.reInvoiceId,
+    required this.originalInvoiceId,
+    required this.returnSummary,
   });
 
   factory Invoice.fromJson(Map<String, dynamic> json, {String? docId}) {
@@ -284,6 +352,12 @@ class Invoice {
           : DateTime.now(),
       paymentMethod: json['paymentMethod'] as String? ?? 'كاش',
       installments: installments,
+      thereIsReturn: json['thereIsReturn'] as bool? ?? false,
+      reInvoiceId: json['reInvoiceId'] as String,
+      originalInvoiceId: json['originalInvoiceId'] as String? ?? '',
+      returnSummary: ReturnSummary.fromJson(
+        json['returnSummary'] as Map<String, dynamic>? ?? {},
+      ),
     );
   }
 
@@ -303,6 +377,11 @@ class Invoice {
       'invoiceNumber': invoiceNumber,
       'createdAt': createdAt.toIso8601String(),
       'paymentMethod': paymentMethod,
+      'thereIsReturn': thereIsReturn,
+      'reInvoiceId': reInvoiceId,
+      'originalInvoiceId': originalInvoiceId,
+      'returnType': returnType,
+      'returnSummary': returnSummary!.toJson(),
     };
 
     // إضافة الأقساط إلى JSON
@@ -326,6 +405,8 @@ class Invoice {
     String? paymentMethod,
     List<Installment>? installments,
     String? returnType,
+    String? originalInvoiceId,
+    ReturnSummary? returnSummary,
   }) {
     return Invoice(
       id: id ?? this.id,
@@ -340,6 +421,10 @@ class Invoice {
       createdAt: createdAt ?? this.createdAt,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       installments: installments ?? this.installments,
+      thereIsReturn: thereIsReturn,
+      reInvoiceId: reInvoiceId,
+      originalInvoiceId: originalInvoiceId ?? this.originalInvoiceId,
+      returnSummary: returnSummary ?? this.returnSummary,
     );
   }
 
