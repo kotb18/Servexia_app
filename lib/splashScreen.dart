@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:maintenance/homePage.dart';
 import 'dart:async';
 import 'package:maintenance/signIn.dart';
@@ -30,6 +31,20 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _animation;
 
   Future<void> checkAndNavigate() async {
+    // 1. استخراج الـ groupId من URL أولاً
+    final groupId = _extractGroupIdFromUrl();
+
+    // 2. لو فيه groupId في اللينك → روح للمتجر مباشرة
+    if (groupId != null && groupId != 'default') {
+      await Future.delayed(const Duration(seconds: 3)); // انتظر Animation
+      if (!mounted) return;
+
+      // استخدم GoRouter للتنقل للمتجر
+      context.go('/shop/$groupId');
+      return;
+    }
+
+    // 3. لو مفيش لينك → كمل الطبيعي
     user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       print('kotb');
@@ -62,6 +77,25 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
+  // استخراج groupId من URL
+  String? _extractGroupIdFromUrl() {
+    final uri = Uri.base;
+    final host = uri.host;
+
+    // للـ Firebase Hosting: groupId.web.app
+    final parts = host.split('.');
+    if (parts.length >= 3 && parts.first != 'maintenance-b7282') {
+      return parts.first; // ahmed-store.web.app => ahmed-store
+    }
+
+    // من الـ path: /shop/ahmed-store
+    if (uri.pathSegments.isNotEmpty && uri.pathSegments.first == 'shop') {
+      return uri.pathSegments.length > 1 ? uri.pathSegments[1] : null;
+    }
+
+    return null;
+  }
+
   Future<void> getAdmins() async {
     final doc = await FirebaseFirestore.instance
         .collection('admins')
@@ -81,7 +115,7 @@ class _SplashScreenState extends State<SplashScreen>
     linkStore = data['shareLink'];
     appRun = data['appRun'];
     admins = data['admins'];
-    // print(FirebaseAuth.instance.currentUser!.email);
+
     if (user != null) {
       setState(() {
         isAdmin = admins.contains(FirebaseAuth.instance.currentUser!.email);

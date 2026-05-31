@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:maintenance/Store/select_products_screen.dart';
+import 'package:maintenance/Store/store_dashboard_screen.dart';
 import 'package:maintenance/addAsset.dart';
 import 'package:maintenance/addAwarehouseItem.dart';
 import 'package:maintenance/addTask.dart';
@@ -387,7 +389,11 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                   color: Colors.transparent,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(18),
-                    onTap: () {},
+                    onTap: () {
+                      _navigateTo(
+                        StoreDashboardScreen(groupId: widget.workspaceId),
+                      );
+                    },
                     child: const Padding(
                       padding: EdgeInsets.symmetric(
                         horizontal: 18,
@@ -396,14 +402,10 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.point_of_sale_rounded,
-                            color: Colors.white,
-                            size: 24,
-                          ),
+                          Icon(Icons.store, color: Colors.white, size: 24),
                           SizedBox(width: 10),
                           Text(
-                            'البيع السريع (الكاشيـــر)',
+                            'المتجـــر الإليكتروني',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 17,

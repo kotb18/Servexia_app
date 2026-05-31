@@ -340,6 +340,8 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
         'coast': coastController.text.isNotEmpty
             ? double.parse(coastController.text)
             : 0.0,
+        'isInStore': false,
+        'imagesList': [],
       });
 
       await docRef.collection('movements').add({

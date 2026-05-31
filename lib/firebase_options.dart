@@ -89,4 +89,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'maintenance-b7282.firebasestorage.app',
     measurementId: 'G-D0WP4RNEVN',
   );
+
 }

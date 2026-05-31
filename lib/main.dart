@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:go_router/go_router.dart';
 import 'package:maintenance/JoinGroup.dart';
 import 'package:maintenance/addAsset.dart';
 import 'package:maintenance/addAwarehouseItem.dart';
@@ -29,10 +30,17 @@ import 'package:maintenance/wareHouseItemeMovement.dart';
 import 'package:maintenance/warehouseScreen.dart';
 import 'package:maintenance/workSpace.dart';
 import 'package:maintenance/services/billing_service.dart';
+import 'package:maintenance/Store/store_home_screen.dart';
 import 'package:provider/provider.dart';
+
+// ✅ Conditional import للـ Platform Setup
+import 'mobile_setup.dart' if (dart.library.html) 'web_setup.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ✅ Platform-specific setup
+  await PlatformSetup.init();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
@@ -62,13 +70,12 @@ void main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       title: 'Maintenance',
-      localizationsDelegates: [
+      localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
@@ -79,90 +86,271 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: "ElMessiri",
       ),
-      home: SplashScreen(),
-      routes: {
-        Login.screenroute: (context) => const Login(),
-        Homepage.screenroute: (context) => const Homepage(isAdmin: false),
-        Creategroup.screenroute: (context) => const Creategroup(),
-        JoinGroupScreen.screenroute: (context) => JoinGroupScreen(),
-        WorkspaceHomeScreen.screenroute: (context) =>
-            const WorkspaceHomeScreen(workspaceId: ''),
-        TeamScreen.screenroute: (context) => TeamScreen(
-          groupId: '',
-          adminId: '',
-          isAdmin: false,
-          isXadmin: false,
-        ),
-        AdminApprovalPage.screenroute: (context) =>
-            AdminApprovalPage(groupId: ''),
-        AddTaskScreen.screenroute: (context) => AddTaskScreen(
-          groupId: '',
-          fromConstTasks: false,
-          description: TextEditingController(),
-          title: TextEditingController(),
-        ),
-        AddAssetScreen.screenroute: (context) => AddAssetScreen(groupId: ''),
-        AssetsScreen.screenroute: (context) => AssetsScreen(groupId: ''),
-        TasksScreen.screenroute: (context) =>
-            TasksScreen(groupId: '', isAdmin: false),
-        DailyAttendanceScreen.screenroute: (context) =>
-            DailyAttendanceScreen(groupId: '', isAdmin: false),
-        SplashScreen.screenroute: (context) => SplashScreen(),
-        Updateversion.screenroute: (context) => Updateversion(storeLink: ''),
-        TermsAndConditionsScreen.screenroute: (context) =>
-            TermsAndConditionsScreen(),
-        AddInventoryItemScreen.screenroute: (context) => AddInventoryItemScreen(
-          groupId: '',
-          isFromInvoice: false,
-          invoiceType: '',
-          customerId: '',
-        ),
-        StoreScreen.screenroute: (context) => StoreScreen(
-          groupId: '',
-          isFromInvoice: false,
-          deletedItems: false,
-          invoiceType: '',
-          customerId: '',
-        ),
-        InventoryItemDetailsScreenRefactored.screenroute: (context) =>
-            InventoryItemDetailsScreenRefactored(
-              groupId: '',
-              itemId: '',
-              deletedItems: false,
-            ),
-        MainAdmin.screenroute: (context) => const MainAdmin(),
-        FeedbacksPage.screenroute: (context) => const FeedbacksPage(),
-        AddReportPage.screenroute: (context) => AddReportPage(groupId: ''),
-        GroupsMintor.screenroute: (context) => const GroupsMintor(),
-        InvoicePage.screenroute: (context) => InvoicePage(
-          groupId: '',
-          itemsSale: [],
-          itemsPurchase: [],
-          name: '',
-          phone: '',
-          address: '',
-          customerId: '',
-          isFromConstCustomers: false,
-          isFromWorkSpace: false,
-          type: '',
-        ),
-        CustomersSuppliers.screenroute: (context) => const CustomersSuppliers(
-          groupId: '',
-          isFromInvoice: false,
-          itemsSale: [],
-          itemsPruchase: [],
-          invoiceType: '',
-        ),
-        InvoiceSettingsPage.routeName: (context) => const InvoiceSettingsPage(
-          groupId: '',
-          items: [],
-          isFromConstCustomers: false,
-          customerId: '',
-          name: '',
-          phone: '',
-          address: '',
-        ),
-      },
+      routerConfig: _router,
     );
   }
 }
+
+// GoRouter Configuration
+final GoRouter _router = GoRouter(
+  initialLocation: '/',
+  routes: [
+    // SplashScreen - دايماً يفتح أولاً
+    GoRoute(
+      path: '/',
+      name: 'splash',
+      builder: (context, state) => const SplashScreen(),
+    ),
+
+    // صفحة المتجر من لينك خارجي
+    GoRoute(
+      path: '/shop/:groupId',
+      name: 'shop',
+      builder: (context, state) {
+        final groupId = state.pathParameters['groupId'] ?? 'default';
+        return StoreHomeScreen(groupId: groupId, storeName: groupId);
+      },
+    ),
+
+    // Routes القديمة
+    GoRoute(
+      path: '/login',
+      name: 'login',
+      builder: (context, state) => const Login(),
+    ),
+    GoRoute(
+      path: '/home',
+      name: 'home',
+      builder: (context, state) {
+        final isAdmin = state.uri.queryParameters['isAdmin'] == 'true';
+        return Homepage(isAdmin: isAdmin);
+      },
+    ),
+    GoRoute(
+      path: '/create-group',
+      name: 'createGroup',
+      builder: (context, state) => const Creategroup(),
+    ),
+    GoRoute(
+      path: '/join-group',
+      name: 'joinGroup',
+      builder: (context, state) => JoinGroupScreen(),
+    ),
+    GoRoute(
+      path: '/workspace/:workspaceId',
+      name: 'workspace',
+      builder: (context, state) {
+        final workspaceId = state.pathParameters['workspaceId'] ?? '';
+        return WorkspaceHomeScreen(workspaceId: workspaceId);
+      },
+    ),
+    GoRoute(
+      path: '/team/:groupId',
+      name: 'team',
+      builder: (context, state) {
+        final groupId = state.pathParameters['groupId'] ?? '';
+        final adminId = state.uri.queryParameters['adminId'] ?? '';
+        final isAdmin = state.uri.queryParameters['isAdmin'] == 'true';
+        final isXadmin = state.uri.queryParameters['isXadmin'] == 'true';
+        return TeamScreen(
+          groupId: groupId,
+          adminId: adminId,
+          isAdmin: isAdmin,
+          isXadmin: isXadmin,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/admin-approval/:groupId',
+      name: 'adminApproval',
+      builder: (context, state) {
+        final groupId = state.pathParameters['groupId'] ?? '';
+        return AdminApprovalPage(groupId: groupId);
+      },
+    ),
+    GoRoute(
+      path: '/add-task',
+      name: 'addTask',
+      builder: (context, state) => AddTaskScreen(
+        groupId: state.uri.queryParameters['groupId'] ?? '',
+        fromConstTasks: state.uri.queryParameters['fromConstTasks'] == 'true',
+        description: TextEditingController(),
+        title: TextEditingController(),
+      ),
+    ),
+    GoRoute(
+      path: '/add-asset/:groupId',
+      name: 'addAsset',
+      builder: (context, state) {
+        final groupId = state.pathParameters['groupId'] ?? '';
+        return AddAssetScreen(groupId: groupId);
+      },
+    ),
+    GoRoute(
+      path: '/assets/:groupId',
+      name: 'assets',
+      builder: (context, state) {
+        final groupId = state.pathParameters['groupId'] ?? '';
+        return AssetsScreen(groupId: groupId);
+      },
+    ),
+    GoRoute(
+      path: '/tasks/:groupId',
+      name: 'tasks',
+      builder: (context, state) {
+        final groupId = state.pathParameters['groupId'] ?? '';
+        final isAdmin = state.uri.queryParameters['isAdmin'] == 'true';
+        return TasksScreen(groupId: groupId, isAdmin: isAdmin);
+      },
+    ),
+    GoRoute(
+      path: '/attendance/:groupId',
+      name: 'attendance',
+      builder: (context, state) {
+        final groupId = state.pathParameters['groupId'] ?? '';
+        final isAdmin = state.uri.queryParameters['isAdmin'] == 'true';
+        return DailyAttendanceScreen(groupId: groupId, isAdmin: isAdmin);
+      },
+    ),
+    GoRoute(
+      path: '/update-version',
+      name: 'updateVersion',
+      builder: (context, state) => Updateversion(
+        storeLink: state.uri.queryParameters['storeLink'] ?? '',
+      ),
+    ),
+    GoRoute(
+      path: '/terms',
+      name: 'terms',
+      builder: (context, state) => TermsAndConditionsScreen(),
+    ),
+    GoRoute(
+      path: '/add-inventory/:groupId',
+      name: 'addInventory',
+      builder: (context, state) {
+        final groupId = state.pathParameters['groupId'] ?? '';
+        return AddInventoryItemScreen(
+          groupId: groupId,
+          isFromInvoice: state.uri.queryParameters['isFromInvoice'] == 'true',
+          invoiceType: state.uri.queryParameters['invoiceType'] ?? '',
+          customerId: state.uri.queryParameters['customerId'] ?? '',
+        );
+      },
+    ),
+    GoRoute(
+      path: '/store/:groupId',
+      name: 'store',
+      builder: (context, state) {
+        final groupId = state.pathParameters['groupId'] ?? '';
+        return StoreScreen(
+          groupId: groupId,
+          isFromInvoice: state.uri.queryParameters['isFromInvoice'] == 'true',
+          deletedItems: state.uri.queryParameters['deletedItems'] == 'true',
+          invoiceType: state.uri.queryParameters['invoiceType'] ?? '',
+          customerId: state.uri.queryParameters['customerId'] ?? '',
+        );
+      },
+    ),
+    GoRoute(
+      path: '/inventory-details/:groupId/:itemId',
+      name: 'inventoryDetails',
+      builder: (context, state) {
+        final groupId = state.pathParameters['groupId'] ?? '';
+        final itemId = state.pathParameters['itemId'] ?? '';
+        return InventoryItemDetailsScreenRefactored(
+          groupId: groupId,
+          itemId: itemId,
+          deletedItems: state.uri.queryParameters['deletedItems'] == 'true',
+        );
+      },
+    ),
+    GoRoute(
+      path: '/main-admin',
+      name: 'mainAdmin',
+      builder: (context, state) => const MainAdmin(),
+    ),
+    GoRoute(
+      path: '/feedbacks',
+      name: 'feedbacks',
+      builder: (context, state) => const FeedbacksPage(),
+    ),
+    GoRoute(
+      path: '/add-report/:groupId',
+      name: 'addReport',
+      builder: (context, state) {
+        final groupId = state.pathParameters['groupId'] ?? '';
+        return AddReportPage(groupId: groupId);
+      },
+    ),
+    GoRoute(
+      path: '/groups-monitor',
+      name: 'groupsMonitor',
+      builder: (context, state) => const GroupsMintor(),
+    ),
+    GoRoute(
+      path: '/invoice',
+      name: 'invoice',
+      builder: (context, state) => InvoicePage(
+        groupId: state.uri.queryParameters['groupId'] ?? '',
+        itemsSale: [],
+        itemsPurchase: [],
+        name: state.uri.queryParameters['name'] ?? '',
+        phone: state.uri.queryParameters['phone'] ?? '',
+        address: state.uri.queryParameters['address'] ?? '',
+        customerId: state.uri.queryParameters['customerId'] ?? '',
+        isFromConstCustomers:
+            state.uri.queryParameters['isFromConstCustomers'] == 'true',
+        isFromWorkSpace: state.uri.queryParameters['isFromWorkSpace'] == 'true',
+        type: state.uri.queryParameters['type'] ?? '',
+      ),
+    ),
+    GoRoute(
+      path: '/customers-suppliers/:groupId',
+      name: 'customersSuppliers',
+      builder: (context, state) {
+        final groupId = state.pathParameters['groupId'] ?? '';
+        return CustomersSuppliers(
+          groupId: groupId,
+          isFromInvoice: state.uri.queryParameters['isFromInvoice'] == 'true',
+          itemsSale: [],
+          itemsPruchase: [],
+          invoiceType: state.uri.queryParameters['invoiceType'] ?? '',
+        );
+      },
+    ),
+    GoRoute(
+      path: '/invoice-settings',
+      name: 'invoiceSettings',
+      builder: (context, state) => InvoiceSettingsPage(
+        groupId: state.uri.queryParameters['groupId'] ?? '',
+        items: [],
+        isFromConstCustomers:
+            state.uri.queryParameters['isFromConstCustomers'] == 'true',
+        customerId: state.uri.queryParameters['customerId'] ?? '',
+        name: state.uri.queryParameters['name'] ?? '',
+        phone: state.uri.queryParameters['phone'] ?? '',
+        address: state.uri.queryParameters['address'] ?? '',
+      ),
+    ),
+  ],
+  errorBuilder: (context, state) => Scaffold(
+    body: Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, size: 80, color: Colors.red),
+          const SizedBox(height: 16),
+          const Text(
+            'الصفحة غير موجودة',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () => context.go('/'),
+            child: const Text('الرجوع للرئيسية'),
+          ),
+        ],
+      ),
+    ),
+  ),
+);
