@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:maintenance/JoinGroup.dart';
+import 'package:maintenance/Store/inventory_item_model.dart';
+import 'package:maintenance/Store/inventory_store_service.dart';
+import 'package:maintenance/Store/store_product_detail_screen.dart';
 import 'package:maintenance/addAsset.dart';
 import 'package:maintenance/addAwarehouseItem.dart';
 import 'package:maintenance/addTask.dart';
@@ -111,7 +114,71 @@ final GoRouter _router = GoRouter(
         return StoreHomeScreen(groupId: groupId, storeName: groupId);
       },
     ),
+    GoRoute(
+      path: '/shop/:groupId/product/:sku',
+      name: 'productDetail',
+      builder: (context, state) {
+        final groupId = state.pathParameters['groupId'] ?? '';
+        final sku = state.pathParameters['sku'] ?? '';
+        final service = InventoryStoreService();
 
+        return FutureBuilder<InventoryItemModel?>(
+          future: service.getItemById(groupId, sku), // أو getItemBySku
+          builder: (context, snapshot) {
+            // Loading
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            // خطأ
+            if (snapshot.hasError) {
+              return Scaffold(
+                body: Center(child: Text('خطأ: ${snapshot.error}')),
+              );
+            }
+
+            // مش موجود
+            if (!snapshot.hasData || snapshot.data == null) {
+              return Scaffold(
+                body: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        size: 80,
+                        color: Colors.red,
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'المنتج غير موجود',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () => context.go('/shop/$groupId'),
+                        child: const Text('الرجوع للمتجر'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            // ✅ المنتج موجود
+            return StoreProductDetailScreen(
+              groupId: groupId,
+              item: snapshot.data!,
+            );
+          },
+        );
+      },
+    ),
     // Routes القديمة
     GoRoute(
       path: '/login',

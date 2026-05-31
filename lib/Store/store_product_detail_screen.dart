@@ -1,19 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:maintenance/Store/store_cart_service.dart';
 import 'package:maintenance/Store/inventory_item_model.dart';
 import 'store_cart_screen.dart';
 
 class StoreProductDetailScreen extends StatefulWidget {
   final InventoryItemModel item;
-  final String groupId; // <-- أضفناه
+  final String groupId;
   final bool isPreview;
 
   const StoreProductDetailScreen({
     super.key,
     required this.item,
-    required this.groupId, // <-- أضفناه
-    this.isPreview = false, // <-- افتراضي false
+    required this.groupId,
+    this.isPreview = false,
   });
 
   @override
@@ -24,6 +26,144 @@ class StoreProductDetailScreen extends StatefulWidget {
 class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
   int _currentImage = 0;
   int _quantity = 1;
+
+  // ✅ توليد لينك المنتج
+  String _generateProductLink() {
+    const baseUrl = 'https://maintenance-b7282.web.app';
+    return '$baseUrl/shop/${widget.groupId}/product/${widget.item.sku}';
+  }
+
+  // ✅ نسخ اللينك
+  Future<void> _copyLinkToClipboard() async {
+    final link = _generateProductLink();
+    await Clipboard.setData(ClipboardData(text: link));
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('تم نسخ لينك المنتج'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // ✅ مشاركة اللينك
+  Future<void> _shareProductLink() async {
+    final link = _generateProductLink();
+
+    await Share.share(
+      '${widget.item.name}\n'
+      'السعر: ${widget.item.effectiveStorePrice.toStringAsFixed(2)} \n'
+      '$link',
+      subject: widget.item.name,
+    );
+  }
+
+  // ✅ عرض BottomSheet للمشاركة
+  void _showShareOptions() {
+    final link = _generateProductLink();
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // شريط السحب
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            const Text(
+              'مشاركة المنتج',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+
+            Text(
+              widget.item.name,
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+
+            // عرض اللينك
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      link,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade700,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 20),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _copyLinkToClipboard();
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // زر المشاركة
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _shareProductLink();
+                },
+                icon: const Icon(Icons.share),
+                label: const Text('مشاركة اللينك'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // زر إلغاء
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('إلغاء'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,11 +199,11 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                     ),
             ),
             actions: [
+              // ✅ زر المشاركة المعدّل
               IconButton(
                 icon: const Icon(Icons.share),
-                onPressed: () {
-                  // TODO: مشاركة المنتج
-                },
+                tooltip: 'مشاركة المنتج',
+                onPressed: _showShareOptions,
               ),
             ],
           ),
@@ -77,7 +217,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                   Row(
                     children: [
                       Text(
-                        '${item.effectiveStorePrice.toStringAsFixed(2)} ج.م',
+                        '${item.effectiveStorePrice.toStringAsFixed(2)} ',
                         style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
@@ -86,7 +226,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                       if (item.hasDiscount) ...[
                         const SizedBox(width: 12),
                         Text(
-                          '${item.price.toStringAsFixed(2)} ج.م',
+                          '${item.price.toStringAsFixed(2)} ',
                           style: const TextStyle(
                             fontSize: 16,
                             decoration: TextDecoration.lineThrough,
@@ -181,7 +321,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
         ],
       ),
       bottomNavigationBar: widget.isPreview
-          ? null // <-- مفيش زر شراء في المعاينة
+          ? null
           : SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -219,9 +359,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => StoreCartScreen(
-                  groupId: widget.groupId, // <-- صححنا الخطأ هنا
-                ),
+                builder: (_) => StoreCartScreen(groupId: widget.groupId),
               ),
             );
           },

@@ -21,6 +21,17 @@ class InventoryStoreService {
         );
   }
 
+  Future<InventoryItemModel?> getItemById(String groupId, String itemId) async {
+    try {
+      final doc = await _itemsCollection(groupId).doc(itemId).get();
+      if (!doc.exists || doc.data() == null) return null;
+      return InventoryItemModel.fromFirestore(doc);
+    } catch (e) {
+      print('Error getting item: $e');
+      return null;
+    }
+  }
+
   /// جلب الأصناف المُفعلة في المتجر فقط (للعملاء)
   Stream<List<InventoryItemModel>> getStoreItems(String groupId) {
     return _itemsCollection(groupId)
