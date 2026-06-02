@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:maintenance/Store/inventory_item_model.dart';
 import 'package:maintenance/Store/inventory_store_service.dart';
 import 'package:maintenance/Store/store_cart_screen.dart';
 import 'package:maintenance/Store/store_product_detail_screen.dart';
+import 'package:maintenance/imageControl/platform_image.dart';
 import 'package:share_plus/share_plus.dart';
 
 class StoreHomeScreen extends StatefulWidget {
@@ -35,13 +37,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
 
   // توليد لينك المتجر
   String _generateStoreLink() {
-    // اللينك الأساسي للـ Hosting
     const baseUrl = 'https://maintenance-b7282.web.app';
-
-    // لو عايز لينك مباشر بالـ subdomain (مستقبلاً)
-    // return 'https://${widget.groupId}.web.app';
-
-    // دلوقتي بالـ path
     return '$baseUrl/shop/${widget.groupId}';
   }
 
@@ -84,7 +80,6 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // شريط السحب
             Container(
               width: 40,
               height: 4,
@@ -94,20 +89,16 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
             const Text(
               'مشاركة المتجر',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-
             Text(
               widget.storeName,
               style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
             ),
             const SizedBox(height: 20),
-
-            // عرض اللينك
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -139,8 +130,6 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // زر المشاركة
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -159,8 +148,6 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
               ),
             ),
             const SizedBox(height: 12),
-
-            // زر إلغاء
             SizedBox(
               width: double.infinity,
               child: TextButton(
@@ -177,30 +164,29 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.storeName),
-        actions: [
-          // ✅ زر المشاركة الجديد
-          IconButton(
-            icon: const Icon(Icons.share),
-            tooltip: 'مشاركة المتجر',
-            onPressed: _showShareOptions,
-          ),
-          // زر السلة
-          IconButton(
-            icon: const Icon(Icons.shopping_cart),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => StoreCartScreen(groupId: widget.groupId),
-              ),
+      appBar: widget.isPreview
+          ? null
+          : AppBar(
+              title: Text(widget.storeName),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.share),
+                  tooltip: 'مشاركة المتجر',
+                  onPressed: _showShareOptions,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.shopping_cart),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => StoreCartScreen(groupId: widget.groupId),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
       body: Column(
         children: [
-          // شريط البحث
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
@@ -226,8 +212,6 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
               ),
             ),
           ),
-
-          // المنتجات
           Expanded(
             child: StreamBuilder<List<InventoryItemModel>>(
               stream: _service.getStoreItems(widget.groupId),
@@ -237,7 +221,14 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                 }
 
                 if (snapshot.hasError) {
-                  return Center(child: Text('خطأ: ${snapshot.error}'));
+                  return Center(
+                    child: Column(
+                      children: [
+                        Text('خطأ: ${snapshot.error}'),
+                        Text('${snapshot.stackTrace}'),
+                      ],
+                    ),
+                  );
                 }
 
                 final items = snapshot.data ?? [];
@@ -330,11 +321,11 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                       top: Radius.circular(12),
                     ),
                     child: item.imagesList.isNotEmpty
-                        ? Image.network(
-                            item.imagesList.first,
+                        ? WebImage(
+                            src: item.imagesList.first,
                             width: double.infinity,
+                            height: double.infinity,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _buildPlaceholder(),
                           )
                         : _buildPlaceholder(),
                   ),

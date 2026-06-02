@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:maintenance/imageControl/platform_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:maintenance/Store/store_cart_service.dart';
 import 'package:maintenance/Store/inventory_item_model.dart';
@@ -54,7 +55,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
 
     await Share.share(
       '${widget.item.name}\n'
-      'السعر: ${widget.item.effectiveStorePrice.toStringAsFixed(2)} \n'
+      'السعر: ${widget.item.effectiveStorePrice.toStringAsFixed(2)} ج.م\n'
       '$link',
       subject: widget.item.name,
     );
@@ -74,7 +75,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // شريط السحب
             Container(
               width: 40,
               height: 4,
@@ -84,21 +84,17 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
             const Text(
               'مشاركة المنتج',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-
             Text(
               widget.item.name,
               style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
-
-            // عرض اللينك
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -130,8 +126,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // زر المشاركة
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -150,8 +144,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
               ),
             ),
             const SizedBox(height: 12),
-
-            // زر إلغاء
             SizedBox(
               width: double.infinity,
               child: TextButton(
@@ -186,10 +178,11 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                         },
                       ),
                       items: item.imagesList.map((url) {
-                        return Image.network(
-                          url,
-                          fit: BoxFit.cover,
+                        return WebImage(
+                          src: url,
                           width: double.infinity,
+                          height: 400,
+                          fit: BoxFit.cover,
                         );
                       }).toList(),
                     )
@@ -199,7 +192,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                     ),
             ),
             actions: [
-              // ✅ زر المشاركة المعدّل
               IconButton(
                 icon: const Icon(Icons.share),
                 tooltip: 'مشاركة المنتج',
@@ -217,7 +209,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                   Row(
                     children: [
                       Text(
-                        '${item.effectiveStorePrice.toStringAsFixed(2)} ',
+                        '${item.effectiveStorePrice.toStringAsFixed(2)} ج.م',
                         style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
@@ -226,9 +218,9 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                       if (item.hasDiscount) ...[
                         const SizedBox(width: 12),
                         Text(
-                          '${item.price.toStringAsFixed(2)} ',
+                          '${item.price.toStringAsFixed(2)} ج.م',
                           style: const TextStyle(
-                            fontSize: 16,
+                            //  FontSize: 16,
                             decoration: TextDecoration.lineThrough,
                             color: Colors.grey,
                           ),

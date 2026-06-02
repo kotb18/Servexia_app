@@ -66,7 +66,7 @@ class InventoryService {
     final data = itemSnap.data() as Map<String, dynamic>;
     final currentQty = data['quantity'];
 
-    final newQty = type == 'in' ? currentQty + qty : currentQty - qty;
+    final double newQty = type == 'in' ? currentQty + qty : currentQty - qty;
 
     if (newQty < 0) {
       throw Exception('الكمية غير كافية في المخزون.');

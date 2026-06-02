@@ -37,7 +37,7 @@ class InventoryStoreService {
     return _itemsCollection(groupId)
         .where('deleted', isEqualTo: false)
         .where('isInStore', isEqualTo: true)
-        .where('quantity', isGreaterThan: 0)
+        .where('quantity', isGreaterThan: 0.0)
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
