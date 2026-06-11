@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:maintenance/Store/order_details_screen.dart';
 import 'package:maintenance/Store/order_status_badge.dart';
 import 'package:maintenance/Store/store_order_model.dart';
 import 'package:maintenance/Store/store_order_service.dart';
@@ -47,10 +48,19 @@ class StoreOrdersScreen extends StatelessWidget {
                   ),
                   title: Text(order.customerInfo.name),
                   subtitle: Text(
-                    '${order.total.toStringAsFixed(2)} ج.م - ${order.customerInfo.phone}',
+                    '${order.total.toStringAsFixed(2)} - ${order.customerInfo.phone}',
                   ),
                   trailing: OrderStatusBadge(status: order.status),
                   onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => OrderDetailsScreen(
+                          order: order,
+                          isFromCustomerOrders: false,
+                        ),
+                      ),
+                    );
                     // TODO: شاشة تفاصيل الطلب
                   },
                 ),

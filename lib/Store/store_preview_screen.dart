@@ -18,17 +18,7 @@ class StorePreviewScreen extends StatelessWidget {
         title: const Text('معاينة المتجر'),
         centerTitle: true,
         backgroundColor: Colors.green,
-        actions: [
-          // زر المشاركة
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: () {
-              // TODO: مشاركة الرابط
-              final url = 'https://$groupId.web.app';
-              // Share.share(url);
-            },
-          ),
-        ],
+
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
@@ -37,7 +27,7 @@ class StorePreviewScreen extends StatelessWidget {
       body: StoreHomeScreen(
         groupId: groupId,
         storeName: storeName,
-        isPreview: true, // <-- علم المعاينة
+        isPreview: false, // <-- علم المعاينة
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:maintenance/Store/store_model.dart';
 import 'package:maintenance/Store/store_preview_screen.dart';
@@ -7,18 +8,88 @@ import 'package:maintenance/Store/store_setup_screen.dart';
 import 'select_products_screen.dart';
 import 'store_orders_screen.dart';
 
-class StoreDashboardScreen extends StatelessWidget {
+class StoreDashboardScreen extends StatefulWidget {
   final String groupId;
+
   const StoreDashboardScreen({super.key, required this.groupId});
 
   @override
-  Widget build(BuildContext context) {
-    // TODO: جلب merchantId من Firebase Auth
+  State<StoreDashboardScreen> createState() => _StoreDashboardScreenState();
+}
 
+class _StoreDashboardScreenState extends State<StoreDashboardScreen> {
+  double totalSales = 0.0;
+  int newOrdersCount = 0;
+  bool isLoadingStats = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  Future<void> _loadStats() async {
+    final sales = await getTotalSales(widget.groupId);
+    final orders = await getNoOfNewOrders(widget.groupId);
+
+    if (mounted) {
+      setState(() {
+        totalSales = sales;
+        newOrdersCount = orders;
+        isLoadingStats = false;
+      });
+    }
+  }
+
+  // ========== عدد الطلبات الجديدة ==========
+  Future<int> getNoOfNewOrders(String storeId) async {
+    try {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('store_orders')
+          .doc(storeId)
+          .collection('items')
+          .where('status', isEqualTo: 'pending')
+          .count()
+          .get();
+
+      return querySnapshot.count ?? 0;
+    } catch (e) {
+      debugPrint('Error getting new orders count: $e');
+      return 0;
+    }
+  }
+
+  // ========== إجمالي المبيعات ==========
+  // ========== عدد الطلبات الجديدة ==========
+
+  // ========== إجمالي المبيعات ==========
+  Future<double> getTotalSales(String storeId) async {
+    try {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('store_orders')
+          .doc(storeId)
+          .collection('items')
+          .where('status', isEqualTo: 'delivered')
+          .get();
+
+      double total = 0;
+      for (var doc in querySnapshot.docs) {
+        final data = doc.data();
+        total += (data['total'] as num?)?.toDouble() ?? 0;
+      }
+      return total;
+    } catch (e) {
+      debugPrint('Error getting total sales: $e');
+      return 0.0;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('لوحة تحكم المتجر')),
       body: StreamBuilder<StoreModel?>(
-        stream: StoreService().getMerchantStore(groupId),
+        stream: StoreService().getMerchantStore(widget.groupId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -27,7 +98,7 @@ class StoreDashboardScreen extends StatelessWidget {
           final store = snapshot.data;
 
           if (store == null) {
-            return _buildNoStoreView(context, groupId);
+            return _buildNoStoreView(context, widget.groupId);
           }
 
           return _buildDashboardView(context, store);
@@ -134,14 +205,14 @@ class StoreDashboardScreen extends StatelessWidget {
             children: [
               _buildStatCard(
                 'الطلبات الجديدة',
-                '0',
+                isLoadingStats ? '...' : '$newOrdersCount',
                 Icons.shopping_bag,
                 Colors.orange,
               ),
               const SizedBox(width: 12),
               _buildStatCard(
                 'إجمالي المبيعات',
-                '0 ج.م',
+                isLoadingStats ? '...' : '${totalSales.toStringAsFixed(2)} ',
                 Icons.attach_money,
                 Colors.green,
               ),
@@ -186,7 +257,6 @@ class StoreDashboardScreen extends StatelessWidget {
               // TODO: شاشة الإعدادات
             },
           ),
-          // في StoreDashboardScreen
           _buildMenuItem(
             icon: Icons.visibility,
             title: 'معاينة المتجر',
@@ -195,7 +265,7 @@ class StoreDashboardScreen extends StatelessWidget {
               context,
               MaterialPageRoute(
                 builder: (_) => StorePreviewScreen(
-                  groupId: store.id, // أو groupId
+                  groupId: store.id,
                   storeName: store.name,
                 ),
               ),

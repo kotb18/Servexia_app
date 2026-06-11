@@ -116,7 +116,7 @@ class ProductCard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '${item.effectiveStorePrice.toStringAsFixed(2)} ج.م',
+                                '${item.effectiveStorePrice.toStringAsFixed(2)} ',
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: theme.primaryColor,
@@ -125,7 +125,7 @@ class ProductCard extends StatelessWidget {
                               if (item.storePrice != null &&
                                   item.storePrice! < item.price)
                                 Text(
-                                  '${item.price.toStringAsFixed(2)} ج.م',
+                                  '${item.price.toStringAsFixed(2)} ',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     decoration: TextDecoration.lineThrough,
                                     color: Colors.grey,

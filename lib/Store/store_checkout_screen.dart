@@ -1,9 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:maintenance/Store/inventory_item_model.dart';
 import 'package:maintenance/Store/store_cart_service.dart';
 import 'package:maintenance/Store/store_order_model.dart';
 import 'package:maintenance/Store/store_order_service.dart';
 import 'package:maintenance/Store/store_order_success_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 class StoreCheckoutScreen extends StatefulWidget {
@@ -283,6 +285,16 @@ class _StoreCheckoutScreenState extends State<StoreCheckoutScreen> {
     );
   }
 
+  Future<void> removeCartKey() async {
+    final prefs = await SharedPreferences.getInstance();
+    String cartKey = FirebaseAuth.instance.currentUser != null
+        ? 'store_cart_${FirebaseAuth.instance.currentUser!.uid}'
+        : 'store_cart_guest';
+    final key = '${cartKey}_${widget.groupId}';
+
+    await prefs.remove(key);
+  }
+
   Future<void> _submitOrder() async {
     if (!_formKey.currentState!.validate()) return;
     if (widget.cartService.isEmpty) {
@@ -298,6 +310,7 @@ class _StoreCheckoutScreenState extends State<StoreCheckoutScreen> {
       final order = StoreOrderModel(
         id: const Uuid().v4(),
         storeId: widget.groupId,
+        customerId: FirebaseAuth.instance.currentUser!.uid, // زائر
         items: widget.cartService.items
             .map(
               (item) => OrderItem(
@@ -349,8 +362,14 @@ class _StoreCheckoutScreenState extends State<StoreCheckoutScreen> {
       );
 
       final createdOrder = await _orderService.createOrder(order);
-      widget.cartService.clearCart();
-
+      await FirebaseFirestore.instance
+          .collection('store_orders')
+          .doc(widget.groupId)
+          .set({
+            'customerId': order.customerId,
+            'orderNumber': createdOrder.orderNumber,
+          });
+      removeCartKey();
       if (mounted) {
         Navigator.pushReplacement(
           context,

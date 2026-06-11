@@ -181,9 +181,14 @@ final GoRouter _router = GoRouter(
     ),
     // Routes القديمة
     GoRoute(
-      path: '/login',
-      name: 'login',
-      builder: (context, state) => const Login(),
+      path: '/signIn',
+      name: 'logIn',
+      builder: (context, state) => const Login(fromCheckout: false),
+    ),
+    GoRoute(
+      path: '/termsAndConditions',
+      name: 'terms',
+      builder: (context, state) => const TermsAndConditionsScreen(),
     ),
     GoRoute(
       path: '/home',
@@ -286,11 +291,7 @@ final GoRouter _router = GoRouter(
         storeLink: state.uri.queryParameters['storeLink'] ?? '',
       ),
     ),
-    GoRoute(
-      path: '/terms',
-      name: 'terms',
-      builder: (context, state) => TermsAndConditionsScreen(),
-    ),
+
     GoRoute(
       path: '/add-inventory/:groupId',
       name: 'addInventory',
@@ -332,7 +333,7 @@ final GoRouter _router = GoRouter(
       },
     ),
     GoRoute(
-      path: '/main-admin',
+      path: '/admin/mainAdmin',
       name: 'mainAdmin',
       builder: (context, state) => const MainAdmin(),
     ),

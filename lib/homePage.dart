@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:maintenance/JoinGroup.dart';
 import 'package:maintenance/admin/mainAdmin.dart';
 import 'package:maintenance/createGroup.dart';
@@ -339,8 +340,9 @@ class _HomepageState extends State<Homepage>
           const Spacer(),
           if (isMainAdmin)
             TextButton(
-              onPressed: () {
-                Navigator.pushNamed(context, MainAdmin.screenroute);
+              onPressed: () async {
+                context.pushNamed('mainAdmin');
+                print('main admin');
               },
               child: Text(
                 'main admin',
@@ -456,9 +458,13 @@ class _HomepageState extends State<Homepage>
               await prefs.remove(_localKey('$groupId $uid'));
             } */
 
-                        Navigator.of(
+                        Navigator.pushAndRemoveUntil(
                           context,
-                        ).pushReplacementNamed(Login.screenroute);
+                          MaterialPageRoute(
+                            builder: (_) => Login(fromCheckout: false),
+                          ),
+                          (route) => false,
+                        );
                       },
                       child: const Text(
                         'تسجيل الخروج',

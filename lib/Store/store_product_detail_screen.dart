@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:carousel_slider/carousel_slider.dart';
@@ -6,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:maintenance/Store/store_cart_service.dart';
 import 'package:maintenance/Store/inventory_item_model.dart';
 import 'store_cart_screen.dart';
+import 'package:maintenance/signIn.dart';
 
 class StoreProductDetailScreen extends StatefulWidget {
   final InventoryItemModel item;
@@ -312,35 +314,51 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: widget.isPreview
-          ? null
-          : SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    onPressed: item.isInStock ? _addToCart : null,
-                    icon: const Icon(Icons.shopping_cart),
-                    label: Text(
-                      item.isInStock
-                          ? 'إضافة للسلة - ${(item.effectiveStorePrice * _quantity).toStringAsFixed(2)} ج.م'
-                          : 'نفذت الكمية',
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: item.isInStock ? null : Colors.grey,
-                    ),
-                  ),
-                ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton.icon(
+              onPressed: item.isInStock ? _addToCart : null,
+              icon: const Icon(Icons.shopping_cart),
+              label: Text(
+                item.isInStock
+                    ? 'إضافة للسلة - ${(item.effectiveStorePrice * _quantity).toStringAsFixed(2)} '
+                    : 'نفذت الكمية',
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: item.isInStock ? null : Colors.grey,
               ),
             ),
+          ),
+        ),
+      ),
     );
   }
 
-  void _addToCart() {
+  void _addToCart() async {
+    if (FirebaseAuth.instance.currentUser == null) {
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => Login(fromCheckout: true)),
+      );
+
+      // لو المستخدم سجل دخول ورجع بنجاح
+      if (result == true) {
+        _addToCart(); // نكمل نفس الدالة تاني بعد login
+      }
+
+      return;
+    }
+
     final cart = StoreCartService();
+    await cart.loadCart(
+      widget.groupId,
+    ); // لازم نعمل load قبل ما نضيف عشان نضمن اننا بنشتغل على آخر نسخة من السلة
     cart.addToCart(widget.item, quantity: _quantity);
+    cart.saveCart(widget.groupId);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -351,7 +369,10 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => StoreCartScreen(groupId: widget.groupId),
+                builder: (_) => StoreCartScreen(
+                  groupId: widget.groupId,
+                  makeSetStateOnCartChange: false,
+                ),
               ),
             );
           },

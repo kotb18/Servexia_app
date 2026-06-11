@@ -39,7 +39,10 @@ class StoreOrderService {
       ],
     );
 
-    await _orders.doc(orderWithNumber.id).set(orderWithNumber.toMap());
+    await _orders
+        .doc(orderWithNumber.storeId)
+        .collection('items')
+        .add(orderWithNumber.toMap());
 
     // TODO: Cloud Function يخصم الكمية من المخزون وينشئ فاتورة في ERP
 
@@ -48,7 +51,7 @@ class StoreOrderService {
 
   // توليد رقم طلب فريد
   Future<String> _generateOrderNumber(String storeId) async {
-    final counterRef = _counters.doc('orders_$storeId');
+    final counterRef = _counters.doc(storeId);
 
     return _firestore.runTransaction((transaction) async {
       final counterDoc = await transaction.get(counterRef);
@@ -73,7 +76,8 @@ class StoreOrderService {
     DateTime? toDate,
   }) {
     Query query = _orders
-        .where('storeId', isEqualTo: storeId)
+        .doc(storeId)
+        .collection('items')
         .orderBy('createdAt', descending: true);
 
     if (status != null) {
@@ -88,8 +92,13 @@ class StoreOrderService {
   }
 
   // جلب طلبات العميل
-  Stream<List<StoreOrderModel>> getCustomerOrders(String customerId) {
+  Stream<List<StoreOrderModel>> getCustomerOrders(
+    String groupId,
+    String customerId,
+  ) {
     return _orders
+        .doc(groupId)
+        .collection('items')
         .where('customerId', isEqualTo: customerId)
         .orderBy('createdAt', descending: true)
         .snapshots()
@@ -101,20 +110,31 @@ class StoreOrderService {
   }
 
   // جلب طلب بالـ ID
-  Future<StoreOrderModel?> getOrderById(String orderId) async {
-    final doc = await _orders.doc(orderId).get();
+  Future<StoreOrderModel?> getOrderById(String storeId, String orderId) async {
+    final doc = await _orders
+        .doc(storeId)
+        .collection('items')
+        .doc(orderId)
+        .get();
     if (!doc.exists) return null;
     return StoreOrderModel.fromFirestore(doc);
   }
 
   // تحديث حالة الطلب
   Future<void> updateOrderStatus(
+    String storeId,
     String orderId,
     OrderStatus newStatus, {
     String? note,
     String? updatedBy,
+    StoreOrderModel? order,
+    bool notifyCustomer = true,
+    bool? takeOrder,
   }) async {
-    final order = await getOrderById(orderId);
+    if (takeOrder == false) {
+      order = await getOrderById(storeId, orderId);
+    }
+
     if (order == null) return;
 
     final statusUpdate = OrderStatusUpdate(
@@ -144,6 +164,6 @@ class StoreOrderService {
         break;
     }
 
-    await _orders.doc(orderId).update(updates);
+    await _orders.doc(storeId).collection('items').doc(orderId).update(updates);
   }
 }

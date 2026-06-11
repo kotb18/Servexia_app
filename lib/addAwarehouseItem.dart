@@ -328,7 +328,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
       await docRef.set({
         'name': nameController.text.trim(),
         'sku': skuController.text.trim(),
-        'quantity': int.parse(qtyController.text),
+        'quantity': double.parse(qtyController.text),
         'unit': unitController.text.trim(),
         'location': locationController.text.trim(),
         'notes': notesController.text.trim(),

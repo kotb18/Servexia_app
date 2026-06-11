@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -26,11 +25,14 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
   final _descControllers = <String, TextEditingController>{};
   final Map<String, List<String>> _tempImages = {};
   final Set<String> _selectedItems = {};
-  final Set<String> _modifiedItems = {}; // <-- جديد: منتجات تم تعديلها
+  final Set<String> _modifiedItems = {};
 
   final _searchController = TextEditingController();
   String _searchQuery = '';
   bool _isLoading = false;
+
+  // Notifier to update the save button and count without rebuilding the whole page
+  final ValueNotifier<int> _changesCountNotifier = ValueNotifier(0);
 
   @override
   void dispose() {
@@ -41,7 +43,12 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
       c.dispose();
     }
     _searchController.dispose();
+    _changesCountNotifier.dispose();
     super.dispose();
+  }
+
+  void _updateChangesCount() {
+    _changesCountNotifier.value = _selectedItems.length + _modifiedItems.length;
   }
 
   // ========== الصور ==========
@@ -67,8 +74,8 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
         _tempImages[sku]!.addAll(
           compressedImages.where((url) => url != null).cast<String>(),
         );
-        // علّم المنتج كمُعدّل
         _modifiedItems.add(sku);
+        _updateChangesCount();
       });
     } catch (e) {
       if (mounted) {
@@ -118,6 +125,7 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
         _tempImages.remove(sku);
       }
       _modifiedItems.add(sku);
+      _updateChangesCount();
     });
   }
 
@@ -130,7 +138,6 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
     int updatedCount = 0;
 
     try {
-      // اجمع كل المنتجات اللي لازم تحفظ (مختارة + مُعدّلة)
       final itemsToSave = {..._selectedItems, ..._modifiedItems};
 
       for (final sku in itemsToSave) {
@@ -156,7 +163,6 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
         if (item == null) continue;
 
         if (item.isInStore) {
-          // تحديث منتج موجود
           await _service.updateStoreProduct(
             groupId: widget.groupId,
             sku: sku,
@@ -166,7 +172,6 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
           );
           updatedCount++;
         } else {
-          // إضافة منتج جديد
           await _service.addToStore(
             groupId: widget.groupId,
             sku: sku,
@@ -189,7 +194,6 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
             ),
           ),
         );
-        // ارجع للخلف بعد نجاح الحفظ
         Future.delayed(const Duration(seconds: 1), () {
           if (mounted) Navigator.pop(context);
         });
@@ -205,7 +209,13 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
         );
       }
     } finally {
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+        _modifiedItems.clear(); // Clear modified items after successful save
+        _selectedItems.clear(); // Clear selected items after successful save
+        _tempImages.clear(); // Clear temporary images after successful save
+        _updateChangesCount();
+      });
     }
   }
 
@@ -259,12 +269,12 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
         await _deleteStoreImages(widget.groupId, item.sku);
         await _service.removeFromStore(widget.groupId, item.sku);
 
-        // نظف الـ controllers
         _priceControllers.remove(item.sku)?.dispose();
         _descControllers.remove(item.sku)?.dispose();
         _tempImages.remove(item.sku);
         _selectedItems.remove(item.sku);
         _modifiedItems.remove(item.sku);
+        _updateChangesCount();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -319,34 +329,39 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
         ),
         centerTitle: true,
         actions: [
-          // عدد المنتجات المختارة
-          if (_selectedItems.isNotEmpty || _modifiedItems.isNotEmpty)
-            Center(
-              child: Container(
-                margin: const EdgeInsets.only(left: 8),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '${_selectedItems.length + _modifiedItems.length}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+          ValueListenableBuilder<int>(
+            valueListenable: _changesCountNotifier,
+            builder: (context, count, child) {
+              if (count > 0) {
+                return Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(left: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '$count',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
           const SizedBox(width: 8),
         ],
       ),
       body: Column(
         children: [
-          // شريط البحث المحسّن
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -357,7 +372,11 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
             ),
             child: TextField(
               controller: _searchController,
-              onChanged: (value) => setState(() => _searchQuery = value),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
               textDirection: TextDirection.rtl,
               textAlign: TextAlign.right,
               decoration: InputDecoration(
@@ -390,8 +409,6 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
               ),
             ),
           ),
-
-          // القائمة
           Expanded(
             child: StreamBuilder<List<InventoryItemModel>>(
               stream: _service.getAllItems(widget.groupId),
@@ -405,12 +422,8 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
                 }
 
                 final allItems = snapshot.data ?? [];
+                if (allItems.isEmpty) return _buildEmptyWidget();
 
-                if (allItems.isEmpty) {
-                  return _buildEmptyWidget();
-                }
-
-                // فلترة البحث
                 final items = _searchQuery.isEmpty
                     ? allItems
                     : allItems.where((item) {
@@ -427,7 +440,6 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
                 return ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    // الأصناف المُفعلة
                     if (inStoreItems.isNotEmpty) ...[
                       _buildSectionHeader(
                         '✅ منتجات في المتجر',
@@ -439,8 +451,6 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
                       ),
                       const SizedBox(height: 24),
                     ],
-
-                    // الأصناف المتاحة
                     if (notInStoreItems.isNotEmpty) ...[
                       _buildSectionHeader(
                         '📦 أصناف المخزون',
@@ -451,7 +461,6 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
                         (item) => _buildItemCard(item, isAlreadyInStore: false),
                       ),
                     ],
-
                     if (items.isEmpty) _buildNoSearchResults(),
                   ],
                 );
@@ -460,14 +469,49 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
           ),
         ],
       ),
-
-      // زر الحفظ السفلي المحسّن
-      bottomNavigationBar: _buildSaveButton(theme),
+      bottomNavigationBar: ValueListenableBuilder<int>(
+        valueListenable: _changesCountNotifier,
+        builder: (context, count, child) {
+          return _buildSaveButton(theme, count > 0);
+        },
+      ),
     );
   }
 
-  // ========== ويدجتس مساعدة ==========
+  Widget _buildItemCard(
+    InventoryItemModel item, {
+    required bool isAlreadyInStore,
+  }) {
+    // We use a separate widget for each card to manage its own text controllers
+    // and avoid global rebuilds when typing.
+    return _ItemCardWidget(
+      key: ValueKey(item.sku),
+      item: item,
+      isAlreadyInStore: isAlreadyInStore,
+      priceControllers: _priceControllers,
+      descControllers: _descControllers,
+      tempImages: _tempImages,
+      selectedItems: _selectedItems,
+      modifiedItems: _modifiedItems,
+      onToggleAddSelection: (sku) {
+        setState(() {
+          if (_selectedItems.contains(sku)) {
+            _selectedItems.remove(sku);
+            _tempImages.remove(sku);
+          } else {
+            _selectedItems.add(sku);
+          }
+          _updateChangesCount();
+        });
+      },
+      onRemoveImage: _removeImage,
+      onConfirmRemoveFromStore: _confirmRemoveFromStore,
+      onNotifyChange: _updateChangesCount,
+      pickImages: _pickImages,
+    );
+  }
 
+  // Same helper widgets as before...
   Widget _buildErrorWidget(String error) {
     return Center(
       child: Padding(
@@ -585,9 +629,7 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
     );
   }
 
-  Widget _buildSaveButton(ThemeData theme) {
-    final hasChanges = _selectedItems.isNotEmpty || _modifiedItems.isNotEmpty;
-
+  Widget _buildSaveButton(ThemeData theme, bool hasChanges) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       padding: const EdgeInsets.all(16),
@@ -642,50 +684,112 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
       ),
     );
   }
+}
 
-  // ========== كارت المنتج ==========
+// Extracting ItemCard into a separate StatefulWidget to manage its own state
+class _ItemCardWidget extends StatefulWidget {
+  final InventoryItemModel item;
+  final bool isAlreadyInStore;
+  final Map<String, TextEditingController> priceControllers;
+  final Map<String, TextEditingController> descControllers;
+  final Map<String, List<String>> tempImages;
+  final Set<String> selectedItems;
+  final Set<String> modifiedItems;
+  final Function(String) onToggleAddSelection;
+  final Function(String, String) onRemoveImage;
+  final Function(InventoryItemModel) onConfirmRemoveFromStore;
+  final VoidCallback onNotifyChange; // Callback to notify parent of changes
+  final Function(String) pickImages;
 
-  Widget _buildItemCard(
-    InventoryItemModel item, {
-    required bool isAlreadyInStore,
-  }) {
-    final isSelected = _selectedItems.contains(item.sku);
-    final isModified = _modifiedItems.contains(item.sku);
-    final showDetails = isSelected || isAlreadyInStore;
+  const _ItemCardWidget({
+    Key? key,
+    required this.item,
+    required this.isAlreadyInStore,
+    required this.priceControllers,
+    required this.descControllers,
+    required this.tempImages,
+    required this.selectedItems,
+    required this.modifiedItems,
+    required this.onToggleAddSelection,
+    required this.onRemoveImage,
+    required this.onConfirmRemoveFromStore,
+    required this.onNotifyChange,
+    required this.pickImages,
+  }) : super(key: key);
 
-    // تهيئة الـ controllers
-    if (!_priceControllers.containsKey(item.sku)) {
-      _priceControllers[item.sku] = TextEditingController(
+  @override
+  State<_ItemCardWidget> createState() => _ItemCardWidgetState();
+}
+
+class _ItemCardWidgetState extends State<_ItemCardWidget> {
+  late TextEditingController _priceController;
+  late TextEditingController _descController;
+
+  @override
+  void initState() {
+    super.initState();
+    _priceController = widget.priceControllers.putIfAbsent(
+      widget.item.sku,
+      () => TextEditingController(
         text:
-            item.storePrice?.toStringAsFixed(2) ??
-            item.price.toStringAsFixed(2),
-      );
-    }
-    if (!_descControllers.containsKey(item.sku)) {
-      _descControllers[item.sku] = TextEditingController(
-        text: item.storeDescription ?? '',
-      );
-    }
+            widget.item.storePrice?.toStringAsFixed(2) ??
+            widget.item.price.toStringAsFixed(2),
+      ),
+    );
+    _descController = widget.descControllers.putIfAbsent(
+      widget.item.sku,
+      () => TextEditingController(text: widget.item.storeDescription ?? ''),
+    );
+
+    // Add listeners to notify the parent about changes immediately
+    _priceController.addListener(_handleTextChange);
+    _descController.addListener(_handleTextChange);
+  }
+
+  void _handleTextChange() {
+    // Always add to modifiedItems and notify parent, as text content might change
+    // even if the item was already marked as modified.
+    widget.modifiedItems.add(widget.item.sku);
+    widget.onNotifyChange();
+  }
+
+  @override
+  void dispose() {
+    // Don't dispose controllers here as they are owned by the parent
+    _priceController.removeListener(_handleTextChange);
+    _descController.removeListener(_handleTextChange);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isSelected = widget.selectedItems.contains(widget.item.sku);
+    final isModified = widget.modifiedItems.contains(widget.item.sku);
+    final showDetails = isSelected || widget.isAlreadyInStore;
+
+    final currentImages =
+        widget.tempImages[widget.item.sku] ??
+        List<String>.from(widget.item.imagesList);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isAlreadyInStore
+        color: widget.isAlreadyInStore
             ? Colors.green.shade50
             : isSelected
             ? Colors.blue.shade50
             : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isAlreadyInStore
+          color: widget.isAlreadyInStore
               ? Colors.green
               : isSelected
               ? Colors.blue
               : isModified
               ? Colors.orange
               : Colors.grey.shade200,
-          width: isSelected || isAlreadyInStore || isModified ? 2 : 1,
+          width: isSelected || widget.isAlreadyInStore || isModified ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
@@ -697,50 +801,48 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
       ),
       child: Column(
         children: [
-          // الصف الرئيسي
           InkWell(
-            onTap: isAlreadyInStore
+            onTap: widget.isAlreadyInStore
                 ? null
-                : () => _toggleAddSelection(item.sku),
+                : () {
+                    widget.onToggleAddSelection(widget.item.sku);
+                    // The onToggleAddSelection callback already calls _updateChangesCount
+                    // in the parent, so no need to call onNotifyChange here again.
+                  },
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  // Checkbox أو أيقونة
                   Container(
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: isAlreadyInStore
+                      color: widget.isAlreadyInStore
                           ? Colors.green
                           : isSelected
                           ? Colors.red
                           : Colors.transparent,
                       shape: BoxShape.circle,
-                      border: isAlreadyInStore || isSelected
+                      border: widget.isAlreadyInStore || isSelected
                           ? null
                           : Border.all(color: Colors.grey.shade400),
                     ),
-                    child: isAlreadyInStore
+                    child: widget.isAlreadyInStore
                         ? const Icon(Icons.check, color: Colors.white, size: 18)
                         : isSelected
                         ? const Icon(Icons.check, color: Colors.white, size: 18)
                         : null,
                   ),
                   const SizedBox(width: 16),
-
-                  // الصورة
-                  _buildItemImage(item),
+                  _buildItemImage(widget.item),
                   const SizedBox(width: 16),
-
-                  // المعلومات
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          item.name,
+                          widget.item.name,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -757,7 +859,7 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            'كود: ${item.sku}',
+                            'كود: ${widget.item.sku}',
                             style: TextStyle(
                               color: Colors.grey.shade600,
                               fontSize: 12,
@@ -775,7 +877,7 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              '${item.quantity} ${item.unit}',
+                              '${widget.item.quantity} ${widget.item.unit}',
                               style: TextStyle(
                                 color: Colors.grey.shade600,
                                 fontSize: 13,
@@ -788,7 +890,7 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
                               color: Colors.grey.shade500,
                             ),
                             Text(
-                              'تكلفة: ${item.coast.toStringAsFixed(2)}',
+                              'تكلفة: ${widget.item.coast.toStringAsFixed(2)}',
                               style: TextStyle(
                                 color: Colors.grey.shade600,
                                 fontSize: 13,
@@ -796,7 +898,8 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
                             ),
                           ],
                         ),
-                        if (item.isInStore && item.storePrice != null)
+                        if (widget.item.isInStore &&
+                            widget.item.storePrice != null)
                           Container(
                             margin: const EdgeInsets.only(top: 8),
                             padding: const EdgeInsets.symmetric(
@@ -808,7 +911,7 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              'سعر المتجر: ${item.storePrice!.toStringAsFixed(2)} ج.م',
+                              'سعر المتجر: ${widget.item.storePrice!.toStringAsFixed(2)} ',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 12,
@@ -823,14 +926,12 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
               ),
             ),
           ),
-
-          // التفاصيل القابلة للتوسيع
           if (showDetails)
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               decoration: BoxDecoration(
-                color: isAlreadyInStore
+                color: widget.isAlreadyInStore
                     ? Colors.green.shade50
                     : Colors.blue.shade50,
                 borderRadius: const BorderRadius.vertical(
@@ -841,25 +942,22 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
                 children: [
                   const Divider(),
                   const SizedBox(height: 12),
-
-                  // السعر
-                  _buildPriceField(item),
+                  _buildPriceField(widget.item),
                   const SizedBox(height: 12),
-
-                  // الوصف
-                  _buildDescriptionField(item),
+                  _buildDescriptionField(widget.item),
                   const SizedBox(height: 16),
-
-                  // الصور
-                  _buildImagesSection(item.sku, item),
+                  _buildImagesSection(
+                    widget.item.sku,
+                    widget.item,
+                    currentImages,
+                  ),
                   const SizedBox(height: 16),
-
-                  // زر الإزالة (للمنتجات المُفعلة فقط)
-                  if (isAlreadyInStore)
+                  if (widget.isAlreadyInStore)
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        onPressed: () => _confirmRemoveFromStore(item),
+                        onPressed: () =>
+                            widget.onConfirmRemoveFromStore(widget.item),
                         icon: const Icon(
                           Icons.delete_forever,
                           color: Colors.red,
@@ -912,7 +1010,7 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
           ),
           Expanded(
             child: TextField(
-              controller: _priceControllers[item.sku],
+              controller: _priceController,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
@@ -922,9 +1020,7 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
                 hintText: item.price.toStringAsFixed(2),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                suffixText: 'ج.م',
               ),
-              onChanged: (_) => setState(() => _modifiedItems.add(item.sku)),
             ),
           ),
         ],
@@ -940,7 +1036,7 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
         border: Border.all(color: Colors.grey.shade200),
       ),
       child: TextField(
-        controller: _descControllers[item.sku],
+        controller: _descController,
         maxLines: 3,
         textAlign: TextAlign.right,
         textDirection: TextDirection.rtl,
@@ -950,115 +1046,103 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
           border: InputBorder.none,
           contentPadding: const EdgeInsets.all(16),
         ),
-        onChanged: (_) => setState(() => _modifiedItems.add(item.sku)),
       ),
     );
   }
 
-  Widget _buildImagesSection(String sku, InventoryItemModel item) {
-    final currentImages =
-        _tempImages[sku] ?? List<String>.from(item.imagesList);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.image_outlined, color: Colors.grey.shade600),
-              const SizedBox(width: 8),
+  Widget _buildImagesSection(
+    String sku,
+    InventoryItemModel item,
+    List<String> currentImages,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.image_outlined, color: Colors.grey.shade600),
+            const SizedBox(width: 8),
+            Text(
+              'صور المنتج في المتجر',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const Spacer(),
+            if (currentImages.isNotEmpty)
               Text(
-                'صور المنتج في المتجر',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade700,
-                ),
+                '${currentImages.length} صورة',
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
               ),
-              const Spacer(),
-              if (currentImages.isNotEmpty)
-                Text(
-                  '${currentImages.length} صورة',
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // عرض الصور
-          if (currentImages.isNotEmpty)
-            SizedBox(
-              height: 100,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: currentImages.length,
-                itemBuilder: (context, index) {
-                  return Stack(
-                    children: [
-                      Container(
-                        width: 100,
-                        height: 100,
-                        margin: const EdgeInsets.only(right: 10),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          image: DecorationImage(
-                            image: NetworkImage(currentImages[index]),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        top: 4,
-                        right: 14,
-                        child: InkWell(
-                          onTap: () => _removeImage(sku, currentImages[index]),
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(color: Colors.black26, blurRadius: 4),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.close,
-                              size: 14,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-
-          const SizedBox(height: 12),
-
-          // زر إضافة صور
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (currentImages.isNotEmpty)
           SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => _pickImages(sku),
-              icon: const Icon(Icons.add_photo_alternate_outlined),
-              label: const Text('إضافة صور'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+            height: 100,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: currentImages.length,
+              itemBuilder: (context, index) {
+                return Stack(
+                  children: [
+                    Container(
+                      width: 100,
+                      height: 100,
+                      margin: const EdgeInsets.only(right: 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        image: DecorationImage(
+                          image: NetworkImage(currentImages[index]),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 4,
+                      right: 14,
+                      child: InkWell(
+                        onTap: () =>
+                            widget.onRemoveImage(sku, currentImages[index]),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(color: Colors.black26, blurRadius: 4),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.close,
+                            size: 14,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => widget.pickImages(sku),
+            icon: const Icon(Icons.add_photo_alternate_outlined),
+            label: const Text('إضافة صور'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1088,16 +1172,5 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
       ),
       child: Icon(Icons.image, color: Colors.grey.shade300, size: 32),
     );
-  }
-
-  void _toggleAddSelection(String sku) {
-    setState(() {
-      if (_selectedItems.contains(sku)) {
-        _selectedItems.remove(sku);
-        _tempImages.remove(sku);
-      } else {
-        _selectedItems.add(sku);
-      }
-    });
   }
 }

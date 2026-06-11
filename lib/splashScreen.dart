@@ -51,7 +51,7 @@ class _SplashScreenState extends State<SplashScreen>
       if (!mounted) return;
       await Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => Login()),
+        MaterialPageRoute(builder: (_) => Login(fromCheckout: false)),
       );
       return;
     }

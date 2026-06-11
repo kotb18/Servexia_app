@@ -4,9 +4,9 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 //import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:maintenance/homePage.dart';
-import 'package:maintenance/termsAndConditions.dart';
 import 'package:maintenance/updateVersion.dart';
 
 List<dynamic> admins = [];
@@ -18,7 +18,8 @@ User? user;
 
 class Login extends StatefulWidget {
   static const String screenroute = 'logIn';
-  const Login({super.key});
+  final bool fromCheckout;
+  const Login({super.key, required this.fromCheckout});
 
   @override
   State<Login> createState() => _LoginState();
@@ -84,11 +85,17 @@ class _LoginState extends State<Login> {
       await subscribeToNotifications();
 
       if (!mounted) return;
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => Homepage(isAdmin: isAdmin)),
-      );
+      if (widget.fromCheckout) {
+        Navigator.pop(
+          context,
+          true,
+        ); // ارجع للصفحة السابقة (checkout) بعد تسجيل الدخول
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => Homepage(isAdmin: isAdmin)),
+        );
+      }
     } catch (e) {
       print("Google Auth Error: $e");
       ScaffoldMessenger.of(
@@ -166,10 +173,7 @@ class _LoginState extends State<Login> {
                       Expanded(
                         child: GestureDetector(
                           onTap: () {
-                            Navigator.pushNamed(
-                              context,
-                              TermsAndConditionsScreen.screenroute,
-                            );
+                            context.pushNamed('terms');
                           },
                           child: const Text(
                             'أوافق على الشروط والأحكام',

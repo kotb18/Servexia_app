@@ -1,21 +1,47 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:maintenance/Store/store_cart_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'store_checkout_screen.dart';
+import 'package:maintenance/imageControl/platform_image.dart';
 
-class StoreCartScreen extends StatelessWidget {
+class StoreCartScreen extends StatefulWidget {
   final String groupId;
   final double shippingFee;
+  final bool makeSetStateOnCartChange;
 
   const StoreCartScreen({
     super.key,
     required this.groupId,
     this.shippingFee = 50,
+    required this.makeSetStateOnCartChange,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final cart = StoreCartService();
+  State<StoreCartScreen> createState() => _StoreCartScreenState();
+}
 
+class _StoreCartScreenState extends State<StoreCartScreen> {
+  final cart = StoreCartService();
+  void makeSetStateOnCartChange() async {
+    await cart.loadCart(widget.groupId);
+    if (widget.makeSetStateOnCartChange) {
+      setState(() {});
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    makeSetStateOnCartChange();
+    print(
+      'StoreHomeScreen initialized with groupId: ${widget.groupId}, shippingFee: ${widget.shippingFee}',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('سلة المشتريات')),
       body: cart.isEmpty
@@ -43,110 +69,166 @@ class StoreCartScreen extends StatelessWidget {
                     itemCount: cart.items.length,
                     itemBuilder: (context, index) {
                       final item = cart.items[index];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Row(
-                            children: [
-                              // الصورة
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: item.product.imagesList.isNotEmpty
-                                    ? Image.network(
-                                        item.product.imagesList.first,
-                                        width: 80,
-                                        height: 80,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) =>
-                                            _buildPlaceholder(),
-                                      )
-                                    : _buildPlaceholder(),
-                              ),
-                              const SizedBox(width: 12),
+                      return Stack(
+                        children: [
+                          Card(
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Row(
+                                children: [
+                                  // الصورة
+                                  SizedBox(
+                                    width: 80,
+                                    height: 80,
+                                    child: ClipRRect(
+                                      borderRadius: const BorderRadius.vertical(
+                                        top: Radius.circular(12),
+                                      ),
+                                      child: item.product.imagesList.isNotEmpty
+                                          ? WebImage(
+                                              src:
+                                                  item.product.imagesList.first,
+                                              width: double.infinity,
+                                              height: double.infinity,
+                                              fit: BoxFit.cover,
+                                            )
+                                          : _buildPlaceholder(),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
 
-                              // المعلومات
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      item.product.name,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
+                                  // المعلومات
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          item.product.name,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${item.product.effectiveStorePrice.toStringAsFixed(2)} ',
+                                          style: TextStyle(
+                                            color: Theme.of(
+                                              context,
+                                            ).primaryColor,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        if (item.product.hasDiscount)
+                                          Text(
+                                            '${item.product.price.toStringAsFixed(2)} ',
+                                            style: const TextStyle(
+                                              decoration:
+                                                  TextDecoration.lineThrough,
+                                              color: Colors.grey,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                      ],
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${item.product.effectiveStorePrice.toStringAsFixed(2)} ج.م',
-                                      style: TextStyle(
-                                        color: Theme.of(context).primaryColor,
-                                        fontWeight: FontWeight.w500,
+                                  ),
+
+                                  // التحكم في الكمية
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.remove_circle_outline,
+                                        ),
+                                        onPressed: item.quantity > 1
+                                            ? () async {
+                                                cart.updateQuantity(
+                                                  item.product.sku,
+                                                  item.quantity - 1,
+                                                  attributes:
+                                                      item.selectedAttributes,
+                                                );
+                                                await cart.saveCart(
+                                                  widget.groupId,
+                                                );
+                                                setState(() {});
+                                              }
+                                            : null,
                                       ),
-                                    ),
-                                    if (item.product.hasDiscount)
                                       Text(
-                                        '${item.product.price.toStringAsFixed(2)} ج.م',
+                                        '${item.quantity}',
                                         style: const TextStyle(
-                                          decoration:
-                                              TextDecoration.lineThrough,
-                                          color: Colors.grey,
-                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
                                         ),
                                       ),
-                                  ],
-                                ),
-                              ),
-
-                              // التحكم في الكمية
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.remove_circle_outline,
-                                    ),
-                                    onPressed: item.quantity > 1
-                                        ? () {
-                                            cart.updateQuantity(
-                                              item.product.sku,
-                                              item.quantity - 1,
-                                              attributes:
-                                                  item.selectedAttributes,
-                                            );
-                                          }
-                                        : null,
-                                  ),
-                                  Text(
-                                    '${item.quantity}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.add_circle_outline),
-                                    onPressed:
-                                        item.quantity < item.product.quantity
-                                        ? () {
-                                            cart.updateQuantity(
-                                              item.product.sku,
-                                              item.quantity + 1,
-                                              attributes:
-                                                  item.selectedAttributes,
-                                            );
-                                          }
-                                        : null,
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.add_circle_outline,
+                                        ),
+                                        onPressed:
+                                            item.quantity <
+                                                item.product.quantity
+                                            ? () async {
+                                                cart.updateQuantity(
+                                                  item.product.sku,
+                                                  item.quantity + 1,
+                                                  attributes:
+                                                      item.selectedAttributes,
+                                                );
+                                                await cart.saveCart(
+                                                  widget.groupId,
+                                                );
+                                                setState(() {});
+                                              }
+                                            : null,
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                            ],
+                            ),
                           ),
-                        ),
+                          Positioned(
+                            left: 10,
+                            top: 0,
+                            child: IconButton.filled(
+                              style: ButtonStyle(
+                                padding: WidgetStateProperty.all(
+                                  const EdgeInsets.all(4),
+                                ),
+                                minimumSize: WidgetStateProperty.all(Size.zero),
+                                shape: WidgetStateProperty.all(
+                                  const CircleBorder(),
+                                ),
+                              ),
+                              onPressed: () {
+                                if (cart.items.length == 1) {
+                                  removeCartKey();
+                                  Navigator.pop(context);
+                                  return;
+                                }
+                                cart.removeFromCart(
+                                  item.product.sku,
+                                  attributes: item.selectedAttributes,
+                                );
+                                cart.saveCart(widget.groupId);
+                                setState(() {});
+                              },
+                              icon: Icon(
+                                Icons.close,
+                                color: Colors.red.shade400,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ],
                       );
                     },
                   ),
@@ -168,12 +250,16 @@ class StoreCartScreen extends StatelessWidget {
                           'المجموع الفرعي',
                           cart.subtotal,
                         ),
-                        _buildSummaryRow(context, 'مصاريف الشحن', shippingFee),
+                        _buildSummaryRow(
+                          context,
+                          'مصاريف الشحن',
+                          widget.shippingFee,
+                        ),
                         const Divider(),
                         _buildSummaryRow(
                           context,
                           'الإجمالي',
-                          cart.subtotal + shippingFee,
+                          cart.subtotal + widget.shippingFee,
                           isTotal: true,
                         ),
                         const SizedBox(height: 16),
@@ -187,8 +273,8 @@ class StoreCartScreen extends StatelessWidget {
                                 MaterialPageRoute(
                                   builder: (_) => StoreCheckoutScreen(
                                     cartService: cart,
-                                    groupId: groupId,
-                                    shippingFee: shippingFee,
+                                    groupId: widget.groupId,
+                                    shippingFee: widget.shippingFee,
                                   ),
                                 ),
                               );
@@ -203,6 +289,16 @@ class StoreCartScreen extends StatelessWidget {
               ],
             ),
     );
+  }
+
+  Future<void> removeCartKey() async {
+    final prefs = await SharedPreferences.getInstance();
+    String cartKey = FirebaseAuth.instance.currentUser != null
+        ? 'store_cart_${FirebaseAuth.instance.currentUser!.uid}'
+        : 'store_cart_guest';
+    final key = '${cartKey}_${widget.groupId}';
+
+    await prefs.remove(key);
   }
 
   Widget _buildPlaceholder() {
@@ -236,7 +332,7 @@ class StoreCartScreen extends StatelessWidget {
             ),
           ),
           Text(
-            '${amount.toStringAsFixed(2)} ج.م',
+            '${amount.toStringAsFixed(2)} ',
             style: TextStyle(
               fontSize: isTotal ? 18 : 14,
               fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
