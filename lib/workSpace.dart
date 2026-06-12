@@ -347,6 +347,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                           isFromConstCustomers: false,
                           isFromWorkSpace: true,
                           type: 'بيع',
+                          isFormStore: false,
                         ),
                       ),
                     ),

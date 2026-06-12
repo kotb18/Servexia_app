@@ -261,6 +261,7 @@ class _CustomersSuppliersState extends State<CustomersSuppliers> {
                 isFromConstCustomers: true,
                 isFromWorkSpace: false,
                 type: widget.invoiceType,
+                isFormStore: false,
               ),
             ),
           );

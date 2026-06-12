@@ -260,6 +260,8 @@ class InvoicePage extends StatefulWidget {
     required this.type,
     this.invoice,
     this.isEditMode = false,
+    required this.isFormStore,
+    this.orderId,
   });
 
   static const String screenroute = 'InvoicePage';
@@ -276,6 +278,8 @@ class InvoicePage extends StatefulWidget {
   final String type;
   final Invoice? invoice;
   final bool isEditMode;
+  final bool isFormStore;
+  final String? orderId;
 
   @override
   State<InvoicePage> createState() => _InvoicePageState();
@@ -881,6 +885,8 @@ class _InvoicePageState extends State<InvoicePage>
                       isEditMode: widget.isEditMode,
                       totalBeforeReturn: totalBeforeReturn,
                       totalPaidInstallments: totalPaidInstallments,
+                      isFromStore: widget.isFormStore,
+                      orderId: widget.orderId ?? '',
                     ),
             ),
           ],
@@ -925,6 +931,8 @@ class InvoicePageDesign extends StatefulWidget {
   final bool isEditMode;
   final double totalBeforeReturn;
   final double totalPaidInstallments;
+  final bool isFromStore;
+  final String orderId;
 
   const InvoicePageDesign({
     super.key,
@@ -942,6 +950,8 @@ class InvoicePageDesign extends StatefulWidget {
     required this.isEditMode,
     required this.totalBeforeReturn,
     required this.totalPaidInstallments,
+    required this.isFromStore,
+    required this.orderId,
   });
 
   @override
@@ -955,7 +965,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
   void initState() {
     super.initState();
     // Initialize controllers with customer data if coming from customers list
-    if (widget.isFromConstCustomers) {
+    if (widget.isFromConstCustomers || widget.isFromStore) {
       nameController.text = widget.name;
       phoneController.text = widget.phone;
       addressController.text = widget.address;
@@ -1356,7 +1366,14 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
         'reInvoiceId': reInvoiceId,
       });
     }
-
+    if (widget.orderId != '') {
+      final ref4 = FirebaseFirestore.instance
+          .collection('store_orders')
+          .doc(widget.groupId)
+          .collection('items')
+          .doc(widget.orderId);
+      batch.update(ref4, {'linkedInvoiceId': reInvoiceId});
+    }
     // تحديث رقم آخر فاتورة
     final invoiceMainRef = firestore.collection('invoices').doc(widget.groupId);
 
@@ -2567,7 +2584,13 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
       width: double.infinity,
       height: 52,
       child: ElevatedButton.icon(
-        onPressed: isValid ? () => _handleSave() : null,
+        onPressed: isValid
+            ? () => showCustomDialog(
+                context: context,
+                title: 'تأكيد الحفظ',
+                message: 'إختر نوع الفاتوره',
+              )
+            : null,
         icon: const Icon(Icons.save_outlined, color: Colors.white),
         label: Text(
           widget.type == 'عرض سعر' ? 'حفظ عرض السعر' : 'حفظ وطباعة الفاتورة',
@@ -2581,7 +2604,46 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     );
   }
 
-  Future<void> _handleSave() async {
+  Future<void> showCustomDialog({
+    required BuildContext context,
+    required String title,
+    required String message,
+
+    VoidCallback? onConfirm,
+  }) async {
+    await showDialog(
+      context: context,
+      //  barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            ElevatedButton(
+              onPressed: () async {
+                final navigator = Navigator.of(context);
+                if (!mounted) return;
+                navigator.pop();
+                await _handleSave(true);
+              },
+              child: Text('طابعة حرارية'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final navigator = Navigator.of(context);
+                if (!mounted) return;
+                navigator.pop();
+                await _handleSave(false);
+              },
+              child: Text('طابعة A4'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _handleSave(bool thermalInvoice) async {
     // Validate payment schedule sums
     if (selectedPaymentMethod != 'كاش' && widget.type != 'عرض سعر') {
       double sum = widget.state.paymentScheduleData.fold(
@@ -2653,39 +2715,63 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
             )
             .toList();
       }
+      if (thermalInvoice == true) {
+        final pdfBytes = await ThermalPrinterService.generateThermalPdf(
+          invoiceType: widget.type,
+          invoiceNumber:
+              "${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}",
+          invoiceDate: widget.state.selectedDate,
+          clientName: nameController.text,
+          items: pdfItems,
+          subtotal: widget.state.priceSumItems,
+          discount: widget.state.discountValue,
+          tax: widget.state.taxValue,
+          total: widget.state.total,
+          notes: notesController.text.isNotEmpty ? notesController.text : null,
+          companyName: widget.state.companyName,
+          isQuote: widget.type == 'عرض سعر',
+        );
+        await ThermalPrinterService.printThermalPdf(pdfBytes);
 
-      await InvoiceGenerator.generateProfessionalInvoice(
-        invoiceType: widget.type,
-        invoiceNumber:
-            "${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}",
-        invoiceDate: widget.state.selectedDate,
-        clientName: nameController.text,
-        clientAddress: addressController.text,
-        clientPhone: phoneController.text,
-        items: pdfItems,
-        subtotal: widget.state.priceSumItems,
-        discount: widget.state.discountValue,
-        tax: widget.state.taxValue,
-        total: widget.state.total,
-        notes: notesController.text.isNotEmpty ? notesController.text : null,
-        companyName: widget.state.companyName,
-        companyAddress: widget.state.companyAddress,
-        companyPhone: widget.state.companyPhone,
-        companyEmail: widget.state.companyEmail,
-        companyLogoPath: widget.state.companyLogoPath,
-        isDue: selectedPaymentMethod == 'آجل',
-        isInstallment: selectedPaymentMethod == 'تقسيط',
-        dueDates: widget.state.paymentScheduleData,
-        showAddress: widget.state.showAddress,
-        showEmail: widget.state.showEmail,
-        showDiscount: widget.state.showDiscount,
-        showLogo: widget.state.showLogo,
-        showNotes: widget.state.showNotes,
-        showPhone: widget.state.showPhone,
-        showTax: widget.state.showTax,
-        isQuote: widget.type == 'عرض سعر',
-        originalInvoiceNumber: widget.state.originalInvoiceNumber,
-      );
+        // أو مشاركة
+        await ThermalPrinterService.shareToThermalPrinter(
+          pdfBytes,
+          'فاتورة_001',
+        );
+      } else {
+        await InvoiceGenerator.generateProfessionalInvoice(
+          invoiceType: widget.type,
+          invoiceNumber:
+              "${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}",
+          invoiceDate: widget.state.selectedDate,
+          clientName: nameController.text,
+          clientAddress: addressController.text,
+          clientPhone: phoneController.text,
+          items: pdfItems,
+          subtotal: widget.state.priceSumItems,
+          discount: widget.state.discountValue,
+          tax: widget.state.taxValue,
+          total: widget.state.total,
+          notes: notesController.text.isNotEmpty ? notesController.text : null,
+          companyName: widget.state.companyName,
+          companyAddress: widget.state.companyAddress,
+          companyPhone: widget.state.companyPhone,
+          companyEmail: widget.state.companyEmail,
+          companyLogoPath: widget.state.companyLogoPath,
+          isDue: selectedPaymentMethod == 'آجل',
+          isInstallment: selectedPaymentMethod == 'تقسيط',
+          dueDates: widget.state.paymentScheduleData,
+          showAddress: widget.state.showAddress,
+          showEmail: widget.state.showEmail,
+          showDiscount: widget.state.showDiscount,
+          showLogo: widget.state.showLogo,
+          showNotes: widget.state.showNotes,
+          showPhone: widget.state.showPhone,
+          showTax: widget.state.showTax,
+          isQuote: widget.type == 'عرض سعر',
+          originalInvoiceNumber: widget.state.originalInvoiceNumber,
+        );
+      }
 
       setState(() => widget.state.loading = false);
 
@@ -3915,5 +4001,309 @@ class InvoiceGenerator {
     );
 
     return bytes;
+  }
+}
+
+class ThermalPrinterService {
+  // ═══════════════════════════════════════════════════
+  // Generate thermal PDF - FIXED
+  // ═══════════════════════════════════════════════════
+  static Future<Uint8List> generateThermalPdf({
+    required String invoiceType,
+    required String invoiceNumber,
+    required DateTime invoiceDate,
+    required String clientName,
+    required List<Map<String, dynamic>> items,
+    required double subtotal,
+    required double discount,
+    required double tax,
+    required double total,
+    String? companyName,
+    String? notes,
+    bool isQuote = false,
+  }) async {
+    final pdf = pw.Document();
+
+    // ═══ FIXED: 80mm thermal roll width ═══
+    // 80mm = 226.77 points (72 dpi)
+    final rollWidth = 80.0 * 72.0 / 25.4;
+
+    // ═══ FIXED: Load Arabic font with fallback ═══
+    final arabicFont = await PdfGoogleFonts.cairoRegular();
+    final arabicFontBold = await PdfGoogleFonts.cairoBold();
+
+    final formattedDate =
+        '${invoiceDate.year}-${invoiceDate.month.toString().padLeft(2, '0')}-${invoiceDate.day.toString().padLeft(2, '0')}';
+
+    String paymentStatus = isQuote ? 'عرض سعر' : 'مدفوع';
+
+    // Helper for text style
+    pw.TextStyle _style({
+      double fontSize = 10,
+      PdfColor color = PdfColors.black,
+      pw.FontWeight weight = pw.FontWeight.normal,
+    }) {
+      return pw.TextStyle(
+        font: arabicFont,
+        fontBold: arabicFontBold,
+        fontSize: fontSize,
+        color: color,
+        fontWeight: weight,
+      );
+    }
+
+    pdf.addPage(
+      pw.Page(
+        // ═══ FIXED: Roll paper format ═══
+        pageFormat: PdfPageFormat(rollWidth, double.infinity),
+        margin: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        build: (context) {
+          // ═══ FIXED: RTL Directionality ═══
+          return pw.Directionality(
+            textDirection: pw.TextDirection.rtl,
+            child: pw.Column(
+              // ═══ FIXED: Cross axis start (right alignment) ═══
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                // ═══ HEADER ═══
+                pw.Center(
+                  child: pw.Text(
+                    companyName ?? 'اسم الشركة',
+                    style: _style(fontSize: 16, weight: pw.FontWeight.bold),
+                    textAlign: pw.TextAlign.center,
+                  ),
+                ),
+                pw.SizedBox(height: 4),
+                pw.Center(
+                  child: pw.Text(
+                    '$invoiceType - $paymentStatus',
+                    style: _style(fontSize: 12, weight: pw.FontWeight.bold),
+                    textAlign: pw.TextAlign.center,
+                  ),
+                ),
+                pw.Center(
+                  child: pw.Text(
+                    'رقم: $invoiceNumber',
+                    style: _style(fontSize: 9),
+                    textAlign: pw.TextAlign.center,
+                  ),
+                ),
+                pw.Center(
+                  child: pw.Text(
+                    'التاريخ: $formattedDate',
+                    style: _style(fontSize: 9),
+                    textAlign: pw.TextAlign.center,
+                  ),
+                ),
+                pw.Divider(thickness: 1),
+                pw.SizedBox(height: 4),
+
+                // ═══ CLIENT - FIXED: Right aligned ═══
+                if (clientName.isNotEmpty) ...[
+                  pw.Text(
+                    'العميل: $clientName',
+                    style: _style(fontSize: 10),
+                    textAlign: pw.TextAlign.right,
+                  ),
+                  pw.SizedBox(height: 8),
+                ],
+
+                // ═══ ITEMS TABLE - FIXED: Better layout for thermal ═══
+                // بدل Table نستخدم Column عشان التحكم أفضل
+                ...items.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final item = entry.value;
+                  final qty = (item['quantity'] ?? 0) as num;
+                  final price = (item['price'] ?? 0) as num;
+                  final itemTotal = qty * price;
+                  final name = item['name']?.toString() ?? '';
+
+                  return pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(vertical: 4),
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border(
+                        bottom: pw.BorderSide(
+                          color: index < items.length - 1
+                              ? PdfColors.grey400
+                              : PdfColors.black,
+                          width: index < items.length - 1 ? 0.5 : 1,
+                        ),
+                      ),
+                    ),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        // Name on top
+                        pw.Text(
+                          name,
+                          style: _style(fontSize: 10),
+                          textAlign: pw.TextAlign.right,
+                        ),
+                        pw.SizedBox(height: 2),
+                        // Qty, Price, Total in row
+                        pw.Row(
+                          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                          children: [
+                            pw.Text(
+                              '${qty.toString()} × ${price.toStringAsFixed(2)}',
+                              style: _style(
+                                fontSize: 9,
+                                color: PdfColors.grey700,
+                              ),
+                            ),
+                            pw.Text(
+                              itemTotal.toStringAsFixed(2),
+                              style: _style(
+                                fontSize: 10,
+                                weight: pw.FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+
+                pw.Divider(thickness: 1),
+                pw.SizedBox(height: 4),
+
+                // ═══ SUMMARY - FIXED: Right aligned ═══
+                _summaryRow('المجموع:', subtotal, _style),
+                if (discount > 0)
+                  _summaryRow(
+                    'الخصم:',
+                    -discount,
+                    _style,
+                    color: PdfColors.red,
+                  ),
+                if (tax > 0) _summaryRow('الضريبة:', tax, _style),
+
+                pw.Divider(thickness: 1),
+                pw.SizedBox(height: 4),
+
+                // Total bold
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text(
+                      'الإجمالي:',
+                      style: _style(fontSize: 12, weight: pw.FontWeight.bold),
+                    ),
+                    pw.Text(
+                      total.toStringAsFixed(2),
+                      style: _style(fontSize: 12, weight: pw.FontWeight.bold),
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 8),
+
+                // ═══ NOTES ═══
+                if (notes != null && notes.isNotEmpty) ...[
+                  pw.Divider(thickness: 0.5),
+                  pw.Text(
+                    'ملاحظات:',
+                    style: _style(fontSize: 9, weight: pw.FontWeight.bold),
+                  ),
+                  pw.Text(notes, style: _style(fontSize: 8)),
+                  pw.SizedBox(height: 8),
+                ],
+
+                // ═══ FOOTER ═══
+                pw.Divider(thickness: 1),
+                pw.Center(
+                  child: pw.Text(
+                    'شكراً لتعاملكم معنا',
+                    style: _style(fontSize: 11, weight: pw.FontWeight.bold),
+                    textAlign: pw.TextAlign.center,
+                  ),
+                ),
+                pw.SizedBox(height: 8),
+                pw.Center(
+                  child: pw.BarcodeWidget(
+                    barcode: pw.Barcode.qrCode(),
+                    data: invoiceNumber,
+                    width: 50,
+                    height: 50,
+                  ),
+                ),
+                // ═══ FIXED: Feed for cutting ═══
+                pw.SizedBox(height: 40),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    return await pdf.save();
+  }
+
+  // ═══ FIXED: Summary row with proper RTL ═══
+  static pw.Widget _summaryRow(
+    String label,
+    double value,
+    pw.TextStyle Function({
+      double fontSize,
+      PdfColor color,
+      pw.FontWeight weight,
+    })
+    style, {
+    PdfColor? color,
+  }) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 2),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          // Label first (right side in RTL)
+          pw.Text(label, style: style(fontSize: 10)),
+          // Value second (left side in RTL)
+          pw.Text(
+            value.abs().toStringAsFixed(2),
+            style: style(fontSize: 10, color: color ?? PdfColors.black),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════
+  // Print Methods
+  // ═══════════════════════════════════════════════════
+
+  static Future<void> printThermalPdf(Uint8List pdfBytes) async {
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdfBytes,
+      name: 'thermal_invoice.pdf',
+    );
+  }
+
+  static Future<void> directPrintThermal({
+    required Uint8List pdfBytes,
+    String? printerUrl,
+  }) async {
+    Printer? selectedPrinter;
+
+    if (printerUrl != null) {
+      final printers = await Printing.listPrinters();
+      selectedPrinter = printers.firstWhere(
+        (p) => p.url == printerUrl,
+        orElse: () => throw Exception('Printer not found: $printerUrl'),
+      );
+    }
+
+    await Printing.directPrintPdf(
+      printer: selectedPrinter!,
+      onLayout: (PdfPageFormat format) async => pdfBytes,
+      format: PdfPageFormat(80 * 72 / 25.4, double.infinity),
+    );
+  }
+
+  static Future<void> shareToThermalPrinter(
+    Uint8List pdfBytes,
+    String fileName,
+  ) async {
+    await Printing.sharePdf(bytes: pdfBytes, filename: '$fileName.pdf');
   }
 }

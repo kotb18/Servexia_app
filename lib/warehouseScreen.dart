@@ -156,6 +156,7 @@ class _StoreScreenState extends State<StoreScreen> {
                   isFromConstCustomers: false,
                   isFromWorkSpace: false,
                   type: widget.invoiceType,
+                  isFormStore: false,
                 ),
               ),
             );

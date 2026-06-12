@@ -370,6 +370,7 @@ final GoRouter _router = GoRouter(
             state.uri.queryParameters['isFromConstCustomers'] == 'true',
         isFromWorkSpace: state.uri.queryParameters['isFromWorkSpace'] == 'true',
         type: state.uri.queryParameters['type'] ?? '',
+        isFormStore: state.uri.queryParameters['isFormStore'] == 'true',
       ),
     ),
     GoRoute(

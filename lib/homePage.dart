@@ -150,10 +150,11 @@ class _HomepageState extends State<Homepage>
   }
 
   void createGroup() =>
-      Navigator.of(context).pushNamed(Creategroup.screenroute);
-  void joinGroup() =>
-      Navigator.of(context).pushNamed(JoinGroupScreen.screenroute);
-
+      Navigator.push(context, MaterialPageRoute(builder: (_) => Creategroup()));
+  void joinGroup() => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => JoinGroupScreen()),
+  );
   @override
   Widget build(BuildContext context) {
     return Scaffold(

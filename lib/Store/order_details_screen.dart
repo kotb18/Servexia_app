@@ -5,7 +5,8 @@ import 'package:maintenance/Store/store_order_model.dart';
 import 'package:maintenance/Store/store_order_service.dart';
 import 'package:maintenance/imageControl/platform_image.dart';
 import 'package:maintenance/invoicePage.dart';
-import 'package:maintenance/models.dart';
+import 'package:maintenance/myInvoices.dart';
+import 'package:maintenance/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
@@ -126,6 +127,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     icon: const Icon(Icons.receipt_long),
                     label: const Text('إنشاء فاتورة بيع على الطلب'),
                     onPressed: () async {
+                      print(
+                        'فتح صفحة إنشاء الفاتورة لطلب: ${widget.order.customerInfo.name} - ${widget.order.orderNumber}',
+                      );
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -135,10 +139,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             itemsSale: widget.order.items
                                 .map(
                                   (item) => {
-                                    'itemId': item.inventoryItemId,
+                                    'id': item.inventoryItemId,
                                     'name': item.name,
                                     'price': (item.price as num).toDouble(),
-                                    'quantity': item.quantity,
+                                    'quantity': item.quantity.toDouble(),
                                     'total': (item.total as num).toDouble(),
                                   },
                                 )
@@ -152,6 +156,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             isFromConstCustomers: false,
                             isFromWorkSpace: false,
                             type: 'بيع',
+                            isFormStore: true,
+                            orderId: widget
+                                .order
+                                .id, // Pass the order ID to the invoice page
                           ),
                         ),
                       );
@@ -162,8 +170,23 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   ElevatedButton.icon(
                     icon: const Icon(Icons.receipt_long),
                     label: const Text('الفاتورة المرتبطة'),
-                    onPressed: () {
+                    onPressed: () async {
                       // TODO: فتح الفاتورة المرتبطة في ERP
+
+                      final InvoiceService _invoiceService = InvoiceService();
+                      final invoice = await _invoiceService.getInvoice(
+                        widget.order.storeId,
+                        widget.order.linkedInvoiceId!,
+                      );
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => InvoiceDetailPage(
+                            invoice: invoice!,
+                            groupId: widget.order.storeId,
+                          ),
+                        ),
+                      );
                     },
                   ),
               ],
@@ -797,7 +820,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             ),
           ),
           Text(
-            '${value.toStringAsFixed(2)} ج.م',
+            '${value.toStringAsFixed(2)} ',
             style: TextStyle(
               fontSize: isTotal ? 18 : 14,
               fontWeight: isTotal ? FontWeight.bold : FontWeight.w500,

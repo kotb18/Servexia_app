@@ -295,6 +295,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                     : 0.0,
               },
             ],
+            isFormStore: false,
             name: '',
             phone: '',
             address: '',
