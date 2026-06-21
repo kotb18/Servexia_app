@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:maintenance/employeeDetailsPage.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:pdf/pdf.dart';
@@ -201,161 +202,188 @@ class _TeamScreenState extends State<TeamScreen> {
 
         return Column(
           children: confirmedMembers.map((member) {
-            return Card(
-              elevation: 2,
-              margin: const EdgeInsets.symmetric(vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    /// -------- Top Row (Avatar + Name) --------
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 26,
-                          backgroundColor: Colors.grey.shade300,
-                          backgroundImage:
-                              member['photoURL'] != null &&
-                                  member['photoURL'].toString().isNotEmpty
-                              ? NetworkImage(member['photoURL'])
-                              : null,
-                          child:
-                              member['photoURL'] == null ||
-                                  member['photoURL'].toString().isEmpty
-                              ? const Icon(Icons.person, color: Colors.white)
-                              : null,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                member['name'] ?? '',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                member['job'] ?? 'عضو',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
+            return InkWell(
+              onTap: () {
+                // Handle member tap
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EmployeeDetailsPage(
+                      employeeData: member,
+                      isConfirmed: member['confirm'],
+                      groupId: widget.groupId,
+                    ),
+                  ),
+                );
+              },
+              child: Card(
+                elevation: 2,
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      /// -------- Top Row (Avatar + Name) --------
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 26,
+                            backgroundColor: Colors.grey.shade300,
+                            backgroundImage:
+                                member['photoURL'] != null &&
+                                    member['photoURL'].toString().isNotEmpty
+                                ? NetworkImage(member['photoURL'])
+                                : null,
+                            child:
+                                member['photoURL'] == null ||
+                                    member['photoURL'].toString().isEmpty
+                                ? const Icon(Icons.person, color: Colors.white)
+                                : null,
                           ),
-                        ),
-                        isAdmin && !admins.contains(member['id'])
-                            ? IconButton(
-                                onPressed: () async {
-                                  showDialog(
-                                    context: context,
-                                    builder: (_) => AlertDialog(
-                                      content: const Text(
-                                        'هل تريد بالفعل إضافة العضو كمسؤول؟ تنبيه: سيتمكن المسؤول من الحصول على جميع ميزاتك.',
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context),
-                                          child: const Text('إلغاء'),
-                                        ),
-                                        TextButton(
-                                          onPressed: () async {
-                                            await FirebaseFirestore.instance
-                                                .collection('groups')
-                                                .doc(widget.groupId)
-                                                .update({
-                                                  'admins':
-                                                      FieldValue.arrayUnion([
-                                                        member['id'],
-                                                      ]),
-                                                });
-                                            await FirebaseFirestore.instance
-                                                .collection('teams')
-                                                .doc(widget.groupId)
-                                                .update({
-                                                  'admins':
-                                                      FieldValue.arrayUnion([
-                                                        member['id'],
-                                                      ]),
-                                                });
-                                            await getAdmins();
-                                            setState(() {});
-                                            Navigator.pop(context);
-                                            setState(() {});
-                                          },
-                                          child: const Text('تأكيد'),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                                icon: Icon(
-                                  Icons.star_border_outlined,
-                                  // color: const Color.fromARGB(255, 164, 172, 12),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  member['name'] ?? '',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                                // label: const Text('اضافته كمسؤول'),
-                              )
-                            : isAdmin &&
-                                  member['id'] != uid &&
-                                  admins.contains(member['id']) &&
-                                  member['id'] != widget.adminId
-                            ? IconButton(
-                                onPressed: () async {
-                                  showDialog(
-                                    context: context,
-                                    builder: (_) => AlertDialog(
-                                      content: const Text(
-                                        'هل تريد ازالة العضو كمسؤول؟',
+                                const SizedBox(height: 2),
+                                Text(
+                                  member['job'] ?? 'عضو',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          isAdmin && !admins.contains(member['id'])
+                              ? IconButton(
+                                  onPressed: () async {
+                                    showDialog(
+                                      context: context,
+                                      builder: (_) => AlertDialog(
+                                        content: const Text(
+                                          'هل تريد بالفعل إضافة العضو كمسؤول؟ تنبيه: سيتمكن المسؤول من الحصول على جميع ميزاتك.',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context),
+                                            child: const Text('إلغاء'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () async {
+                                              await FirebaseFirestore.instance
+                                                  .collection('groups')
+                                                  .doc(widget.groupId)
+                                                  .update({
+                                                    'admins':
+                                                        FieldValue.arrayUnion([
+                                                          member['id'],
+                                                        ]),
+                                                  });
+                                              await FirebaseFirestore.instance
+                                                  .collection('teams')
+                                                  .doc(widget.groupId)
+                                                  .update({
+                                                    'admins':
+                                                        FieldValue.arrayUnion([
+                                                          member['id'],
+                                                        ]),
+                                                  });
+                                              await getAdmins();
+                                              setState(() {});
+                                              Navigator.pop(context);
+                                              setState(() {});
+                                            },
+                                            child: const Text('تأكيد'),
+                                          ),
+                                        ],
                                       ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context),
-                                          child: const Text('إلغاء'),
+                                    );
+                                  },
+                                  icon: Icon(
+                                    Icons.star_border_outlined,
+                                    // color: const Color.fromARGB(255, 164, 172, 12),
+                                  ),
+                                  // label: const Text('اضافته كمسؤول'),
+                                )
+                              : isAdmin &&
+                                    member['id'] != uid &&
+                                    admins.contains(member['id']) &&
+                                    member['id'] != widget.adminId
+                              ? IconButton(
+                                  onPressed: () async {
+                                    showDialog(
+                                      context: context,
+                                      builder: (_) => AlertDialog(
+                                        content: const Text(
+                                          'هل تريد ازالة العضو كمسؤول؟',
                                         ),
-                                        TextButton(
-                                          onPressed: () async {
-                                            await FirebaseFirestore.instance
-                                                .collection('groups')
-                                                .doc(widget.groupId)
-                                                .update({
-                                                  'admins':
-                                                      FieldValue.arrayRemove([
-                                                        member['id'],
-                                                      ]),
-                                                });
-                                            await FirebaseFirestore.instance
-                                                .collection('teams')
-                                                .doc(widget.groupId)
-                                                .update({
-                                                  'admins':
-                                                      FieldValue.arrayRemove([
-                                                        member['id'],
-                                                      ]),
-                                                });
-                                            await getAdmins();
-                                            setState(() {});
-                                            Navigator.pop(context);
-                                            setState(() {});
-                                          },
-                                          child: const Text('تأكيد'),
-                                        ),
-                                      ],
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context),
+                                            child: const Text('إلغاء'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () async {
+                                              await FirebaseFirestore.instance
+                                                  .collection('groups')
+                                                  .doc(widget.groupId)
+                                                  .update({
+                                                    'admins':
+                                                        FieldValue.arrayRemove([
+                                                          member['id'],
+                                                        ]),
+                                                  });
+                                              await FirebaseFirestore.instance
+                                                  .collection('teams')
+                                                  .doc(widget.groupId)
+                                                  .update({
+                                                    'admins':
+                                                        FieldValue.arrayRemove([
+                                                          member['id'],
+                                                        ]),
+                                                  });
+                                              await getAdmins();
+                                              setState(() {});
+                                              Navigator.pop(context);
+                                              setState(() {});
+                                            },
+                                            child: const Text('تأكيد'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                  icon: Icon(
+                                    Icons.star,
+                                    color: const Color.fromARGB(
+                                      255,
+                                      164,
+                                      172,
+                                      12,
                                     ),
-                                  );
-                                },
-                                icon: Icon(
+                                  ),
+                                  // label: const Text('اضافته كمسؤول'),
+                                )
+                              : (admins.isNotEmpty &&
+                                    admins.contains(member['id']))
+                              ? Icon(
                                   Icons.star,
                                   color: const Color.fromARGB(
                                     255,
@@ -363,104 +391,97 @@ class _TeamScreenState extends State<TeamScreen> {
                                     172,
                                     12,
                                   ),
-                                ),
-                                // label: const Text('اضافته كمسؤول'),
-                              )
-                            : (admins.isNotEmpty &&
-                                  admins.contains(member['id']))
-                            ? Icon(
-                                Icons.star,
-                                color: const Color.fromARGB(255, 164, 172, 12),
-                              )
-                            : SizedBox.shrink(),
-                      ],
-                    ),
+                                )
+                              : SizedBox.shrink(),
+                        ],
+                      ),
 
-                    const SizedBox(height: 10),
-                    Divider(height: 1),
+                      const SizedBox(height: 10),
+                      Divider(height: 1),
 
-                    /// -------- Actions --------
-                    const SizedBox(height: 6),
-                    Wrap(
-                      alignment: WrapAlignment.end,
-                      spacing: 6,
-                      children: [
-                        /// WhatsApp
-                        TextButton.icon(
-                          onPressed: () {
-                            openWhatsApp(
-                              '${member['phone']}',
-                              'مرحباً ${member['name']}',
-                            );
-                          },
-                          icon: Image.asset('images/whatsapp.png', width: 18),
-                          label: const Text('واتساب'),
-                        ),
-
-                        /// Call
-                        TextButton.icon(
-                          onPressed: () async {
-                            final url = Uri(
-                              scheme: 'tel',
-                              path: member['phone'],
-                            );
-                            if (await canLaunchUrl(url)) {
-                              await launchUrl(url);
-                            }
-                          },
-                          icon: const Icon(Icons.call, size: 18),
-                          label: const Text('اتصال'),
-                        ),
-
-                        /// Remove (Admin only)
-                        if ((member['id'] != widget.adminId &&
-                                member['id'] != uid &&
-                                admins.contains(uid)) ||
-                            member['id'] != widget.adminId &&
-                                (member['id'] != uid &&
-                                    admins.contains(member['id'])))
+                      /// -------- Actions --------
+                      const SizedBox(height: 6),
+                      Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 6,
+                        children: [
+                          /// WhatsApp
                           TextButton.icon(
                             onPressed: () {
-                              showDialog(
-                                context: context,
-                                builder: (_) => AlertDialog(
-                                  content: const Text(
-                                    'هل تريد بالفعل مسح العضو؟',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context),
-                                      child: const Text('إلغاء'),
-                                    ),
-                                    TextButton(
-                                      onPressed: () async {
-                                        await removeMemberFromGroupAndTeam(
-                                          groupId: widget.groupId,
-                                          memberId: member['id'],
-                                        );
-                                        await getAdmins();
-                                        setState(() {});
-                                        Navigator.pop(context);
-                                        setState(() {});
-                                      },
-                                      child: const Text('تأكيد'),
-                                    ),
-                                  ],
-                                ),
+                              openWhatsApp(
+                                '${member['phone']}',
+                                'مرحباً ${member['name']}',
                               );
                             },
-                            icon: const Icon(
-                              Icons.person_remove_alt_1,
-                              color: Colors.red,
-                              size: 18,
-                            ),
-                            label: const Text('حذف'),
-                          )
-                        else
-                          const SizedBox.shrink(),
-                      ],
-                    ),
-                  ],
+                            icon: Image.asset('images/whatsapp.png', width: 18),
+                            label: const Text('واتساب'),
+                          ),
+
+                          /// Call
+                          TextButton.icon(
+                            onPressed: () async {
+                              final url = Uri(
+                                scheme: 'tel',
+                                path: member['phone'],
+                              );
+                              if (await canLaunchUrl(url)) {
+                                await launchUrl(url);
+                              }
+                            },
+                            icon: const Icon(Icons.call, size: 18),
+                            label: const Text('اتصال'),
+                          ),
+
+                          /// Remove (Admin only)
+                          if ((member['id'] != widget.adminId &&
+                                  member['id'] != uid &&
+                                  admins.contains(uid)) ||
+                              member['id'] != widget.adminId &&
+                                  (member['id'] != uid &&
+                                      admins.contains(member['id'])))
+                            TextButton.icon(
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (_) => AlertDialog(
+                                    content: const Text(
+                                      'هل تريد بالفعل مسح العضو؟',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text('إلغاء'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () async {
+                                          await removeMemberFromGroupAndTeam(
+                                            groupId: widget.groupId,
+                                            memberId: member['id'],
+                                          );
+                                          await getAdmins();
+                                          setState(() {});
+                                          Navigator.pop(context);
+                                          setState(() {});
+                                        },
+                                        child: const Text('تأكيد'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.person_remove_alt_1,
+                                color: Colors.red,
+                                size: 18,
+                              ),
+                              label: const Text('حذف'),
+                            )
+                          else
+                            const SizedBox.shrink(),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );

@@ -121,8 +121,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   _getPaymentMethodText(widget.order.paymentMethod),
                   _getPaymentStatusColor(widget.order.paymentStatus),
                 ),
-                if (widget.order.linkedInvoiceId == null &&
-                    widget.order.status != OrderStatus.pending)
+                if (!widget.isFromCustomerOrders &&
+                    widget.order.linkedInvoiceId == null &&
+                    widget.order.status != OrderStatus.pending &&
+                    widget.order.status != OrderStatus.cancelled)
                   ElevatedButton.icon(
                     icon: const Icon(Icons.receipt_long),
                     label: const Text('إنشاء فاتورة بيع على الطلب'),
@@ -166,7 +168,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       // TODO: فتح الفاتورة المرتبطة في ERP
                     },
                   ),
-                if (widget.order.linkedInvoiceId != null)
+                if (!widget.isFromCustomerOrders &&
+                    widget.order.linkedInvoiceId != null)
                   ElevatedButton.icon(
                     icon: const Icon(Icons.receipt_long),
                     label: const Text('الفاتورة المرتبطة'),
