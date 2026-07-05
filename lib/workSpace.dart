@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:maintenance/Store/select_products_screen.dart';
 import 'package:maintenance/Store/store_dashboard_screen.dart';
 import 'package:maintenance/addAsset.dart';
 import 'package:maintenance/addAwarehouseItem.dart';
@@ -45,9 +45,45 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
     print("Device FCM Token: $deviceToken");
   }
 
+  Map<String, bool> permissions = {
+    'المخازن': false,
+    'إضافة صنف مخزني': false,
+    'الفواتير والمشتريات': false,
+    'العملاء والموردين': false,
+    'المتجر الإليكتروني': false,
+    'الأصول والمعدات': false,
+    'إضافة أصل أو معدة': false,
+    'إضافة مهمة': false,
+    'طلبات الانضمام': false,
+  };
+  Future<void> _loadExistingPermissions() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('employees_permissions')
+          .doc(widget.workspaceId)
+          .collection('items')
+          .doc(FirebaseAuth.instance.currentUser!.uid)
+          .get();
+
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        setState(() {
+          permissions.forEach((key, value) {
+            if (data.containsKey(key)) {
+              permissions[key] = data[key] ?? false;
+            }
+          });
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading permissions: \$e');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _loadExistingPermissions(); // Load existing permissions
     _initializeAnimations();
     _loadWorkspace();
     getDeviceToken(); // Call the method to get the device token
@@ -153,7 +189,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
     }
 
     final data = workspaceData!;
-    final bool isAdmin = data['admins']?.contains(uid) ?? false;
+    final bool isAdmin = data['admins'][0] == uid ? true : false;
 
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
@@ -301,7 +337,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                 ),
                 children: [
                   // Admin Cards for Inventory and Sales
-                  if (isAdmin)
+                  if (isAdmin && permissions['المخازن'] == true)
                     _buildDashboardCard(
                       icon: Icons.warehouse,
                       title: 'المخازن',
@@ -316,7 +352,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                         ),
                       ),
                     ),
-                  if (isAdmin)
+                  if (isAdmin && permissions['إضافة صنف مخزني'] == true)
                     _buildDashboardCard(
                       icon: Icons.warehouse_outlined,
                       title: 'إضافة صنف مخزني',
@@ -330,7 +366,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                         ),
                       ),
                     ),
-                  if (isAdmin)
+                  if (isAdmin && permissions['الفواتير والمشتريات'] == true)
                     _buildDashboardCard(
                       icon: Icons.receipt_long,
                       title: 'الفواتير والمشتريات',
@@ -351,7 +387,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                         ),
                       ),
                     ),
-                  if (isAdmin)
+                  if (isAdmin && permissions['العملاء والموردين'] == true)
                     _buildDashboardCard(
                       icon: Icons.account_balance_wallet,
                       title: 'العملاء والموردين',
@@ -368,57 +404,60 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                     ),
                 ],
               ),
-              if (isAdmin) SizedBox(height: 10),
-              Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF1565C0), Color(0xFF42A5F5)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.blue.withOpacity(0.25),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
+
+              SizedBox(height: 10),
+
+              if (isAdmin && permissions['المتجر الإليكتروني'] == true)
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(18),
-                    onTap: () {
-                      _navigateTo(
-                        StoreDashboardScreen(groupId: widget.workspaceId),
-                      );
-                    },
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 16,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF1565C0), Color(0xFF42A5F5)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blue.withOpacity(0.25),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.store, color: Colors.white, size: 24),
-                          SizedBox(width: 10),
-                          Text(
-                            'المتجـــر الإليكتروني',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(18),
+                      onTap: () {
+                        _navigateTo(
+                          StoreDashboardScreen(groupId: widget.workspaceId),
+                        );
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 16,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.store, color: Colors.white, size: 24),
+                            SizedBox(width: 10),
+                            Text(
+                              'المتجـــر الإليكتروني',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
               _buildSectionHeader('إدارة الصيانة والموارد البشرية'),
               GridView(
                 shrinkWrap:
@@ -433,7 +472,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                 ),
                 children: [
                   // Admin Cards for Maintenance and HR
-                  if (isAdmin)
+                  if (isAdmin && permissions['الأصول والمعدات'] == true)
                     _buildDashboardCard(
                       icon: Iconsax.building_4,
                       title: 'الأصول والمعدات',
@@ -442,7 +481,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                         AssetsScreen(groupId: widget.workspaceId),
                       ),
                     ),
-                  if (isAdmin)
+                  if (isAdmin && permissions['إضافة أصل أو معدة'] == true)
                     _buildDashboardCard(
                       icon: Icons.precision_manufacturing,
                       title: 'إضافة أصل أو معدة',
@@ -464,7 +503,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                     ),
                   ),
                   // Admin Add Task Card
-                  if (isAdmin)
+                  if (isAdmin && permissions['إضافة مهمة'] == true)
                     _buildDashboardCard(
                       icon: Icons.add_circle,
                       title: 'إضافة مهمة',
@@ -515,7 +554,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                     ),
                   ),
                   // Admin Join Requests Card with Badge
-                  if (isAdmin)
+                  if (isAdmin && permissions['طلبات الانضمام'] == true)
                     StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance
                           .collection('teams')
@@ -562,6 +601,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
     required String title,
     required Color color,
     required VoidCallback onTap,
+
     int badgeCount = 0,
   }) {
     return Card(

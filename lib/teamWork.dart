@@ -203,19 +203,22 @@ class _TeamScreenState extends State<TeamScreen> {
         return Column(
           children: confirmedMembers.map((member) {
             return InkWell(
-              onTap: () {
-                // Handle member tap
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => EmployeeDetailsPage(
-                      employeeData: member,
-                      isConfirmed: member['confirm'],
-                      groupId: widget.groupId,
-                    ),
-                  ),
-                );
-              },
+              onTap: widget.isAdmin
+                  ? null
+                  : () {
+                      // Handle member tap
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EmployeeDetailsPage(
+                            employeeData: member,
+                            isConfirmed: member['confirm'],
+                            groupId: widget.groupId,
+                            isAdmin: isAdmin,
+                          ),
+                        ),
+                      );
+                    },
               child: Card(
                 elevation: 2,
                 margin: const EdgeInsets.symmetric(vertical: 8),
@@ -269,130 +272,11 @@ class _TeamScreenState extends State<TeamScreen> {
                               ],
                             ),
                           ),
-                          isAdmin && !admins.contains(member['id'])
-                              ? IconButton(
-                                  onPressed: () async {
-                                    showDialog(
-                                      context: context,
-                                      builder: (_) => AlertDialog(
-                                        content: const Text(
-                                          'هل تريد بالفعل إضافة العضو كمسؤول؟ تنبيه: سيتمكن المسؤول من الحصول على جميع ميزاتك.',
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(context),
-                                            child: const Text('إلغاء'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () async {
-                                              await FirebaseFirestore.instance
-                                                  .collection('groups')
-                                                  .doc(widget.groupId)
-                                                  .update({
-                                                    'admins':
-                                                        FieldValue.arrayUnion([
-                                                          member['id'],
-                                                        ]),
-                                                  });
-                                              await FirebaseFirestore.instance
-                                                  .collection('teams')
-                                                  .doc(widget.groupId)
-                                                  .update({
-                                                    'admins':
-                                                        FieldValue.arrayUnion([
-                                                          member['id'],
-                                                        ]),
-                                                  });
-                                              await getAdmins();
-                                              setState(() {});
-                                              Navigator.pop(context);
-                                              setState(() {});
-                                            },
-                                            child: const Text('تأكيد'),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                  icon: Icon(
-                                    Icons.star_border_outlined,
-                                    // color: const Color.fromARGB(255, 164, 172, 12),
-                                  ),
-                                  // label: const Text('اضافته كمسؤول'),
-                                )
-                              : isAdmin &&
-                                    member['id'] != uid &&
-                                    admins.contains(member['id']) &&
-                                    member['id'] != widget.adminId
-                              ? IconButton(
-                                  onPressed: () async {
-                                    showDialog(
-                                      context: context,
-                                      builder: (_) => AlertDialog(
-                                        content: const Text(
-                                          'هل تريد ازالة العضو كمسؤول؟',
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(context),
-                                            child: const Text('إلغاء'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () async {
-                                              await FirebaseFirestore.instance
-                                                  .collection('groups')
-                                                  .doc(widget.groupId)
-                                                  .update({
-                                                    'admins':
-                                                        FieldValue.arrayRemove([
-                                                          member['id'],
-                                                        ]),
-                                                  });
-                                              await FirebaseFirestore.instance
-                                                  .collection('teams')
-                                                  .doc(widget.groupId)
-                                                  .update({
-                                                    'admins':
-                                                        FieldValue.arrayRemove([
-                                                          member['id'],
-                                                        ]),
-                                                  });
-                                              await getAdmins();
-                                              setState(() {});
-                                              Navigator.pop(context);
-                                              setState(() {});
-                                            },
-                                            child: const Text('تأكيد'),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                  icon: Icon(
-                                    Icons.star,
-                                    color: const Color.fromARGB(
-                                      255,
-                                      164,
-                                      172,
-                                      12,
-                                    ),
-                                  ),
-                                  // label: const Text('اضافته كمسؤول'),
-                                )
-                              : (admins.isNotEmpty &&
-                                    admins.contains(member['id']))
-                              ? Icon(
-                                  Icons.star,
-                                  color: const Color.fromARGB(
-                                    255,
-                                    164,
-                                    172,
-                                    12,
-                                  ),
-                                )
-                              : SizedBox.shrink(),
+                          if (isAdmin)
+                            Icon(
+                              Icons.star,
+                              color: const Color.fromARGB(255, 164, 172, 12),
+                            ),
                         ],
                       ),
 

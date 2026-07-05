@@ -91,9 +91,10 @@ class _LoginState extends State<Login> {
           true,
         ); // ارجع للصفحة السابقة (checkout) بعد تسجيل الدخول
       } else {
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => Homepage(isAdmin: isAdmin)),
+          (route) => false,
         );
       }
     } catch (e) {

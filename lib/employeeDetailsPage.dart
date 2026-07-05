@@ -5,12 +5,14 @@ class EmployeeDetailsPage extends StatefulWidget {
   final Map<String, dynamic> employeeData;
   final bool isConfirmed;
   final String groupId;
+  final bool isAdmin;
 
   const EmployeeDetailsPage({
     Key? key,
     required this.employeeData,
     required this.isConfirmed,
     required this.groupId,
+    required this.isAdmin,
   }) : super(key: key);
 
   @override
@@ -23,13 +25,14 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
   // Permissions state
   Map<String, bool> permissions = {
     'المخازن': false,
-    'الفواتير': false,
-    'المشتريات': false,
-    'إدارة العملاء': false,
-    'إدارة الموردين': false,
-    'إدارة الأصول': false,
-    'إدارة المهام والأعطال': false,
-    'إدارة الفريق': false,
+    'إضافة صنف مخزني': false,
+    'الفواتير والمشتريات': false,
+    'العملاء والموردين': false,
+    'المتجر الإليكتروني': false,
+    'الأصول والمعدات': false,
+    'إضافة أصل أو معدة': false,
+    'إضافة مهمة': false,
+    'طلبات الانضمام': false,
   };
 
   @override
@@ -153,14 +156,12 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
                     const SizedBox(height: 24),
 
                     // Permissions Section
-                    if (widget.isConfirmed) ...[
+                    if (widget.isConfirmed && widget.isAdmin) ...[
                       _buildSectionTitle('صلاحيات الوصول'),
                       const SizedBox(height: 12),
                       _buildPermissionsCard(),
                       const SizedBox(height: 24),
                       _buildSaveButton(),
-                    ] else ...[
-                      _buildUnconfirmedBanner(),
                     ],
 
                     const SizedBox(height: 32),
@@ -428,25 +429,28 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
       case 'المخازن':
         icon = Icons.warehouse_outlined;
         break;
-      case 'الفواتير':
+      case 'إضافة صنف مخزني':
+        icon = Icons.add_box_outlined;
+        break;
+      case 'الفواتير والمشتريات':
         icon = Icons.receipt_long_outlined;
         break;
-      case 'المشتريات':
-        icon = Icons.shopping_cart_outlined;
-        break;
-      case 'إدارة العملاء':
+      case 'العملاء والموردين':
         icon = Icons.people_outline;
         break;
-      case 'إدارة الموردين':
-        icon = Icons.business_outlined;
+      case 'المتجر الإليكتروني':
+        icon = Icons.shopping_cart_outlined;
         break;
-      case 'إدارة الأصول':
+      case 'الأصول والمعدات':
         icon = Icons.account_balance_outlined;
         break;
-      case 'إدارة المهام والأعطال':
+      case 'إضافة أصل أو معدة':
+        icon = Icons.add_business_outlined;
+        break;
+      case 'إضافة مهمة':
         icon = Icons.build_outlined;
         break;
-      case 'إدارة الفريق':
+      case 'طلبات الانضمام':
         icon = Icons.groups_outlined;
         break;
       default:
@@ -530,7 +534,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
     );
   }
 
-  Widget _buildUnconfirmedBanner() {
+  /*   Widget _buildUnconfirmedBanner() {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -565,7 +569,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
         ],
       ),
     );
-  }
+  } */
 }
 
 // ==================== USAGE EXAMPLE ====================
