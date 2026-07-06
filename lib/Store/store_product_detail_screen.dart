@@ -12,32 +12,41 @@ import 'package:maintenance/signIn.dart';
 /// ═══════════════════════════════════════════════════════════════════════════
 /// 🎨 PREMIUM COMMERCE DESIGN SYSTEM - PRODUCT DETAIL
 /// ═══════════════════════════════════════════════════════════════════════════
-/// Design Philosophy: Premium Product Showcase with Smooth Interactions
-/// - Elegant image carousel with smooth transitions
-/// - Clear pricing hierarchy with discount highlighting
-/// - Intuitive quantity selector
-/// - Prominent call-to-action button
-/// ═══════════════════════════════════════════════════════════════════════════
 
 class AppColors {
-  // Primary Colors
-  static const Color primaryBlue = Color(0xFF1E40AF); // Deep Blue - Trust
-  static const Color secondaryGreen = Color(0xFF10B981); // Green - Success
-  static const Color accentOrange = Color(0xFFF97316); // Orange - Offers
-  static const Color destructiveRed = Color(0xFFDC2626); // Red - Errors
-
-  // Neutral Colors
+  static const Color primaryBlue = Color(0xFF1E40AF);
+  static const Color secondaryGreen = Color(0xFF10B981);
+  static const Color accentOrange = Color(0xFFF97316);
+  static const Color destructiveRed = Color(0xFFDC2626);
   static const Color white = Color(0xFFFFFFFF);
-  static const Color lightGray = Color(0xFFF3F4F6); // Background
-  static const Color borderGray = Color(0xFFE5E7EB); // Borders
-  static const Color mediumGray = Color(0xFF6B7280); // Secondary Text
-  static const Color darkGray = Color(0xFF111827); // Primary Text
-
-  // Semantic Colors
+  static const Color lightGray = Color(0xFFF3F4F6);
+  static const Color borderGray = Color(0xFFE5E7EB);
+  static const Color mediumGray = Color(0xFF6B7280);
+  static const Color darkGray = Color(0xFF111827);
   static const Color success = secondaryGreen;
   static const Color warning = accentOrange;
   static const Color error = destructiveRed;
 }
+
+// ============================================================================
+// 🎨 بيانات الألوان المتاحة (نفس اللي في شاشة الاختيار)
+// ============================================================================
+final List<Map<String, dynamic>> _availableColors = [
+  {'name': 'أبيض', 'value': 'white', 'color': Colors.white, 'border': true},
+  {'name': 'أسود', 'value': 'black', 'color': Colors.black87},
+  {'name': 'رمادي', 'value': 'gray', 'color': Colors.grey},
+  {'name': 'أحمر', 'value': 'red', 'color': Colors.red},
+  {'name': 'أزرق', 'value': 'blue', 'color': Colors.blue},
+  {'name': 'أخضر', 'value': 'green', 'color': Colors.green},
+  {'name': 'أصفر', 'value': 'yellow', 'color': Colors.amber},
+  {'name': 'برتقالي', 'value': 'orange', 'color': Colors.orange},
+  {'name': 'بنفسجي', 'value': 'purple', 'color': Colors.purple},
+  {'name': 'وردي', 'value': 'pink', 'color': Colors.pink},
+  {'name': 'بني', 'value': 'brown', 'color': Colors.brown},
+  {'name': 'بيج', 'value': 'beige', 'color': Color(0xFFF5F5DC)},
+  {'name': 'ذهبي', 'value': 'gold', 'color': Color(0xFFFFD700)},
+  {'name': 'فضي', 'value': 'silver', 'color': Color(0xFFC0C0C0)},
+];
 
 class StoreProductDetailScreen extends StatefulWidget {
   final InventoryItemModel item;
@@ -60,6 +69,10 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
   int _currentImage = 0;
   int _quantity = 1;
   bool _isAddingToCart = false;
+
+  // 🎨 اختيارات المستخدم
+  String? _selectedColor;
+  String? _selectedSize;
 
   String _generateProductLink() {
     const baseUrl = 'https://maintenance-b7282.web.app';
@@ -115,7 +128,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Drag Handle
             Container(
               width: 40,
               height: 4,
@@ -125,8 +137,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
               ),
             ),
             const SizedBox(height: 24),
-
-            // Title
             Text(
               'مشاركة المنتج',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -135,8 +145,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
               ),
             ),
             const SizedBox(height: 8),
-
-            // Product Name
             Text(
               widget.item.name,
               style: Theme.of(
@@ -145,8 +153,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-
-            // Link Container
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -179,8 +185,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
               ),
             ),
             const SizedBox(height: 24),
-
-            // Share Button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -202,8 +206,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
               ),
             ),
             const SizedBox(height: 12),
-
-            // Cancel Button
             SizedBox(
               width: double.infinity,
               child: TextButton(
@@ -224,19 +226,29 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     );
   }
 
+  // ─── مساعد: جيب بيانات اللون من الـ value ───
+  Map<String, dynamic>? _getColorData(String colorValue) {
+    try {
+      return _availableColors.firstWhere((c) => c['value'] == colorValue);
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
     final isMobile = MediaQuery.of(context).size.width < 600;
 
+    // 🎨 هل المنتج فيه ألوان أو مقاسات؟
+    final hasColors = item.colors != null && item.colors!.isNotEmpty;
+    final hasSizes = item.sizes != null && item.sizes!.isNotEmpty;
+
     return Scaffold(
       backgroundColor: AppColors.white,
       body: CustomScrollView(
         slivers: [
-          // App Bar with Image Carousel
           _buildSliverAppBar(item),
-
-          // Product Details
           SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.symmetric(
@@ -246,11 +258,9 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Price Section
                   _buildPriceSection(item),
                   const SizedBox(height: 24),
 
-                  // Product Name
                   Text(
                     item.name,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -260,7 +270,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Description
                   if (item.storeDescription != null) ...[
                     Text(
                       'الوصف',
@@ -280,11 +289,24 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                     const SizedBox(height: 24),
                   ],
 
-                  // Quantity Selector
+                  // ═══════════════════════════════════════════════════════
+                  // 🎨 قسم اختيار الألوان
+                  // ═══════════════════════════════════════════════════════
+                  if (hasColors) ...[
+                    _buildColorsSection(item.colors!),
+                    const SizedBox(height: 24),
+                  ],
+
+                  // ═══════════════════════════════════════════════════════
+                  // 📏 قسم اختيار المقاسات
+                  // ═══════════════════════════════════════════════════════
+                  if (hasSizes) ...[
+                    _buildSizesSection(item.sizes!),
+                    const SizedBox(height: 24),
+                  ],
+
                   _buildQuantitySelector(item),
                   const SizedBox(height: 32),
-
-                  // Additional Info
                   _buildAdditionalInfo(item),
                 ],
               ),
@@ -292,7 +314,209 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: _buildBottomActionBar(item),
+      bottomNavigationBar: _buildBottomActionBar(item, hasColors, hasSizes),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🎨 قسم اختيار الألوان
+  // ═══════════════════════════════════════════════════════════════════════════
+  Widget _buildColorsSection(List<String> colors) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'اللون',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: AppColors.darkGray,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (_selectedColor != null)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryBlue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'مختار: ${_getColorData(_selectedColor!)?['name'] ?? _selectedColor}',
+                  style: const TextStyle(
+                    color: AppColors.primaryBlue,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: colors.map((colorValue) {
+            final colorData = _getColorData(colorValue);
+            final isSelected = _selectedColor == colorValue;
+
+            if (colorData == null) return const SizedBox.shrink();
+
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedColor = isSelected ? null : colorValue;
+                });
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? (colorData['color'] as Color).withOpacity(0.2)
+                      : AppColors.lightGray,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: isSelected
+                        ? colorData['value'] == 'white'
+                              ? AppColors.primaryBlue
+                              : colorData['color'] as Color
+                        : AppColors.borderGray,
+                    width: isSelected ? 2.5 : 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: colorData['color'] as Color,
+                        shape: BoxShape.circle,
+                        border: colorData['border'] == true
+                            ? Border.all(color: AppColors.borderGray, width: 1)
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      colorData['name'] as String,
+                      style: TextStyle(
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.w500,
+                        color: isSelected
+                            ? AppColors.darkGray
+                            : AppColors.mediumGray,
+                      ),
+                    ),
+                    if (isSelected) ...[
+                      const SizedBox(width: 6),
+                      const Icon(
+                        Icons.check_circle,
+                        size: 18,
+                        color: AppColors.primaryBlue,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 📏 قسم اختيار المقاسات
+  // ═══════════════════════════════════════════════════════════════════════════
+  Widget _buildSizesSection(List<String> sizes) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'المقاس',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: AppColors.darkGray,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (_selectedSize != null)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.accentOrange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'مختار: $_selectedSize',
+                  style: const TextStyle(
+                    color: AppColors.accentOrange,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: sizes.map((size) {
+            final isSelected = _selectedSize == size;
+
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedSize = isSelected ? null : size;
+                });
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 64,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.accentOrange
+                      : AppColors.lightGray,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isSelected
+                        ? AppColors.accentOrange
+                        : AppColors.borderGray,
+                    width: isSelected ? 2 : 1,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  size,
+                  style: TextStyle(
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: isSelected ? AppColors.white : AppColors.darkGray,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 
@@ -357,7 +581,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
         background: item.imagesList.isNotEmpty
             ? Stack(
                 children: [
-                  // Carousel
                   CarouselSlider(
                     options: CarouselOptions(
                       height: 400,
@@ -376,8 +599,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                       );
                     }).toList(),
                   ),
-
-                  // Image Counter
                   if (item.imagesList.length > 1)
                     Positioned(
                       bottom: 16,
@@ -401,8 +622,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                         ),
                       ),
                     ),
-
-                  // Out of Stock Overlay
                   if (!item.isInStock)
                     Container(
                       color: Colors.black.withOpacity(0.5),
@@ -448,7 +667,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Current Price
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -469,8 +687,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
           ],
         ),
         const SizedBox(width: 16),
-
-        // Original Price & Discount Badge
         if (item.hasDiscount) ...[
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -535,7 +751,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
           ),
           child: Row(
             children: [
-              // Decrease Button
               Material(
                 color: Colors.transparent,
                 child: InkWell(
@@ -558,11 +773,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                   ),
                 ),
               ),
-
-              // Divider
               Container(width: 1, height: 44, color: AppColors.borderGray),
-
-              // Quantity Display
               Expanded(
                 child: Center(
                   child: Text(
@@ -574,11 +785,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                   ),
                 ),
               ),
-
-              // Divider
               Container(width: 1, height: 44, color: AppColors.borderGray),
-
-              // Increase Button
               Material(
                 color: Colors.transparent,
                 child: InkWell(
@@ -661,7 +868,33 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
   }
 
   /// ─── BOTTOM ACTION BAR ───
-  Widget _buildBottomActionBar(InventoryItemModel item) {
+  Widget _buildBottomActionBar(
+    InventoryItemModel item,
+    bool hasColors,
+    bool hasSizes,
+  ) {
+    // 🔒 التحقق من اختيار اللون والمقاس (لو موجودين)
+    final bool canAddToCart =
+        item.isInStock &&
+        !widget.isPreview &&
+        (!hasColors || _selectedColor != null) &&
+        (!hasSizes || _selectedSize != null);
+
+    // نص الزر حسب الحالة
+    String buttonText;
+    if (_isAddingToCart) {
+      buttonText = 'جاري الإضافة...';
+    } else if (!item.isInStock) {
+      buttonText = 'نفذت الكمية';
+    } else if (hasColors && _selectedColor == null) {
+      buttonText = 'اختر اللون أولاً';
+    } else if (hasSizes && _selectedSize == null) {
+      buttonText = 'اختر المقاس أولاً';
+    } else {
+      buttonText =
+          'إضافة للسلة - ${(item.effectiveStorePrice * _quantity).toStringAsFixed(2)} ج.م';
+    }
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -669,9 +902,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
           width: double.infinity,
           height: 54,
           child: ElevatedButton.icon(
-            onPressed: (item.isInStock && !_isAddingToCart && !widget.isPreview)
-                ? _addToCart
-                : null,
+            onPressed: canAddToCart ? _addToCart : null,
             icon: _isAddingToCart
                 ? SizedBox(
                     width: 20,
@@ -685,11 +916,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                   )
                 : const Icon(Icons.shopping_cart),
             label: Text(
-              _isAddingToCart
-                  ? 'جاري الإضافة...'
-                  : item.isInStock
-                  ? 'إضافة للسلة - ${(item.effectiveStorePrice * _quantity).toStringAsFixed(2)} ج.م'
-                  : 'نفذت الكمية',
+              buttonText,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             style: ElevatedButton.styleFrom(
@@ -726,18 +953,32 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     try {
       final cart = StoreCartService();
       await cart.loadCart(widget.groupId);
-      cart.addToCart(widget.item, quantity: _quantity);
+
+      // 🎨 نضيف اللون والمقاس المختارين للكارت
+      cart.addToCart(
+        widget.item,
+        quantity: _quantity,
+        selectedColor: _selectedColor,
+        selectedSize: _selectedSize,
+      );
       await cart.saveCart(widget.groupId);
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
+      // بناء نص السناكبار مع اللون والمقاس
+      String snackText = '✓ تمت إضافة ${_quantity} من "${widget.item.name}"';
+      if (_selectedColor != null) {
+        snackText += ' - اللون: ${_getColorData(_selectedColor!)!['name']}';
+      }
+      if (_selectedSize != null) {
+        snackText += ' - المقاس: $_selectedSize';
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            '✓ تمت إضافة ${_quantity} من "${widget.item.name}" إلى السلة',
-          ),
+          content: Text(snackText),
           duration: const Duration(seconds: 3),
           backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,

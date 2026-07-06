@@ -52,6 +52,8 @@ class InventoryStoreService {
     required String sku,
     required double storePrice,
     String? storeDescription,
+    List<String>? colors,
+    List<String>? sizes,
     List<String>? images, // <-- صور المتجر
   }) async {
     final updates = <String, dynamic>{
@@ -62,6 +64,8 @@ class InventoryStoreService {
     if (storeDescription != null)
       updates['storeDescription'] = storeDescription;
     if (images != null && images.isNotEmpty) updates['imagesList'] = images;
+    if (colors != null && colors.isNotEmpty) updates['colors'] = colors;
+    if (sizes != null && sizes.isNotEmpty) updates['sizes'] = sizes;
 
     await _itemsCollection(groupId).doc(sku).update(updates);
   }
@@ -72,6 +76,8 @@ class InventoryStoreService {
     required double storePrice,
     String? storeDescription,
     List<String>? images,
+    List<String>? colors,
+    List<String>? sizes,
   }) async {
     final updates = <String, dynamic>{'storePrice': storePrice};
 
@@ -85,6 +91,14 @@ class InventoryStoreService {
       updates['imagesList'] = images;
     }
 
+    if (colors != null && colors.isNotEmpty) {
+      updates['colors'] = colors;
+    }
+
+    if (sizes != null && sizes.isNotEmpty) {
+      updates['sizes'] = sizes;
+    }
+
     await _itemsCollection(groupId).doc(sku).update(updates);
   }
 
@@ -94,7 +108,10 @@ class InventoryStoreService {
       'isInStore': false,
       'storePrice': FieldValue.delete(),
       'storeDescription': FieldValue.delete(),
-      'imagesList': [], // <-- تفريغ الصور
+      'imagesList': [],
+      'colors': [],
+      'sizes': [],
+      // <-- تفريغ الصور
     });
   }
 

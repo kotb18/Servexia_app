@@ -7,6 +7,81 @@ import 'package:path_provider/path_provider.dart';
 import 'package:maintenance/Store/inventory_item_model.dart';
 import 'package:maintenance/Store/inventory_store_service.dart';
 
+// ============================================================================
+// 📦 بيانات الألوان والمقاسات المتاحة
+// ============================================================================
+
+final List<Map<String, dynamic>> _availableColors = [
+  {'name': 'أبيض', 'value': 'white', 'color': Colors.white, 'border': true},
+  {'name': 'أسود', 'value': 'black', 'color': Colors.black87},
+  {'name': 'رمادي', 'value': 'gray', 'color': Colors.grey},
+  {'name': 'أحمر', 'value': 'red', 'color': Colors.red},
+  {'name': 'أزرق', 'value': 'blue', 'color': Colors.blue},
+  {'name': 'أخضر', 'value': 'green', 'color': Colors.green},
+  {'name': 'أصفر', 'value': 'yellow', 'color': Colors.amber},
+  {'name': 'برتقالي', 'value': 'orange', 'color': Colors.orange},
+  {'name': 'بنفسجي', 'value': 'purple', 'color': Colors.purple},
+  {'name': 'وردي', 'value': 'pink', 'color': Colors.pink},
+  {'name': 'بني', 'value': 'brown', 'color': Colors.brown},
+  {'name': 'بيج', 'value': 'beige', 'color': Color(0xFFF5F5DC)},
+  {'name': 'ذهبي', 'value': 'gold', 'color': Color(0xFFFFD700)},
+  {'name': 'فضي', 'value': 'silver', 'color': Color(0xFFC0C0C0)},
+];
+
+final List<String> _availableSizes = [
+  'XS',
+  'S',
+  'M',
+  'L',
+  'XL',
+  '2XL',
+  '3XL',
+  '4XL',
+  '28',
+  '30',
+  '32',
+  '34',
+  '36',
+  '38',
+  '40',
+  '42',
+  '44',
+  '46',
+  '50',
+  '52',
+  '54',
+  '56',
+  '58',
+  '60',
+  'newborn',
+  '0-3M',
+  '3-6M',
+  '6-9M',
+  '9-12M',
+  '12-18M',
+  '18-24M',
+  '2T',
+  '3T',
+  '4T',
+  '5T',
+  '35',
+  '36',
+  '37',
+  '38',
+  '39',
+  '40',
+  '41',
+  '42',
+  '43',
+  '44',
+  '45',
+  '46',
+];
+
+// ============================================================================
+// 🏠 الشاشة الرئيسية
+// ============================================================================
+
 class SelectProductsScreen extends StatefulWidget {
   final String groupId;
 
@@ -27,11 +102,17 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
   final Set<String> _selectedItems = {};
   final Set<String> _modifiedItems = {};
 
+  // 🎨 تخزين الألوان والمقاسات المختارة لكل منتج
+  final Map<String, Set<String>> _selectedColors = {};
+  final Map<String, Set<String>> _selectedSizes = {};
+
+  // 🚩 Flag: هل تم تحميل البيانات الأولية من Firestore؟
+  bool _initialDataLoaded = false;
+
   final _searchController = TextEditingController();
   String _searchQuery = '';
   bool _isLoading = false;
 
-  // Notifier to update the save button and count without rebuilding the whole page
   final ValueNotifier<int> _changesCountNotifier = ValueNotifier(0);
 
   @override
@@ -48,7 +129,49 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
   }
 
   void _updateChangesCount() {
-    _changesCountNotifier.value = _selectedItems.length + _modifiedItems.length;
+    _changesCountNotifier.value =
+        _selectedItems.length +
+        _modifiedItems.length +
+        _selectedColors.values.where((s) => s.isNotEmpty).length +
+        _selectedSizes.values.where((s) => s.isNotEmpty).length;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🔑 دالة مهمة: تحميل الألوان والمقاسات من Firestore لما الصفحة تفتح
+  // ═══════════════════════════════════════════════════════════════════════════
+  void _loadExistingStoreData(List<InventoryItemModel> items) {
+    if (_initialDataLoaded) return;
+
+    for (final item in items) {
+      if (item.isInStore) {
+        // ✅ لو المنتج موجود في المتجر، نملأ البيانات المحفوظة
+        // ⚠️ عدل هنا حسب اسم الحقل في الـ Model بتاعك
+        // لو اسم الحقل مختلف، عدل السطرين دول
+        if (item.colors != null && item.colors!.isNotEmpty) {
+          _selectedColors[item.sku] = Set<String>.from(item.colors!);
+        }
+        if (item.sizes != null && item.sizes!.isNotEmpty) {
+          _selectedSizes[item.sku] = Set<String>.from(item.sizes!);
+        }
+
+        // نملأ الـ Controllers كمان لو فاضيين
+        _priceControllers.putIfAbsent(
+          item.sku,
+          () => TextEditingController(
+            text:
+                item.storePrice?.toStringAsFixed(2) ??
+                item.price.toStringAsFixed(2),
+          ),
+        );
+        _descControllers.putIfAbsent(
+          item.sku,
+          () => TextEditingController(text: item.storeDescription ?? ''),
+        );
+      }
+    }
+
+    _initialDataLoaded = true;
+    _updateChangesCount();
   }
 
   // ========== الصور ==========
@@ -158,6 +281,8 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
 
         final desc = _descControllers[sku]?.text.trim();
         final images = _tempImages[sku];
+        final colors = _selectedColors[sku]?.toList();
+        final sizes = _selectedSizes[sku]?.toList();
 
         final item = await _service.getItemBySku(widget.groupId, sku);
         if (item == null) continue;
@@ -169,6 +294,8 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
             storePrice: price,
             storeDescription: desc,
             images: images,
+            colors: colors,
+            sizes: sizes,
           );
           updatedCount++;
         } else {
@@ -178,6 +305,8 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
             storePrice: price,
             storeDescription: desc,
             images: images,
+            colors: colors,
+            sizes: sizes,
           );
           addedCount++;
         }
@@ -209,13 +338,8 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
         );
       }
     } finally {
-      setState(() {
-        _isLoading = false;
-        _modifiedItems.clear(); // Clear modified items after successful save
-        _selectedItems.clear(); // Clear selected items after successful save
-        _tempImages.clear(); // Clear temporary images after successful save
-        _updateChangesCount();
-      });
+      // ❌ لا تمسح البيانات هنا! نخليها لحد ما نخرج من الصفحة
+      setState(() => _isLoading = false);
     }
   }
 
@@ -274,6 +398,8 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
         _tempImages.remove(item.sku);
         _selectedItems.remove(item.sku);
         _modifiedItems.remove(item.sku);
+        _selectedColors.remove(item.sku);
+        _selectedSizes.remove(item.sku);
         _updateChangesCount();
 
         if (mounted) {
@@ -424,6 +550,17 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
                 final allItems = snapshot.data ?? [];
                 if (allItems.isEmpty) return _buildEmptyWidget();
 
+                // 🔑 هنا بنحمل البيانات المحفوظة من Firestore
+                if (allItems.isNotEmpty && !_initialDataLoaded) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      setState(() {
+                        _loadExistingStoreData(allItems);
+                      });
+                    }
+                  });
+                }
+
                 final items = _searchQuery.isEmpty
                     ? allItems
                     : allItems.where((item) {
@@ -482,10 +619,10 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
     InventoryItemModel item, {
     required bool isAlreadyInStore,
   }) {
-    // We use a separate widget for each card to manage its own text controllers
-    // and avoid global rebuilds when typing.
     return _ItemCardWidget(
-      key: ValueKey(item.sku),
+      key: ValueKey(
+        '${item.sku}_${_initialDataLoaded}',
+      ), // 🔑 Key يتغير لما البيانات تتحمل
       item: item,
       isAlreadyInStore: isAlreadyInStore,
       priceControllers: _priceControllers,
@@ -493,11 +630,15 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
       tempImages: _tempImages,
       selectedItems: _selectedItems,
       modifiedItems: _modifiedItems,
+      selectedColors: _selectedColors,
+      selectedSizes: _selectedSizes,
       onToggleAddSelection: (sku) {
         setState(() {
           if (_selectedItems.contains(sku)) {
             _selectedItems.remove(sku);
             _tempImages.remove(sku);
+            _selectedColors.remove(sku);
+            _selectedSizes.remove(sku);
           } else {
             _selectedItems.add(sku);
           }
@@ -511,7 +652,6 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
     );
   }
 
-  // Same helper widgets as before...
   Widget _buildErrorWidget(String error) {
     return Center(
       child: Padding(
@@ -686,7 +826,10 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
   }
 }
 
-// Extracting ItemCard into a separate StatefulWidget to manage its own state
+// ============================================================================
+// 🃏 ويدجت الكارت لكل منتج
+// ============================================================================
+
 class _ItemCardWidget extends StatefulWidget {
   final InventoryItemModel item;
   final bool isAlreadyInStore;
@@ -695,10 +838,12 @@ class _ItemCardWidget extends StatefulWidget {
   final Map<String, List<String>> tempImages;
   final Set<String> selectedItems;
   final Set<String> modifiedItems;
+  final Map<String, Set<String>> selectedColors;
+  final Map<String, Set<String>> selectedSizes;
   final Function(String) onToggleAddSelection;
   final Function(String, String) onRemoveImage;
   final Function(InventoryItemModel) onConfirmRemoveFromStore;
-  final VoidCallback onNotifyChange; // Callback to notify parent of changes
+  final VoidCallback onNotifyChange;
   final Function(String) pickImages;
 
   const _ItemCardWidget({
@@ -710,6 +855,8 @@ class _ItemCardWidget extends StatefulWidget {
     required this.tempImages,
     required this.selectedItems,
     required this.modifiedItems,
+    required this.selectedColors,
+    required this.selectedSizes,
     required this.onToggleAddSelection,
     required this.onRemoveImage,
     required this.onConfirmRemoveFromStore,
@@ -741,24 +888,358 @@ class _ItemCardWidgetState extends State<_ItemCardWidget> {
       () => TextEditingController(text: widget.item.storeDescription ?? ''),
     );
 
-    // Add listeners to notify the parent about changes immediately
     _priceController.addListener(_handleTextChange);
     _descController.addListener(_handleTextChange);
   }
 
   void _handleTextChange() {
-    // Always add to modifiedItems and notify parent, as text content might change
-    // even if the item was already marked as modified.
     widget.modifiedItems.add(widget.item.sku);
     widget.onNotifyChange();
   }
 
   @override
   void dispose() {
-    // Don't dispose controllers here as they are owned by the parent
     _priceController.removeListener(_handleTextChange);
     _descController.removeListener(_handleTextChange);
     super.dispose();
+  }
+
+  void _toggleColor(String colorValue) {
+    setState(() {
+      final colors = widget.selectedColors.putIfAbsent(
+        widget.item.sku,
+        () => <String>{},
+      );
+      if (colors.contains(colorValue)) {
+        colors.remove(colorValue);
+      } else {
+        colors.add(colorValue);
+      }
+      widget.modifiedItems.add(widget.item.sku);
+      widget.onNotifyChange();
+    });
+  }
+
+  void _toggleSize(String sizeValue) {
+    setState(() {
+      final sizes = widget.selectedSizes.putIfAbsent(
+        widget.item.sku,
+        () => <String>{},
+      );
+      if (sizes.contains(sizeValue)) {
+        sizes.remove(sizeValue);
+      } else {
+        sizes.add(sizeValue);
+      }
+      widget.modifiedItems.add(widget.item.sku);
+      widget.onNotifyChange();
+    });
+  }
+
+  void _showColorPicker() {
+    final currentColors = widget.selectedColors[widget.item.sku] ?? <String>{};
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: const EdgeInsets.all(20),
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.7,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Icon(Icons.palette, color: Colors.deepPurple),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'اختيار الألوان المتاحة',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: () {
+                          setModalState(() {
+                            widget.selectedColors[widget.item.sku]?.clear();
+                          });
+                          setState(() {});
+                          widget.modifiedItems.add(widget.item.sku);
+                          widget.onNotifyChange();
+                        },
+                        icon: const Icon(Icons.clear_all, size: 18),
+                        label: const Text('مسح الكل'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: _availableColors.map((colorData) {
+                          final value = colorData['value'] as String;
+                          final name = colorData['name'] as String;
+                          final color = colorData['color'] as Color;
+                          final hasBorder = colorData['border'] == true;
+                          final isSelected = currentColors.contains(value);
+
+                          return GestureDetector(
+                            onTap: () {
+                              setModalState(() {
+                                if (currentColors.contains(value)) {
+                                  currentColors.remove(value);
+                                } else {
+                                  currentColors.add(value);
+                                }
+                              });
+                              _toggleColor(value);
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? color.withOpacity(0.2)
+                                    : Colors.grey.shade50,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? color == Colors.white
+                                            ? Colors.deepPurple
+                                            : color
+                                      : Colors.grey.shade300,
+                                  width: isSelected ? 2.5 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 22,
+                                    height: 22,
+                                    decoration: BoxDecoration(
+                                      color: color,
+                                      shape: BoxShape.circle,
+                                      border: hasBorder
+                                          ? Border.all(
+                                              color: Colors.grey.shade400,
+                                              width: 1,
+                                            )
+                                          : null,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    name,
+                                    style: TextStyle(
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: isSelected
+                                          ? Colors.black87
+                                          : Colors.grey.shade600,
+                                    ),
+                                  ),
+                                  if (isSelected) ...[
+                                    const SizedBox(width: 6),
+                                    const Icon(
+                                      Icons.check_circle,
+                                      size: 18,
+                                      color: Colors.deepPurple,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(Icons.check),
+                      label: Text('تم اختيار ${currentColors.length} لون'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showSizePicker() {
+    final currentSizes = widget.selectedSizes[widget.item.sku] ?? <String>{};
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: const EdgeInsets.all(20),
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.7,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Icon(Icons.straighten, color: Colors.deepOrange),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'اختيار المقاسات المتاحة',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: () {
+                          setModalState(() {
+                            widget.selectedSizes[widget.item.sku]?.clear();
+                          });
+                          setState(() {});
+                          widget.modifiedItems.add(widget.item.sku);
+                          widget.onNotifyChange();
+                        },
+                        icon: const Icon(Icons.clear_all, size: 18),
+                        label: const Text('مسح الكل'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: _availableSizes.map((size) {
+                          final isSelected = currentSizes.contains(size);
+
+                          return GestureDetector(
+                            onTap: () {
+                              setModalState(() {
+                                if (currentSizes.contains(size)) {
+                                  currentSizes.remove(size);
+                                } else {
+                                  currentSizes.add(size);
+                                }
+                              });
+                              _toggleSize(size);
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: 64,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Colors.deepOrange
+                                    : Colors.grey.shade50,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? Colors.deepOrange
+                                      : Colors.grey.shade300,
+                                  width: isSelected ? 2 : 1,
+                                ),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                size,
+                                style: TextStyle(
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.w500,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : Colors.grey.shade700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(Icons.check),
+                      label: Text('تم اختيار ${currentSizes.length} مقاس'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -770,6 +1251,9 @@ class _ItemCardWidgetState extends State<_ItemCardWidget> {
     final currentImages =
         widget.tempImages[widget.item.sku] ??
         List<String>.from(widget.item.imagesList);
+
+    final currentColors = widget.selectedColors[widget.item.sku] ?? <String>{};
+    final currentSizes = widget.selectedSizes[widget.item.sku] ?? <String>{};
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -806,8 +1290,6 @@ class _ItemCardWidgetState extends State<_ItemCardWidget> {
                 ? null
                 : () {
                     widget.onToggleAddSelection(widget.item.sku);
-                    // The onToggleAddSelection callback already calls _updateChangesCount
-                    // in the parent, so no need to call onNotifyChange here again.
                   },
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             child: Padding(
@@ -946,6 +1428,8 @@ class _ItemCardWidgetState extends State<_ItemCardWidget> {
                   const SizedBox(height: 12),
                   _buildDescriptionField(widget.item),
                   const SizedBox(height: 16),
+                  _buildColorsAndSizesSection(currentColors, currentSizes),
+                  const SizedBox(height: 16),
                   _buildImagesSection(
                     widget.item.sku,
                     widget.item,
@@ -983,6 +1467,223 @@ class _ItemCardWidgetState extends State<_ItemCardWidget> {
             ),
         ],
       ),
+    );
+  }
+
+  Widget _buildColorsAndSizesSection(
+    Set<String> currentColors,
+    Set<String> currentSizes,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.format_paint_outlined,
+                color: Colors.grey.shade600,
+                size: 20,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'خيارات المنتج (اختياري)',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade700,
+                  fontSize: 14,
+                ),
+              ),
+              const Spacer(),
+              if (currentColors.isNotEmpty || currentSizes.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.deepPurple.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${currentColors.length} لون · ${currentSizes.length} مقاس',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Colors.deepPurple,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildColorPreviewRow(currentColors),
+          const SizedBox(height: 10),
+          _buildSizePreviewRow(currentSizes),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _showColorPicker,
+                  icon: const Icon(
+                    Icons.palette_outlined,
+                    size: 18,
+                    color: Colors.deepPurple,
+                  ),
+                  label: Text(
+                    currentColors.isEmpty ? 'اختيار الألوان' : 'تعديل الألوان',
+                    style: const TextStyle(
+                      color: Colors.deepPurple,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.deepPurple),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _showSizePicker,
+                  icon: const Icon(
+                    Icons.straighten,
+                    size: 18,
+                    color: Colors.deepOrange,
+                  ),
+                  label: Text(
+                    currentSizes.isEmpty ? 'اختيار المقاسات' : 'تعديل المقاسات',
+                    style: const TextStyle(
+                      color: Colors.deepOrange,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.deepOrange),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildColorPreviewRow(Set<String> currentColors) {
+    if (currentColors.isEmpty) {
+      return Text(
+        'لم يتم اختيار ألوان',
+        style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+      );
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      children: currentColors.map((colorValue) {
+        final colorData = _availableColors.firstWhere(
+          (c) => c['value'] == colorValue,
+          orElse: () => {'name': colorValue, 'color': Colors.grey},
+        );
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: (colorData['color'] as Color).withOpacity(0.15),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: (colorData['color'] as Color).withOpacity(0.4),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: colorData['color'] as Color,
+                  shape: BoxShape.circle,
+                  border: colorData['border'] == true
+                      ? Border.all(color: Colors.grey.shade400, width: 1)
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                colorData['name'] as String,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: () => _toggleColor(colorValue),
+                child: Icon(Icons.close, size: 14, color: Colors.grey.shade500),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildSizePreviewRow(Set<String> currentSizes) {
+    if (currentSizes.isEmpty) {
+      return Text(
+        'لم يتم اختيار مقاسات',
+        style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+      );
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      children: currentSizes.map((size) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.deepOrange.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.deepOrange.withOpacity(0.3)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                size,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.deepOrange,
+                ),
+              ),
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: () => _toggleSize(size),
+                child: Icon(Icons.close, size: 14, color: Colors.grey.shade500),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 

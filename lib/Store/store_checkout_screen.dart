@@ -322,6 +322,8 @@ class _StoreCheckoutScreenState extends State<StoreCheckoutScreen> {
                     : null,
                 price: item.product.effectiveStorePrice,
                 quantity: item.quantity,
+                selectedColor: item.selectedColor,
+                selectedSize: item.selectedSize,
                 total: item.total,
                 selectedAttributes: item.selectedAttributes,
               ),

@@ -14,6 +14,8 @@ class InventoryItemModel {
   final double? storePrice; // سعر البيع في المتجر (اختياري)
   final String? storeDescription;
   final List<String> imagesList;
+  final List<String>? colors;
+  final List<String>? sizes;
   final DateTime createdAt;
 
   InventoryItemModel({
@@ -31,6 +33,8 @@ class InventoryItemModel {
     this.storeDescription,
     this.imagesList = const [],
     required this.createdAt,
+    required this.colors,
+    required this.sizes,
   });
 
   factory InventoryItemModel.fromFirestore(DocumentSnapshot doc) {
@@ -50,6 +54,8 @@ class InventoryItemModel {
       storeDescription: data['storeDescription'],
       imagesList: List<String>.from(data['imagesList'] ?? []),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      colors: List<String>.from(data['colors'] ?? []),
+      sizes: List<String>.from(data['sizes'] ?? []),
     );
   }
 
@@ -69,6 +75,8 @@ class InventoryItemModel {
       'storeDescription': storeDescription,
       'imagesList': imagesList,
       'createdAt': Timestamp.fromDate(createdAt),
+      'colors': colors,
+      'sizes': sizes,
     };
   }
 

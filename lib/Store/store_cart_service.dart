@@ -8,8 +8,15 @@ class CartItem {
   final InventoryItemModel product;
   int quantity;
   Map<String, dynamic>? selectedAttributes;
-
-  CartItem({required this.product, this.quantity = 1, this.selectedAttributes});
+  String? selectedColor;
+  String? selectedSize;
+  CartItem({
+    required this.product,
+    this.quantity = 1,
+    this.selectedAttributes,
+    this.selectedColor,
+    this.selectedSize,
+  });
 
   double get total => product.effectiveStorePrice * quantity;
 
@@ -18,6 +25,8 @@ class CartItem {
       'sku': product.sku,
       'quantity': quantity,
       'selectedAttributes': selectedAttributes,
+      'selectedColor': selectedColor,
+      'selectedSize': selectedSize,
     };
   }
 
@@ -76,6 +85,8 @@ class StoreCartService {
     InventoryItemModel product, {
     int quantity = 1,
     Map<String, dynamic>? attributes,
+    String? selectedColor,
+    String? selectedSize,
   }) {
     final index = _items.indexWhere(
       (item) =>
@@ -91,6 +102,8 @@ class StoreCartService {
           product: product,
           quantity: quantity,
           selectedAttributes: attributes,
+          selectedColor: selectedColor,
+          selectedSize: selectedSize,
         ),
       );
     }
@@ -212,6 +225,8 @@ class StoreCartService {
             selectedAttributes: itemData['selectedAttributes'] != null
                 ? Map<String, dynamic>.from(itemData['selectedAttributes'])
                 : null,
+            selectedColor: itemData['selectedColor'] as String?,
+            selectedSize: itemData['selectedSize'] as String?,
           ),
         );
       }

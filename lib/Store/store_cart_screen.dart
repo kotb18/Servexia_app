@@ -134,6 +134,15 @@ class _StoreCartScreenState extends State<StoreCartScreen> {
                                               fontSize: 12,
                                             ),
                                           ),
+                                        if (item.selectedColor != null ||
+                                            item.selectedSize != null)
+                                          Text(
+                                            'اللون: ${item.selectedColor ?? "غير محدد"} | المقاس: ${item.selectedSize ?? "غير محدد"}',
+                                            style: const TextStyle(
+                                              color: Colors.grey,
+                                              fontSize: 12,
+                                            ),
+                                          ),
                                       ],
                                     ),
                                   ),

@@ -151,6 +151,8 @@ class OrderItem {
   final String? image;
   final double price;
   final int quantity;
+  final String? selectedColor;
+  final String? selectedSize;
   final double total;
   final Map<String, dynamic>? selectedAttributes;
 
@@ -163,6 +165,8 @@ class OrderItem {
     required this.quantity,
     required this.total,
     this.selectedAttributes,
+    this.selectedColor,
+    this.selectedSize,
   });
 
   factory OrderItem.fromMap(Map<String, dynamic> map) {
@@ -175,6 +179,8 @@ class OrderItem {
       quantity: map['quantity'] ?? 1,
       total: (map['total'] ?? 0).toDouble(),
       selectedAttributes: map['selectedAttributes'],
+      selectedColor: map['selectedColor'] as String?,
+      selectedSize: map['selectedSize'] as String?,
     );
   }
 
@@ -188,6 +194,8 @@ class OrderItem {
       'quantity': quantity,
       'total': total,
       'selectedAttributes': selectedAttributes,
+      'selectedColor': selectedColor,
+      'selectedSize': selectedSize,
     };
   }
 }

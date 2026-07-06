@@ -33,49 +33,32 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ─── رأس الطلب ───
             _buildOrderHeader(),
             const SizedBox(height: 20),
-
-            // ─── شريط الحالة ───
             _buildStatusTimeline(),
             const SizedBox(height: 20),
-
-            // ─── معلومات العميل ───
             _buildSectionTitle('معلومات العميل'),
             _buildCustomerInfo(),
             const SizedBox(height: 20),
-
-            // ─── عنوان التوصيل ───
             _buildSectionTitle('عنوان التوصيل'),
             _buildShippingAddress(),
             const SizedBox(height: 20),
-
-            // ─── عناصر الطلب ───
             _buildSectionTitle('عناصر الطلب'),
             _buildOrderItems(),
             const SizedBox(height: 20),
-
-            // ─── ملخص المبالغ ───
             _buildSectionTitle('ملخص الطلب'),
             _buildOrderSummary(),
             const SizedBox(height: 20),
-
-            // ─── تاريخ الحالة ───
             _buildSectionTitle('سجل التحديثات'),
             _buildStatusHistory(),
             const SizedBox(height: 20),
-
-            // ─── ملاحظات ───
             if (widget.order.notes != null) ...[
               _buildSectionTitle('ملاحظات'),
               _buildNotes(),
               const SizedBox(height: 20),
             ],
-
-            // ─── أزرار التحكم ───
             if (!widget.isFromCustomerOrders) _buildActionButtons(context),
-            SizedBox(height: 40),
+            const SizedBox(height: 40),
           ],
         ),
       ),
@@ -137,7 +120,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         MaterialPageRoute(
                           builder: (_) => InvoicePage(
                             groupId: widget.order.storeId,
-                            // InvoicePage expects a List<Map> for itemsSale. Convert each order item to the required map.
                             itemsSale: widget.order.items
                                 .map(
                                   (item) => {
@@ -159,13 +141,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                             isFromWorkSpace: false,
                             type: 'بيع',
                             isFormStore: true,
-                            orderId: widget
-                                .order
-                                .id, // Pass the order ID to the invoice page
+                            orderId: widget.order.id,
                           ),
                         ),
                       );
-                      // TODO: فتح الفاتورة المرتبطة في ERP
                     },
                   ),
                 if (!widget.isFromCustomerOrders &&
@@ -174,8 +153,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     icon: const Icon(Icons.receipt_long),
                     label: const Text('الفاتورة المرتبطة'),
                     onPressed: () async {
-                      // TODO: فتح الفاتورة المرتبطة في ERP
-
                       final InvoiceService _invoiceService = InvoiceService();
                       final invoice = await _invoiceService.getInvoice(
                         widget.order.storeId,
@@ -257,7 +234,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               Row(
                 children: List.generate(statuses.length * 2 - 1, (index) {
                   if (index.isOdd) {
-                    // خط الواصل
                     final stepIndex = index ~/ 2;
                     final isActive = stepIndex < currentIndex;
                     return Expanded(
@@ -267,7 +243,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       ),
                     );
                   } else {
-                    // الدائرة
                     final stepIndex = index ~/ 2;
                     final isActive = stepIndex <= currentIndex;
                     final isCurrent = stepIndex == currentIndex;
@@ -327,7 +302,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               widget.order.customerInfo.name,
             ),
             const Divider(),
-            // رقم الهاتف - قابل للاتصال
             _buildPhoneRow(
               Icons.phone,
               'الهاتف',
@@ -343,7 +317,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             ],
             if (widget.order.customerInfo.whatsapp != null) ...[
               const Divider(),
-              // رقم الواتساب - قابل لفتح واتساب برسالة
               _buildWhatsAppRow(
                 Icons.message,
                 'واتساب',
@@ -399,7 +372,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     );
   }
 
-  // ─── عناصر الطلب ───
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🎨📏 عناصر الطلب مع عرض اللون والمقاس المختارين
+  // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildOrderItems() {
     return Card(
       child: ListView.separated(
@@ -409,43 +384,210 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         separatorBuilder: (_, __) => const Divider(),
         itemBuilder: (context, index) {
           final item = widget.order.items[index];
-          return ListTile(
-            leading: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: item.image != null
-                  ? WebImage(
-                      src: item.image!,
-                      width: 50,
-                      height: 50,
-                      fit: BoxFit.cover,
-                    )
-                  : Container(
-                      width: 50,
-                      height: 50,
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.shopping_bag),
-                    ),
-            ),
-            title: Text(item.name),
-            subtitle: Column(
+          return Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${item.price.toStringAsFixed(2)} × ${item.quantity}'),
-                if (item.selectedAttributes != null)
-                  Text(
-                    _formatAttributes(item.selectedAttributes!),
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                // صورة المنتج
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: item.image != null
+                      ? WebImage(
+                          src: item.image!,
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.cover,
+                        )
+                      : Container(
+                          width: 60,
+                          height: 60,
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.shopping_bag),
+                        ),
+                ),
+                const SizedBox(width: 12),
+
+                // تفاصيل المنتج
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+
+                      // السعر × الكمية
+                      Text(
+                        '${item.price.toStringAsFixed(2)} × ${item.quantity}',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // ═══════════════════════════════════════════════
+                      // 🎨📏 عرض اللون والمقاس المختارين
+                      // ═══════════════════════════════════════════════
+                      _buildItemAttributes(item),
+                    ],
                   ),
+                ),
+
+                // الإجمالي
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${item.total.toStringAsFixed(2)} ',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ],
+                ),
               ],
-            ),
-            trailing: Text(
-              '${item.total.toStringAsFixed(2)} ',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
             ),
           );
         },
       ),
     );
+  }
+
+  // ─── عرض خصائص المنتج (اللون والمقاس) ───
+  Widget _buildItemAttributes(dynamic item) {
+    final List<Widget> chips = [];
+
+    // 🎨 اللون المختار
+    if (item.selectedColor != null && item.selectedColor!.isNotEmpty) {
+      final colorData = _getColorData(item.selectedColor!);
+      chips.add(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color:
+                (colorData?['color'] as Color?)?.withOpacity(0.15) ??
+                Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color:
+                  (colorData?['color'] as Color?)?.withOpacity(0.4) ??
+                  Colors.grey.shade300,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: colorData?['color'] as Color? ?? Colors.grey,
+                  shape: BoxShape.circle,
+                  border: colorData?['border'] == true
+                      ? Border.all(color: Colors.grey.shade400, width: 1)
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                colorData?['name'] ?? item.selectedColor!,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // 📏 المقاس المختار
+    if (item.selectedSize != null && item.selectedSize!.isNotEmpty) {
+      chips.add(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.deepOrange.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.deepOrange.withOpacity(0.3)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.straighten, size: 14, color: Colors.deepOrange),
+              const SizedBox(width: 4),
+              Text(
+                item.selectedSize!,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.deepOrange,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // خصائص إضافية أخرى (لو موجودة)
+    if (item.selectedAttributes != null &&
+        item.selectedAttributes!.isNotEmpty) {
+      item.selectedAttributes!.forEach((key, value) {
+        if (key != 'color' && key != 'size') {
+          chips.add(
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Text(
+                '$key: $value',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              ),
+            ),
+          );
+        }
+      });
+    }
+
+    if (chips.isEmpty) return const SizedBox.shrink();
+
+    return Wrap(spacing: 8, runSpacing: 6, children: chips);
+  }
+
+  // ─── بيانات الألوان ───
+  Map<String, dynamic>? _getColorData(String colorValue) {
+    final colors = [
+      {'name': 'أبيض', 'value': 'white', 'color': Colors.white, 'border': true},
+      {'name': 'أسود', 'value': 'black', 'color': Colors.black87},
+      {'name': 'رمادي', 'value': 'gray', 'color': Colors.grey},
+      {'name': 'أحمر', 'value': 'red', 'color': Colors.red},
+      {'name': 'أزرق', 'value': 'blue', 'color': Colors.blue},
+      {'name': 'أخضر', 'value': 'green', 'color': Colors.green},
+      {'name': 'أصفر', 'value': 'yellow', 'color': Colors.amber},
+      {'name': 'برتقالي', 'value': 'orange', 'color': Colors.orange},
+      {'name': 'بنفسجي', 'value': 'purple', 'color': Colors.purple},
+      {'name': 'وردي', 'value': 'pink', 'color': Colors.pink},
+      {'name': 'بني', 'value': 'brown', 'color': Colors.brown},
+      {'name': 'بيج', 'value': 'beige', 'color': const Color(0xFFF5F5DC)},
+      {'name': 'ذهبي', 'value': 'gold', 'color': const Color(0xFFFFD700)},
+      {'name': 'فضي', 'value': 'silver', 'color': const Color(0xFFC0C0C0)},
+    ];
+    try {
+      return colors.firstWhere((c) => c['value'] == colorValue);
+    } catch (_) {
+      return null;
+    }
   }
 
   // ─── ملخص المبالغ ───
@@ -549,7 +691,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   // ─── أزرار التحكم ───
   Widget _buildActionButtons(BuildContext context) {
-    // تحديد الأزرار المتاحة حسب الحالة الحالية
     final List<Widget> buttons = [];
 
     if (widget.order.status == OrderStatus.pending) {
@@ -655,7 +796,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     );
   }
 
-  // صف المعلومات العادي (غير قابل للضغط)
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -678,7 +818,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     );
   }
 
-  // صف الهاتف - قابل للاتصال
   Widget _buildPhoneRow(IconData icon, String label, String phone) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -720,7 +859,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     );
   }
 
-  // صف الواتساب - قابل لفتح واتساب برسالة
   Widget _buildWhatsAppRow(IconData icon, String label, String whatsapp) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -762,7 +900,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     );
   }
 
-  // ========== دوال المساعدة ==========
   Future<void> _makePhoneCall(String phoneNumber) async {
     final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
     if (await canLaunchUrl(launchUri)) {
@@ -772,14 +909,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     }
   }
 
-  // فتح واتساب برسالة من التاجر للمستخدم
   Future<void> _openWhatsApp(String phoneNumber) async {
-    // تنظيف الرقم من أي مسافات أو رموز
     String cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
-
-    // رسالة جاهزة من التاجر للمستخدم
     final String message =
-        // 'مرحباً ${order.customerInfo.name}،\n'
         'أهلاً ${widget.order.customerInfo.name} أود التواصل معك بخصوص طلبك رقم${widget.order.orderNumber}.\n'
         'شكراً لك!';
 
@@ -943,7 +1075,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     }
   }
 
-  // ─── تحديث الحالة ───
   Future<void> _updateStatus(
     BuildContext context,
     OrderStatus newStatus,
@@ -960,10 +1091,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             child: const Text('إلغاء'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context, true);
-              print('تم تأكيد تغيير الحالة إلى: ${widget.order.id}');
-            },
+            onPressed: () => Navigator.pop(context, true),
             child: const Text('تأكيد'),
           ),
         ],
@@ -984,7 +1112,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('تم تحديث الحالة بنجاح')),
           );
-          Navigator.pop(context); // الرجوع للقائمة
+          Navigator.pop(context);
         }
       } catch (e) {
         if (context.mounted) {
@@ -996,7 +1124,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     }
   }
 
-  // ─── حوار الإلغاء ───
   Future<void> _showCancelDialog(BuildContext context) async {
     final reasonController = TextEditingController();
 
