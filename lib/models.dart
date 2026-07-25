@@ -283,6 +283,20 @@ class Invoice {
   final String? notes;
   final DateTime date;
   final String invoiceNumber;
+  final String companyName; // اسم الشركة (للفواتير المرتجعة)
+  final String companyAddress; // عنوان الشركة (للفواتير المرتجعة)
+  final String companyPhone; // هاتف الشركة (للفواتير المرتجعة)
+  final String companyEmail; // بريد الشركة (للفواتير المرتجعة)
+  final String companyLogoUrl; // رابط شعار الشركة (للفواتير المرتجعة)
+  final String companyTaxNumber; // رقم ضريبة الشركة (للفواتير المرتجعة)
+  final bool isQuote; // هل الفاتورة عرض سعر
+  final bool showLogo; // هل تظهر تفاصيل الشركة في الفاتورة
+  final bool showAddress; // هل تظهر عنوان الشركة في الفاتورة
+  final bool showPhone; // هل يظهر هاتف الشركة في الفاتورة
+  final bool showEmail; // هل يظهر بريد الشركة في الفاتورة
+  final bool showNotes;
+  final bool showDiscount; // هل يظهر رقم ضريبة الشركة في الفاتورة
+  final bool showTax; // هل يظهر ضريبة الفاتورة في الفاتورة
   final DateTime createdAt;
   final String paymentMethod; // 'كاش', 'شيك', 'تحويل بنكي', إلخ
   final String originalInvoiceId;
@@ -310,6 +324,20 @@ class Invoice {
     required this.reInvoiceId,
     required this.originalInvoiceId,
     required this.returnSummary,
+    required this.companyName,
+    required this.companyAddress,
+    required this.companyPhone,
+    required this.companyEmail,
+    required this.companyLogoUrl,
+    required this.companyTaxNumber,
+    required this.isQuote,
+    required this.showLogo,
+    required this.showAddress,
+    required this.showPhone,
+    required this.showEmail,
+    required this.showNotes,
+    required this.showDiscount,
+    required this.showTax,
   });
 
   factory Invoice.fromJson(Map<String, dynamic> json, {String? docId}) {
@@ -358,6 +386,20 @@ class Invoice {
       returnSummary: ReturnSummary.fromJson(
         json['returnSummary'] as Map<String, dynamic>? ?? {},
       ),
+      companyName: json['companyName'] as String? ?? '',
+      companyAddress: json['companyAddress'] as String? ?? '',
+      companyPhone: json['companyPhone'] as String? ?? '',
+      companyEmail: json['companyEmail'] as String? ?? '',
+      companyLogoUrl: json['companyLogoUrl'] as String? ?? '',
+      companyTaxNumber: json['companyTaxNumber'] as String? ?? '',
+      isQuote: json['isQuote'] as bool? ?? false,
+      showLogo: json['showLogo'] as bool? ?? false,
+      showAddress: json['showAddress'] as bool? ?? false,
+      showPhone: json['showPhone'] as bool? ?? false,
+      showEmail: json['showEmail'] as bool? ?? false,
+      showNotes: json['showNotes'] as bool? ?? false,
+      showDiscount: json['showDiscount'] as bool? ?? false,
+      showTax: json['showTax'] as bool? ?? false,
     );
   }
 
@@ -425,6 +467,20 @@ class Invoice {
       reInvoiceId: reInvoiceId,
       originalInvoiceId: originalInvoiceId ?? this.originalInvoiceId,
       returnSummary: returnSummary ?? this.returnSummary,
+      companyName: companyName,
+      companyAddress: companyAddress,
+      companyPhone: companyPhone,
+      companyEmail: companyEmail,
+      companyLogoUrl: companyLogoUrl,
+      companyTaxNumber: companyTaxNumber,
+      isQuote: isQuote,
+      showLogo: showLogo,
+      showAddress: showAddress,
+      showPhone: showPhone,
+      showEmail: showEmail,
+      showNotes: showNotes,
+      showDiscount: showDiscount,
+      showTax: showTax,
     );
   }
 

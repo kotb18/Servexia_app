@@ -217,14 +217,126 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
     });
   }
 
-  void _printInvoice(Invoice invoice) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'وظيفة الطباعة للفاتورة رقم ${invoice.invoiceNumber} غير مطبقة بعد.',
-        ),
-      ),
+  Future<void> showCustomDialog({
+    required BuildContext context,
+    required String title,
+    required String message,
+    required Invoice invoice,
+    VoidCallback? onConfirm,
+  }) async {
+    await showDialog(
+      context: context,
+      //  barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            ElevatedButton(
+              onPressed: () async {
+                final navigator = Navigator.of(context);
+                if (!mounted) return;
+                navigator.pop();
+                _printInvoice(invoice, true);
+              },
+              child: Text('طابعة حرارية'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final navigator = Navigator.of(context);
+                if (!mounted) return;
+                navigator.pop();
+                _printInvoice(invoice, false);
+              },
+              child: Text('طابعة A4'),
+            ),
+          ],
+        );
+      },
     );
+  }
+
+  void _printInvoice(Invoice invoice, bool thermalInvoice) async {
+    if (thermalInvoice == true) {
+      final pdfBytes = await ThermalPrinterService.generateThermalPdf(
+        invoiceType: invoice.type,
+        invoiceNumber:
+            invoice.invoiceNumber, // استخدم رقم الفاتورة من الكائن invoice
+        invoiceDate: invoice.date,
+        clientName: invoice.customerName,
+        items: invoice.items.map((item) {
+          return {
+            'itemId': item.itemId ?? '',
+            'name': item.name,
+            'quantity': item.quantity,
+            'price': item.price,
+            'total': item.total,
+          };
+        }).toList(),
+        subtotal: invoice.summary.subTotal,
+        discount: invoice.summary.discountValue,
+        tax: invoice.summary.taxValue,
+        total: invoice.summary.total,
+        notes: invoice.notes,
+        companyName: invoice.companyName,
+
+        isQuote: invoice.type == 'عرض سعر',
+      );
+      await ThermalPrinterService.printThermalPdf(pdfBytes);
+
+      // أو مشاركة
+      await ThermalPrinterService.shareToThermalPrinter(pdfBytes, 'فاتورة_001');
+    } else {
+      await InvoiceGenerator.generateProfessionalInvoice(
+        invoiceType: invoice.type,
+        invoiceNumber:
+            invoice.invoiceNumber, // استخدم رقم الفاتورة من الكائن invoice
+        invoiceDate: invoice.date,
+        clientName: invoice.customerName,
+        clientAddress: invoice.customerAddress,
+        clientPhone: invoice.customerPhone,
+        items: invoice.items.map((item) {
+          return {
+            'itemId': item.itemId ?? '',
+            'name': item.name,
+            'quantity': item.quantity,
+            'price': item.price,
+            'total': item.total,
+          };
+        }).toList(),
+        subtotal: invoice.summary.subTotal,
+        discount: invoice.summary.discountValue,
+        tax: invoice.summary.taxValue,
+        total: invoice.summary.total,
+        notes: invoice.notes,
+        companyName: invoice.companyName,
+        companyAddress: invoice.companyAddress,
+        companyPhone: invoice.companyPhone,
+        companyEmail: invoice.companyEmail,
+        companyLogoPath: 'widget.state.companyLogoPath',
+        isDue: invoice.paymentMethod == 'آجل',
+        isInstallment: invoice.paymentMethod == 'تقسيط',
+        dueDates: invoice.installments.map((installment) {
+          return {
+            'date': installment.date,
+            'value': installment.value,
+            'status': installment.status,
+            'type': installment.type,
+          };
+        }).toList(),
+        showAddress: invoice.showAddress,
+        showEmail: invoice.showEmail,
+        showDiscount: invoice.showDiscount,
+        showLogo: invoice.showLogo,
+        showNotes: invoice.showNotes,
+        showPhone: invoice.showPhone,
+        showTax: invoice.showTax,
+        isQuote: invoice.type == 'عرض سعر',
+        originalInvoiceNumber: invoice.type == 'مرتجع'
+            ? invoice.invoiceNumber
+            : null,
+      );
+    }
     // TODO: Implement actual print invoice logic, potentially using a package like 'printing' or 'pdf'
   }
 
@@ -572,7 +684,13 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
                       onTap: () => _openInvoiceDetails(invoice),
                       onEdit: () => _editInvoice(invoice),
                       onDelete: () => _deleteInvoice(invoice),
-                      onPrint: () => _printInvoice(invoice),
+                      onPrint: () => showCustomDialog(
+                        context: context,
+                        title: 'اختر نوع الطباعة',
+                        message:
+                            'هل ترغب في طباعة الفاتورة على طابعة حرارية أم طابعة A4؟',
+                        invoice: invoice,
+                      ),
                     );
                   },
                 );

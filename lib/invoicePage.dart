@@ -1281,6 +1281,17 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     return {
       'reInvoiceId': reInvoiceId ?? '', // Include ID for edit mode
       "type": widget.type,
+      'companyName': widget.state.companyName,
+      'companyAddress': widget.state.companyAddress,
+      'companyPhone': widget.state.companyPhone,
+      'companyEmail': widget.state.companyEmail,
+      'showLogo': widget.state.showLogo,
+      'showAddress': widget.state.showAddress,
+      'showPhone': widget.state.showPhone,
+      'showEmail': widget.state.showEmail,
+      'showNotes': widget.state.showNotes,
+      'showTax': widget.state.showTax,
+      'showDiscount': widget.state.showDiscount,
       "customer": {
         "id": widget.customerId,
         "name": nameController.text.isNotEmpty ? nameController.text : null,
