@@ -76,7 +76,17 @@ class _CreategroupState extends State<Creategroup> {
     'سوهاج',
     'مطروح',
   ];
-
+  Map<String, bool> permissions = {
+    'المخازن': true,
+    'إضافة صنف مخزني': true,
+    'الفواتير والمشتريات': true,
+    'العملاء والموردين': true,
+    'المتجر الإليكتروني': true,
+    'الأصول والمعدات': true,
+    'إضافة أصل أو معدة': true,
+    'إضافة مهمة': true,
+    'طلبات الانضمام': true,
+  };
   @override
   void initState() {
     _checkSubscriptionStatus();
@@ -328,6 +338,33 @@ class _CreategroupState extends State<Creategroup> {
     final attendanceRef = firestore.collection('attendance').doc(groupId);
 
     batch.set(attendanceRef, {'groupId': groupId});
+
+    final permissionRef0 = await FirebaseFirestore.instance
+        .collection('employees_permissions')
+        .doc(groupId);
+    batch.set(permissionRef0, {'groupId': groupId});
+    final permissionRef1 = await FirebaseFirestore.instance
+        .collection('employees_permissions')
+        .doc(groupId)
+        .collection('items')
+        .doc(uid);
+
+    batch.set(permissionRef1, {
+      ...permissions,
+      'employeeId': uid,
+      'employeeName': adminName,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم حفظ الصلاحيات بنجاح ✅'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
 
     // تنفيذ كل العمليات مرة واحدة
     await batch.commit();

@@ -203,7 +203,7 @@ class _TeamScreenState extends State<TeamScreen> {
         return Column(
           children: confirmedMembers.map((member) {
             return InkWell(
-              onTap: widget.isAdmin
+              onTap: !widget.isAdmin
                   ? null
                   : () {
                       // Handle member tap
