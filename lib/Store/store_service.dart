@@ -32,14 +32,10 @@ class StoreService {
 
   // جلب متجر التاجر
   Stream<StoreModel?> getMerchantStore(String groupId) {
-    return _stores
-        .where('groupId', isEqualTo: groupId)
-        .limit(1)
-        .snapshots()
-        .map((snapshot) {
-          if (snapshot.docs.isEmpty) return null;
-          return StoreModel.fromFirestore(snapshot.docs.first);
-        });
+    return _stores.doc(groupId).snapshots().map((snapshot) {
+      if (!snapshot.exists) return null;
+      return StoreModel.fromFirestore(snapshot);
+    });
   }
 
   // التحقق من توفر الـ Slug

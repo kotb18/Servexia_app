@@ -111,7 +111,7 @@ final GoRouter _router = GoRouter(
       name: 'shop',
       builder: (context, state) {
         final groupId = state.pathParameters['groupId'] ?? 'default';
-        return StoreHomeScreen(groupId: groupId, storeName: groupId);
+        return StoreHomeScreen(groupId: groupId);
       },
     ),
     GoRoute(
@@ -174,6 +174,8 @@ final GoRouter _router = GoRouter(
             return StoreProductDetailScreen(
               groupId: groupId,
               item: snapshot.data!,
+              shippingFee:
+                  0.0, // <-- يمكنك تعديل قيمة رسوم الشحن هنا إذا لزم الأمر
             );
           },
         );

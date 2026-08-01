@@ -19,6 +19,8 @@ class StoreModel {
   final DateTime createdAt;
   final DateTime updatedAt;
   final StoreSettings settings;
+  final bool isClothes; // <-- علم الملابس
+  final double shippingFee; // <-- رسوم الشحن
 
   StoreModel({
     required this.id,
@@ -39,6 +41,8 @@ class StoreModel {
     required this.createdAt,
     required this.updatedAt,
     required this.settings,
+    required this.isClothes,
+    required this.shippingFee,
   });
 
   factory StoreModel.fromFirestore(DocumentSnapshot doc) {
@@ -62,6 +66,8 @@ class StoreModel {
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       settings: StoreSettings.fromMap(data['settings'] ?? {}),
+      isClothes: data['isClothes'] ?? false,
+      shippingFee: (data['shippingFee'] ?? 0).toDouble(),
     );
   }
 
@@ -84,6 +90,8 @@ class StoreModel {
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
       'settings': settings.toMap(),
+      'isClothes': isClothes,
+      'shippingFee': shippingFee,
     };
   }
 

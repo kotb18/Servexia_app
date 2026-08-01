@@ -652,24 +652,47 @@ class _InventoryItemDetailsScreenRefactoredState
     final priceController = TextEditingController(
       text: item['price'] != null ? item['price'].toString() : '',
     );
+    final nameController = TextEditingController(
+      text: item['name'] != null ? item['name'] : '',
+    );
 
     showDialog(
       context: context,
       builder: (BuildContext ctx) => AlertDialog(
-        title: const Text('تعديل سعر الوحدة'),
-        content: TextField(
-          controller: priceController,
-          onTap: () {
-            priceController.selection = TextSelection(
-              baseOffset: 0,
-              extentOffset: priceController.text.length,
-            );
-          },
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'سعر الوحدة',
-            prefixIcon: Icon(Icons.attach_money),
-          ),
+        title: const Text('تعديل بيانات الصنف'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              onTap: () {
+                nameController.selection = TextSelection(
+                  baseOffset: 0,
+                  extentOffset: nameController.text.length,
+                );
+              },
+
+              decoration: const InputDecoration(
+                labelText: 'اسم الصنف',
+                prefixIcon: Icon(Icons.attach_money),
+              ),
+            ),
+            SizedBox(height: 12),
+            TextField(
+              controller: priceController,
+              onTap: () {
+                priceController.selection = TextSelection(
+                  baseOffset: 0,
+                  extentOffset: priceController.text.length,
+                );
+              },
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'سعر الوحدة',
+                prefixIcon: Icon(Icons.attach_money),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -679,6 +702,7 @@ class _InventoryItemDetailsScreenRefactoredState
           ElevatedButton(
             onPressed: () async {
               final newPrice = double.tryParse(priceController.text) ?? 0.0;
+              final newName = nameController.text.trim();
               if (newPrice < 0) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -693,7 +717,7 @@ class _InventoryItemDetailsScreenRefactoredState
                     .doc(widget.groupId)
                     .collection('items')
                     .doc(widget.itemId)
-                    .update({'price': newPrice});
+                    .update({'price': newPrice, 'name': newName});
                 if (mounted) {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(

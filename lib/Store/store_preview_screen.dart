@@ -26,7 +26,7 @@ class StorePreviewScreen extends StatelessWidget {
       ),
       body: StoreHomeScreen(
         groupId: groupId,
-        storeName: storeName,
+
         isPreview: false, // <-- علم المعاينة
       ),
     );

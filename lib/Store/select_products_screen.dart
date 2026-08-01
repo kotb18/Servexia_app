@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:maintenance/Store/store_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:maintenance/Store/inventory_item_model.dart';
 import 'package:maintenance/Store/inventory_store_service.dart';
@@ -101,6 +102,7 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
   final Map<String, List<String>> _tempImages = {};
   final Set<String> _selectedItems = {};
   final Set<String> _modifiedItems = {};
+  bool _isClothes = false; // <-- علم الملابس
 
   // 🎨 تخزين الألوان والمقاسات المختارة لكل منتج
   final Map<String, Set<String>> _selectedColors = {};
@@ -437,6 +439,22 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
     }
   }
 
+  Future<void> getStoreData() async {
+    final storeService = StoreService();
+    final store = await storeService.getStoreById(widget.groupId);
+    if (store != null) {
+      setState(() {
+        _isClothes = store.isClothes;
+      });
+    }
+  }
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    getStoreData();
+  }
   // ========== UI ==========
 
   @override
@@ -632,6 +650,7 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
       modifiedItems: _modifiedItems,
       selectedColors: _selectedColors,
       selectedSizes: _selectedSizes,
+      isClothes: _isClothes,
       onToggleAddSelection: (sku) {
         setState(() {
           if (_selectedItems.contains(sku)) {
@@ -845,6 +864,7 @@ class _ItemCardWidget extends StatefulWidget {
   final Function(InventoryItemModel) onConfirmRemoveFromStore;
   final VoidCallback onNotifyChange;
   final Function(String) pickImages;
+  final bool isClothes;
 
   const _ItemCardWidget({
     Key? key,
@@ -862,6 +882,7 @@ class _ItemCardWidget extends StatefulWidget {
     required this.onConfirmRemoveFromStore,
     required this.onNotifyChange,
     required this.pickImages,
+    required this.isClothes,
   }) : super(key: key);
 
   @override
@@ -1428,7 +1449,8 @@ class _ItemCardWidgetState extends State<_ItemCardWidget> {
                   const SizedBox(height: 12),
                   _buildDescriptionField(widget.item),
                   const SizedBox(height: 16),
-                  _buildColorsAndSizesSection(currentColors, currentSizes),
+                  if (widget.isClothes)
+                    _buildColorsAndSizesSection(currentColors, currentSizes),
                   const SizedBox(height: 16),
                   _buildImagesSection(
                     widget.item.sku,

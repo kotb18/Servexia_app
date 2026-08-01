@@ -52,12 +52,14 @@ class StoreProductDetailScreen extends StatefulWidget {
   final InventoryItemModel item;
   final String groupId;
   final bool isPreview;
+  final double shippingFee;
 
   const StoreProductDetailScreen({
     super.key,
     required this.item,
     required this.groupId,
     this.isPreview = false,
+    required this.shippingFee,
   });
 
   @override
@@ -996,6 +998,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                   builder: (_) => StoreCartScreen(
                     groupId: widget.groupId,
                     makeSetStateOnCartChange: false,
+                    shippingFee: widget.shippingFee,
                   ),
                 ),
               );

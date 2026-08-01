@@ -393,17 +393,28 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: item.image != null
-                      ? WebImage(
-                          src: item.image!,
+                      ? Image.network(
+                          item.image!,
                           width: 60,
                           height: 60,
                           fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: 60,
+                              height: 60,
+                              color: Colors.grey[300],
+                              child: const Icon(
+                                Icons.image_not_supported,
+                                color: Colors.grey,
+                              ),
+                            );
+                          },
                         )
                       : Container(
                           width: 60,
                           height: 60,
                           color: Colors.grey[300],
-                          child: const Icon(Icons.shopping_bag),
+                          child: const Icon(Icons.image),
                         ),
                 ),
                 const SizedBox(width: 12),

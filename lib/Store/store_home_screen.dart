@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +8,7 @@ import 'package:maintenance/Store/inventory_store_service.dart';
 import 'package:maintenance/Store/store_cart_screen.dart';
 import 'package:maintenance/Store/store_cart_service.dart';
 import 'package:maintenance/Store/store_product_detail_screen.dart';
+import 'package:maintenance/Store/store_service.dart';
 import 'package:maintenance/imageControl/platform_image.dart';
 import 'package:maintenance/signIn.dart';
 import 'package:share_plus/share_plus.dart';
@@ -43,14 +45,14 @@ class AppColors {
 
 class StoreHomeScreen extends StatefulWidget {
   final String groupId;
-  final String storeName;
+
   final bool isPreview;
   final String? customerId;
 
   const StoreHomeScreen({
     super.key,
     required this.groupId,
-    required this.storeName,
+
     this.isPreview = false,
     this.customerId,
   });
@@ -64,11 +66,31 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   bool _isSearchFocused = false;
+  double? _shippingFee;
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<String> getStoreName() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('stores')
+          .doc(widget.groupId)
+          .get();
+
+      if (snapshot.exists) {
+        final data = snapshot.data();
+        return data?['name'] ?? 'متجر';
+      }
+      return 'متجر';
+    } catch (error) {
+      // ignore: avoid_print
+      print('Error fetching store name: $error');
+      return 'متجر';
+    }
   }
 
   String _generateStoreLink() {
@@ -96,9 +118,10 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
 
   Future<void> _shareStoreLink() async {
     final link = _generateStoreLink();
+    final name = await getStoreName();
     await Share.share(
-      'إليك متجر ${widget.storeName} على Maintenance App\n$link',
-      subject: 'متجر ${widget.storeName}',
+      'إليك متجر $name على Maintenance App\n$link',
+      subject: 'متجر $name',
     );
   }
 
@@ -142,11 +165,16 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              widget.storeName,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: AppColors.mediumGray),
+            FutureBuilder<String>(
+              future: getStoreName(),
+              builder: (context, snapshot) {
+                return Text(
+                  snapshot.data ?? 'متجر',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: AppColors.mediumGray),
+                );
+              },
             ),
             const SizedBox(height: 24),
 
@@ -255,6 +283,22 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
     );
   }
 
+  Future<void> getStoreData() async {
+    final storeService = StoreService();
+    final store = await storeService.getStoreById(widget.groupId);
+    if (store != null) {
+      setState(() {
+        _shippingFee = store.shippingFee;
+      });
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    getStoreData();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 600;
@@ -272,6 +316,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
 
           // Products Grid
           Expanded(child: _buildProductsGrid()),
+          SizedBox(height: 60),
         ],
       ),
     );
@@ -315,14 +360,18 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
 
           // Store Name
           Expanded(
-            child: Text(
-              widget.storeName,
-              style: const TextStyle(
-                color: AppColors.darkGray,
-                fontWeight: FontWeight.w600,
-                fontSize: 18,
-              ),
-              overflow: TextOverflow.ellipsis,
+            child: FutureBuilder<String>(
+              future: getStoreName(),
+              builder: (context, snapshot) {
+                return Text(
+                  snapshot.data ?? 'متجر',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.mediumGray,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -355,6 +404,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                   builder: (_) => StoreCartScreen(
                     groupId: widget.groupId,
                     makeSetStateOnCartChange: true,
+                    shippingFee: _shippingFee!,
                   ),
                 ),
               );
@@ -445,6 +495,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                   MaterialPageRoute(
                     builder: (_) => StoreCartScreen(
                       groupId: widget.groupId,
+                      shippingFee: _shippingFee!,
                       makeSetStateOnCartChange: true,
                     ),
                   ),
@@ -534,7 +585,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
 
   /// ─── PRODUCT CARD ───
   Widget _buildProductCard(InventoryItemModel item) {
-    return GestureDetector(
+    return InkWell(
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(
@@ -542,6 +593,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
             item: item,
             groupId: widget.groupId,
             isPreview: widget.isPreview,
+            shippingFee: _shippingFee!,
           ),
         ),
       ),
@@ -870,12 +922,39 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         MaterialPageRoute(builder: (_) => Login(fromCheckout: true)),
       );
 
-      if (result == true) {
+      if (result == true && product.sizes!.isEmpty && product.colors!.isEmpty) {
         _addToCart(product, quantity);
+      } else if (result == true &&
+          (product.sizes!.isNotEmpty || product.colors!.isNotEmpty)) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => StoreProductDetailScreen(
+              item: product,
+              groupId: widget.groupId,
+              isPreview: widget.isPreview,
+              shippingFee: _shippingFee!,
+            ),
+          ),
+        );
       }
       return;
     }
-
+    if (product.sizes!.isNotEmpty && product.colors!.isNotEmpty) {
+      // If the product has sizes, navigate to the product detail screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => StoreProductDetailScreen(
+            item: product,
+            groupId: widget.groupId,
+            isPreview: widget.isPreview,
+            shippingFee: _shippingFee!,
+          ),
+        ),
+      );
+      return;
+    }
     final cart = StoreCartService();
     await cart.loadCart(widget.groupId);
     cart.addToCart(product, quantity: quantity);

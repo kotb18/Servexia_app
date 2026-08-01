@@ -320,7 +320,7 @@ class _StoreScreenState extends State<StoreScreen> {
                     const SizedBox(height: 10),
 
                     /// سويتش المحذوفات
-                    if (!widget.isFromInvoice)
+                    /* if (!widget.isFromInvoice)
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -345,7 +345,7 @@ class _StoreScreenState extends State<StoreScreen> {
                             },
                           ),
                         ],
-                      ),
+                      ), */
                   ],
                 );
               },

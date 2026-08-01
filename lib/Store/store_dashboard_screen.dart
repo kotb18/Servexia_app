@@ -123,7 +123,8 @@ class _StoreDashboardScreenState extends State<StoreDashboardScreen> {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => StoreSetupScreen(groupId: groupId),
+                builder: (_) =>
+                    StoreSetupScreen(groupId: groupId, isFromSettings: false),
               ),
             ),
             icon: const Icon(Icons.add),
@@ -255,6 +256,13 @@ class _StoreDashboardScreenState extends State<StoreDashboardScreen> {
             subtitle: 'تخصيص المظهر والمعلومات',
             onTap: () {
               // TODO: شاشة الإعدادات
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      StoreSetupScreen(groupId: store.id, isFromSettings: true),
+                ),
+              );
             },
           ),
           _buildMenuItem(

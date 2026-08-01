@@ -13,7 +13,7 @@ class StoreCartScreen extends StatefulWidget {
   const StoreCartScreen({
     super.key,
     required this.groupId,
-    this.shippingFee = 50,
+    required this.shippingFee,
     required this.makeSetStateOnCartChange,
   });
 
