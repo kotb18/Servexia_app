@@ -393,7 +393,7 @@ class _InvoicePageState extends State<InvoicePage>
           state.showNotes = data['showNotes'] ?? true;
           state.showTax = data['showTax'] ?? true;
           state.showDiscount = data['showDiscount'] ?? true;
-          state.lastInvoiceNumber = data['lastInvoiceNumber'] ?? 1;
+          state.lastInvoiceNumber = data['lastInvoiceNumber'] ?? 0;
         });
       }
 
@@ -1388,9 +1388,9 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     // تحديث رقم آخر فاتورة
     final invoiceMainRef = firestore.collection('invoices').doc(widget.groupId);
 
-    batch.update(invoiceMainRef, {
+    batch.set(invoiceMainRef, {
       'lastInvoiceNumber': widget.state.lastInvoiceNumber + 1,
-    });
+    }, SetOptions(merge: true));
 
     // تحديث المخزون
     if (widget.invoiceType.affectsStock &&

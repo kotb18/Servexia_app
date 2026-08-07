@@ -1,6 +1,10 @@
+import 'dart:convert';
+
+import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_pagination/firebase_pagination.dart';
 import 'package:flutter/material.dart';
+import 'package:maintenance/addAwarehouseItem.dart';
 import 'package:maintenance/invoicePage.dart';
 import 'package:maintenance/wareHouseItemeMovement.dart';
 import 'package:pdf/pdf.dart';
@@ -40,7 +44,11 @@ class _StoreScreenState extends State<StoreScreen> {
   String searchText = '';
   bool deletedItems = false;
   final searchController = TextEditingController();
+  TextEditingController nameController = TextEditingController();
+  TextEditingController skuController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  String scannedId = '';
+  double selectedQuantity = 0.0;
 
   /// تحميل المواقع
   Future<List<String>> loadLocations() async {
@@ -101,6 +109,18 @@ class _StoreScreenState extends State<StoreScreen> {
   TextEditingController itemQuantityController = TextEditingController();
   TextEditingController itemPriceController = TextEditingController();
   TextEditingController itemBuyController = TextEditingController();
+
+  void _showError(String msg) {
+    AwesomeDialog(
+      context: context,
+      dialogType: DialogType.error,
+      title: "خطأ",
+      desc: msg,
+      btnOkText: 'حسنـــــأً',
+      btnOkOnPress: () {},
+    ).show();
+  }
+
   @override
   void initState() {
     // TODO: implement initState
@@ -229,6 +249,196 @@ class _StoreScreenState extends State<StoreScreen> {
           'المخزن',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
+        actions: [
+          TextButton.icon(
+            onPressed: () async {
+              T? getDynamicValue<T>(
+                Map<String, dynamic> data,
+                List<String> keys,
+              ) {
+                for (String key in keys) {
+                  if (data.containsKey(key) && data[key] != null) {
+                    // Attempt to cast to the desired type, or convert if possible
+                    if (T == String) {
+                      return data[key].toString() as T;
+                    } else if (T == double) {
+                      return double.tryParse(data[key].toString()) as T?;
+                    } else if (T == int) {
+                      return int.tryParse(data[key].toString()) as T?;
+                    } else {
+                      return data[key] as T;
+                    }
+                  }
+                }
+                return null;
+              }
+
+              final scanResult = await Navigator.push<Map<String, dynamic>>(
+                context,
+                MaterialPageRoute(builder: (_) => const QrScanScreen()),
+              );
+
+              if (scanResult == null) return;
+
+              final String raw = scanResult['raw'] ?? '';
+              final String format = scanResult['format'] ?? '';
+
+              if (raw.isEmpty) {
+                _showError("لم يتم قراءة أي بيانات");
+                return;
+              }
+
+              print("RAW: $raw");
+              print("FORMAT: $format");
+              print("TYPE >>> ${raw.runtimeType}");
+              // 🧠 1. محاولة تحليل JSON
+              try {
+                final data = jsonDecode(raw);
+
+                if (data is Map<String, dynamic>) {
+                  // Try multiple common keys for product name
+                  final name =
+                      getDynamicValue<String>(data, [
+                        'name',
+                        'title',
+                        'product_name',
+                      ]) ??
+                      '';
+                  // Try multiple common keys for barcode
+                  final barcode =
+                      getDynamicValue<String>(data, [
+                        'barcode',
+                        'upc',
+                        'ean',
+                        'sku',
+                        'code',
+                      ]) ??
+                      '';
+                  // Try multiple common keys for price
+                  final price =
+                      getDynamicValue<double>(data, [
+                        'price',
+                        'unit_price',
+                        'item_price',
+                      ]) ??
+                      0.0;
+
+                  print("JSON QR");
+                  print('name: $name');
+                  print('barcode: $barcode');
+                  print('price: $price');
+
+                  return;
+                }
+              } catch (_) {}
+
+              // 🟡 2. Barcode (أرقام فقط)
+              if (RegExp(r'^[0-9]+$').hasMatch(raw) && !widget.isFromInvoice) {
+                print("Barcode Detected");
+
+                skuController.text = raw;
+                setState(() {
+                  scannedId = raw;
+                });
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => InventoryItemDetailsScreenRefactored(
+                      groupId: widget.groupId,
+                      itemId: raw,
+                      deletedItems: deletedItems,
+                    ),
+                  ),
+                );
+              } else if (RegExp(r'^[0-9]+$').hasMatch(raw) &&
+                  widget.isFromInvoice) {
+                print("Barcode Detected");
+
+                skuController.text = raw;
+                setState(() {
+                  scannedId = raw;
+
+                  final index = itemsList.indexWhere(
+                    (item) => item['sku'] == scannedId,
+                  );
+
+                  if (index == -1) return;
+
+                  setState(() {
+                    if (!selectedIndex.contains(index)) {
+                      items.add({
+                        'id': itemsList[index]['sku'],
+                        'isInventoryItem': true,
+                        'name': itemsList[index]['name'],
+                        'quantity': counters[index] > 0 ? counters[index] : 1.0,
+                        'unit': itemsList[index]['unit'],
+                        'sku': itemsList[index]['sku'] ?? '',
+                        'price': itemsList[index]['price'] ?? 0,
+                        'location': itemsList[index]['location'],
+                        'notes': itemsList[index]['notes'],
+                        'createdAt': FieldValue.serverTimestamp(),
+                        'deleted': false,
+
+                        'coast': itemBuyController.text.isNotEmpty
+                            ? double.tryParse(itemBuyController.text)
+                            : 0.0,
+                      });
+                      selectedIndex.add(index);
+                      buttonText = ' اضافة ${selectedIndex.length} عنصر';
+                    }
+                    counters[index]++;
+                    items
+                        .where((item) => item['id'] == itemsList[index]['sku'])
+                        .forEach((item) {
+                          item['quantity'] = counters[index] > 0
+                              ? counters[index]
+                              : 1;
+                        });
+                  });
+                });
+              }
+
+              // 🌐 3. Link
+              if (raw.startsWith("http")) {
+                print("Link Detected");
+
+                skuController.text = raw;
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("تم قراءة رابط، تأكد من استخدامه بشكل صحيح"),
+                  ),
+                );
+                return;
+              }
+
+              // 🟠 4. نص عادي
+              print("Plain Text");
+
+              nameController.text = raw;
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("تم ملء الاسم من الكود، راجع البيانات"),
+                ),
+              );
+            },
+            icon: const Icon(Icons.qr_code_scanner, size: 24),
+            label: const Text(
+              'امسح الباركود',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            style: ElevatedButton.styleFrom(
+              foregroundColor: Colors.black,
+              elevation: 6,
+              shadowColor: Colors.black.withOpacity(0.3),
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -380,17 +590,27 @@ class _StoreScreenState extends State<StoreScreen> {
                       itemBuilder: (context, docs, index) {
                         final doc = docs[index];
                         final data = doc.data() as Map<String, dynamic>;
-                        itemsList.add(data);
+                        if (index != 0) {
+                          itemsList = docs
+                              .map((doc) => doc.data() as Map<String, dynamic>)
+                              .toList();
+                        }
                         final id = doc.id;
-                        isSelected = selectedIndex.contains(index);
+
+                        isSelected =
+                            selectedIndex.contains(index) || id == scannedId;
+                        if (isSelected) {
+                          print('hmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaam');
+                        }
+
                         if (items.isNotEmpty) {
-                          items.where((item) => item['id'] == id).forEach((
+                          items.where((item) => item['sku'] == id).forEach((
                             item,
                           ) {
                             counters[index] = item['quantity'];
                           });
                         }
-                        double selectedQuantity = 0.0;
+
                         selectedQuantity = counters[index];
                         return Stack(
                           children: [
@@ -429,7 +649,7 @@ class _StoreScreenState extends State<StoreScreen> {
 
                                     counters[index]++;
                                     items
-                                        .where((item) => item['id'] == id)
+                                        .where((item) => item['sku'] == id)
                                         .forEach((item) {
                                           item['quantity'] = counters[index] > 0
                                               ? counters[index]
