@@ -370,7 +370,9 @@ class _StoreScreenState extends State<StoreScreen> {
                         'id': itemsList[index]['sku'],
                         'isInventoryItem': true,
                         'name': itemsList[index]['name'],
-                        'quantity': counters[index] > 0 ? counters[index] : 1.0,
+                        'quantity': counters[index] > 0
+                            ? counters[index].toDouble()
+                            : 1.0,
                         'unit': itemsList[index]['unit'],
                         'sku': itemsList[index]['sku'] ?? '',
                         'price': itemsList[index]['price'] ?? 0,
@@ -391,7 +393,7 @@ class _StoreScreenState extends State<StoreScreen> {
                         .where((item) => item['id'] == itemsList[index]['sku'])
                         .forEach((item) {
                           item['quantity'] = counters[index] > 0
-                              ? counters[index]
+                              ? counters[index].toDouble()
                               : 1;
                         });
                   });
@@ -607,11 +609,12 @@ class _StoreScreenState extends State<StoreScreen> {
                           items.where((item) => item['sku'] == id).forEach((
                             item,
                           ) {
-                            counters[index] = item['quantity'];
+                            counters[index] =
+                                item['quantity'].toDouble() ?? 1.0;
                           });
                         }
 
-                        selectedQuantity = counters[index];
+                        selectedQuantity = counters[index].toDouble();
                         return Stack(
                           children: [
                             GestureDetector(
@@ -624,7 +627,7 @@ class _StoreScreenState extends State<StoreScreen> {
                                         'isInventoryItem': true,
                                         'name': data['name'],
                                         'quantity': counters[index] > 0
-                                            ? counters[index]
+                                            ? counters[index].toDouble()
                                             : 1.0,
                                         'unit': data['unit'],
                                         'sku': data['sku'] ?? '',
@@ -652,8 +655,8 @@ class _StoreScreenState extends State<StoreScreen> {
                                         .where((item) => item['sku'] == id)
                                         .forEach((item) {
                                           item['quantity'] = counters[index] > 0
-                                              ? counters[index]
-                                              : 1;
+                                              ? counters[index].toDouble()
+                                              : 1.0;
                                         });
                                   });
                                 } else {

@@ -1213,7 +1213,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           maintenanceItems.map(
             (item) => {
               "name": item['name'],
-              "quantity": item['quantity'] ?? 1,
+              "quantity": double.tryParse(item['quantity'].toString()) ?? 1,
               "price": item['price'] ?? 0,
               "total": (item['quantity'] ?? 1) * (item['price'] ?? 0),
               "isManual": true,
@@ -1227,9 +1227,9 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           widget.itemsPurchase.map(
             (item) => {
               "name": item['name'],
-              "quantity": item['quantity'] ?? 0,
+              "quantity": double.tryParse(item['quantity'].toString()) ?? 1,
               "price": item['price'] ?? 0,
-              "total": (item['quantity'] ?? 0) * (item['price'] ?? 0),
+              "total": (item['quantity'] ?? 1) * (item['price'] ?? 0),
               'itemId': item['id'] ?? '',
             },
           ),
@@ -1240,9 +1240,9 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           widget.itemsSale.map(
             (item) => {
               "name": item['name'],
-              "quantity": item['quantity'] ?? 0,
+              "quantity": double.tryParse(item['quantity'].toString()) ?? 1,
               "price": item['price'] ?? 0,
-              "total": (item['quantity'] ?? 0) * (item['price'] ?? 0),
+              "total": (item['quantity'] ?? 1) * (item['price'] ?? 0),
               "isManual": item['isManual'] ?? false,
               'itemId': item['id'] ?? '',
             },
@@ -1254,9 +1254,9 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           returnItems.map(
             (item) => {
               "name": item['name'],
-              "quantity": item['quantity'] ?? 0,
+              "quantity": double.tryParse(item['quantity'].toString()) ?? 1,
               "price": item['price'] ?? 0,
-              "total": (item['quantity'] ?? 0).abs() * (item['price'] ?? 0),
+              "total": (item['quantity'] ?? 1).abs() * (item['price'] ?? 0),
               "isReturn": true,
               'itemId':
                   item['id'] ?? '', // FIX: Include itemId for stock restoration
@@ -1269,13 +1269,15 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           widget.itemsSale.map(
             (item) => {
               "name": item['name'],
-              "quantity": item['quantity'] ?? 0,
+              "quantity": (num.tryParse(item['quantity'].toString()) ?? 1.0)
+                  .toDouble(),
               "price": item['price'] ?? 0,
-              "total": (item['quantity'] ?? 0).abs() * (item['price'] ?? 0),
+              "total": (item['quantity'] ?? 1.0).abs() * (item['price'] ?? 0),
               'itemId': item['id'] ?? '',
             },
           ),
         );
+        print('Items for invoice: $items');
     }
 
     return {

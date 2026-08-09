@@ -403,7 +403,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
           children: [
             TextButton.icon(
               onPressed: () async {
-                nameController.clear();
+                //  nameController.clear();
                 skuController.clear();
                 qtyController.clear();
                 unitController.clear();

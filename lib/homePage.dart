@@ -6,7 +6,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:maintenance/JoinGroup.dart';
-import 'package:maintenance/admin/mainAdmin.dart';
 import 'package:maintenance/createGroup.dart';
 import 'package:maintenance/signIn.dart';
 import 'package:maintenance/workSpace.dart';
@@ -701,7 +700,7 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
 
   void _handleTap(BuildContext context, Map<String, dynamic> group) async {
     setState(() {
-      isLoading = true;
+      isLoading = false;
     });
     // Subscription Logic from original code
     final adminId = group['adminId'];

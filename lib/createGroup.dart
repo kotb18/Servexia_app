@@ -547,6 +547,7 @@ class _CreategroupState extends State<Creategroup> {
                                     : 'تم تسجيل الوجه ✔',
                               ),
                               onPressed: () async {
+                                FocusManager.instance.primaryFocus?.unfocus();
                                 final result =
                                     await Navigator.push<List<double>>(
                                       context,
