@@ -259,7 +259,7 @@ class InvoicePage extends StatefulWidget {
     required this.itemsPurchase,
     required this.type,
     this.invoice,
-    this.isEditMode = false,
+    required this.isEditMode,
     required this.isFormStore,
     this.orderId,
   });
@@ -292,7 +292,7 @@ class _InvoicePageState extends State<InvoicePage>
   late double totalBeforeReturn = 0.0;
   late double totalPaidInstallments = 0.0;
   late String paymentMethodReturn = '';
-
+  late bool isEditMode;
   final List<InvoiceTypeModel> invoiceTypes = [
     const InvoiceTypeModel(
       title: 'فاتورة بيع',
@@ -358,6 +358,7 @@ class _InvoicePageState extends State<InvoicePage>
     super.initState();
     selectedFilter = widget.type;
     state = InvoiceState();
+    isEditMode = widget.isEditMode;
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -521,7 +522,7 @@ class _InvoicePageState extends State<InvoicePage>
     returnItems.clear();
     late Invoice? result;
     if (!mounted) return;
-    await Navigator.push(
+    final result0 = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => MyInvoicesPage(
@@ -530,33 +531,30 @@ class _InvoicePageState extends State<InvoicePage>
           customerId: widget.customerId,
           customerName: widget.name,
           isFromCustomerScreen: false,
-          onInvoiceSelected: (invoice) {
-            result = invoice; // استلم الفاتورة المختارة
-            // هنا تستلم البيانات في الصفحة البعيدة مباشرة
-            print("تم استلام الفاتورة: ${invoice.invoiceNumber}");
-          },
         ),
         // settings: RouteSettings(name: '/MyInvoices'), // اختياري لتسمية المسار
       ),
     );
-    if (result != null && result is Invoice) {
-      debugPrint('Selected original invoice: ${result!.invoiceNumber}');
+    result = result0['invoice'] as Invoice?;
+    isEditMode = result0['isEditMode'] ?? false;
+    if (result != null) {
+      debugPrint('Selected original invoice: ${result.invoiceNumber}');
       setState(() {
         state.originalInvoiceId = result!.id;
-        state.originalInvoiceNumber = result!.invoiceNumber;
+        state.originalInvoiceNumber = result.invoiceNumber;
 
         // Auto-fill customer data from original invoice
-        final customer = result!.customer;
+        final customer = result.customer;
         nameController.text = customer.name ?? '';
         phoneController.text = customer.phone ?? '';
         addressController.text = customer.address ?? '';
-        selectedFilter = result!.type;
-        selectedPaymentMethod = result!.paymentMethod;
-        discountController.text = result!.summary.discountPercent.toString();
-        taxController.text = result!.summary.taxPercent.toString();
+        selectedFilter = result.type;
+        selectedPaymentMethod = result.paymentMethod;
+        discountController.text = result.summary.discountPercent.toString();
+        taxController.text = result.summary.taxPercent.toString();
         // Copy payment schedule
         state.paymentScheduleData.clear();
-        for (var installment in result!.installments) {
+        for (var installment in result.installments) {
           state.paymentScheduleData.add({
             "type": installment.type,
             "value": installment.value,
@@ -570,8 +568,8 @@ class _InvoicePageState extends State<InvoicePage>
         // Copy items for return (preserve item IDs for stock restoration)
         widget.itemsSale.clear();
         widget.itemsPurchase.clear();
-        for (var item in result!.items) {
-          result!.type == 'بيع'
+        for (var item in result.items) {
+          result.type == 'بيع'
               ? widget.itemsSale.add({
                   'name': item.name,
                   'quantity': item.quantity,
@@ -582,7 +580,7 @@ class _InvoicePageState extends State<InvoicePage>
                 '', */
                   // FIX: Preserve item ID for stock restoration
                 })
-              : result!.type == 'شراء'
+              : result.type == 'شراء'
               ? widget.itemsPurchase.add({
                   'name': item.name,
                   'quantity': item.quantity,
@@ -612,7 +610,7 @@ class _InvoicePageState extends State<InvoicePage>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'تم اختيار الفاتورة الأصلية: ${result!.invoiceNumber}',
+              'تم اختيار الفاتورة الأصلية: ${result.invoiceNumber}',
             ),
             backgroundColor: AppColors.success,
           ),
@@ -682,7 +680,7 @@ class _InvoicePageState extends State<InvoicePage>
       },
       child: Scaffold(
         backgroundColor: _getBackgroundColor(selectedFilter),
-        floatingActionButton: !widget.isEditMode
+        floatingActionButton: !isEditMode
             ? FloatingActionButton.extended(
                 onPressed: () async {
                   _resetForNewType('بيع');
@@ -701,7 +699,7 @@ class _InvoicePageState extends State<InvoicePage>
             : null,
         appBar: AppBar(
           title: Text(
-            !widget.isEditMode ? 'تسجيل فاتورة جديدة' : 'تعديل فاتورة',
+            !isEditMode ? 'تسجيل فاتورة جديدة' : 'تعديل فاتورة',
             style: const TextStyle(fontSize: 18),
           ),
           actions: [
@@ -737,7 +735,7 @@ class _InvoicePageState extends State<InvoicePage>
         body: Column(
           children: [
             // Filter Chips
-            if (!widget.isEditMode)
+            if (!isEditMode)
               Container(
                 height: 80,
                 padding: const EdgeInsets.symmetric(
@@ -787,7 +785,7 @@ class _InvoicePageState extends State<InvoicePage>
               ),
 
             // Type hint
-            if (_getTypeHint(selectedFilter).isNotEmpty && !widget.isEditMode)
+            if (_getTypeHint(selectedFilter).isNotEmpty && !isEditMode)
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -805,7 +803,7 @@ class _InvoicePageState extends State<InvoicePage>
               ),
 
             // Return invoice selector
-            if (selectedFilter == 'مرتجع' && !widget.isEditMode)
+            if (selectedFilter == 'مرتجع' && !isEditMode)
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 padding: const EdgeInsets.all(12),
@@ -882,7 +880,7 @@ class _InvoicePageState extends State<InvoicePage>
                       isFromConstCustomers: widget.isFromConstCustomers,
                       state: state,
                       invoiceType: selectedType,
-                      isEditMode: widget.isEditMode,
+                      isEditMode: isEditMode,
                       totalBeforeReturn: totalBeforeReturn,
                       totalPaidInstallments: totalPaidInstallments,
                       isFromStore: widget.isFormStore,
@@ -1955,6 +1953,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                             : widget.itemsPurchase,
                         isFromInvoice: true,
                         invoiceType: widget.type,
+                        isEditMode: widget.isEditMode,
                       ),
                     ),
                   );
@@ -2215,6 +2214,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                     deletedItems: widget.state.total == 0.0,
                     invoiceType: widget.type,
                     customerId: widget.customerId,
+                    isEditMode: widget.isEditMode,
                   ),
                 ),
               );
@@ -2250,6 +2250,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                     deletedItems: widget.state.total == 0.0,
                     invoiceType: widget.type,
                     customerId: widget.customerId,
+                    isEditMode: widget.isEditMode,
                   ),
                 ),
               );
@@ -2273,6 +2274,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                         deletedItems: widget.state.total == 0.0,
                         invoiceType: widget.type,
                         customerId: widget.customerId,
+                        isEditMode: widget.isEditMode,
                       ),
                     ),
                   );
@@ -2286,6 +2288,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                         invoiceType: widget.type,
                         isFromInvoice: true,
                         customerId: widget.customerId,
+                        isEditMode: widget.isEditMode,
                       ),
                     ),
                   );

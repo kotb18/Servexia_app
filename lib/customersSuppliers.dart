@@ -32,6 +32,7 @@ class CustomersSuppliers extends StatefulWidget {
     required this.invoiceType,
     required this.itemsSale,
     required this.itemsPruchase,
+    required this.isEditMode,
   });
   final String groupId;
   final bool isFromInvoice;
@@ -39,6 +40,7 @@ class CustomersSuppliers extends StatefulWidget {
   final List<Map> itemsSale;
   final List<Map> itemsPruchase;
   static const String screenroute = '/customersSuppliers';
+  final bool isEditMode;
 
   @override
   State<CustomersSuppliers> createState() => _CustomersSuppliersState();
@@ -262,6 +264,8 @@ class _CustomersSuppliersState extends State<CustomersSuppliers> {
                 isFromWorkSpace: false,
                 type: widget.invoiceType,
                 isFormStore: false,
+                isEditMode: widget
+                    .isEditMode, // Pass the isFromInvoice value to isEditMode
               ),
             ),
           );

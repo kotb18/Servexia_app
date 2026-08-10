@@ -36,6 +36,8 @@ class StoreProductDetailScreen extends StatefulWidget {
 
 class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
   final _storeService = StoreService();
+  final CarouselSliderController _carouselController =
+      CarouselSliderController();
 
   StoreModel? _store;
   bool _isLoadingStore = true;
@@ -70,6 +72,11 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     _loadStoreData();
   }
 
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
   Future<void> _loadStoreData() async {
     try {
       final store = await _storeService.getStoreById(widget.groupId);
@@ -84,7 +91,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     }
   }
 
-  /// ─── Dynamic Theme Helpers ───
   Color get primaryColor => _store != null
       ? _hexToColor(_store!.primaryColor)
       : const Color(0xFF2196F3);
@@ -98,7 +104,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
 
   String get storeName => _store?.name ?? 'متجر';
 
-  /// ─── Helpers ───
   Map<String, dynamic>? _getColorData(String colorValue) {
     try {
       return _availableColors.firstWhere((c) => c['value'] == colorValue);
@@ -121,7 +126,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
   Future<void> _shareProductLink() async {
     await Share.share(
       '${widget.item.name}\n'
-      'السعر: ${widget.item.effectiveStorePrice.toStringAsFixed(2)}\n'
+      'السعر: ${widget.item.effectiveStorePrice.toStringAsFixed(2)} ر.س\n'
       '${_generateProductLink()}',
       subject: widget.item.name,
     );
@@ -250,9 +255,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     );
   }
 
-  /// ═══════════════════════════════════════════════════════════════════════
-  /// 🏗️ MAIN BUILD - Responsive Layout
-  /// ═══════════════════════════════════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
     if (_isLoadingStore) {
@@ -266,7 +268,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     final size = MediaQuery.of(context).size;
     final isMobile = size.width < 800;
 
-    // 🎨 Product data
     final item = widget.item;
     final hasColors = item.colors != null && item.colors!.isNotEmpty;
     final hasSizes = item.sizes != null && item.sizes!.isNotEmpty;
@@ -282,9 +283,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     );
   }
 
-  /// ═══════════════════════════════════════════════════════════════════════
-  /// 📱 MOBILE LAYOUT (Single Column)
-  /// ═══════════════════════════════════════════════════════════════════════
   Widget _buildMobileLayout(
     InventoryItemModel item,
     bool hasColors,
@@ -328,9 +326,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     );
   }
 
-  /// ═══════════════════════════════════════════════════════════════════════
-  /// 💻 WEB LAYOUT (Two Columns)
-  /// ═══════════════════════════════════════════════════════════════════════
   Widget _buildWebLayout(
     InventoryItemModel item,
     bool hasColors,
@@ -345,10 +340,8 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 🖼️ Left: Image Gallery
                 Expanded(flex: 5, child: _buildWebImageGallery(item)),
                 const SizedBox(width: 40),
-                // 📝 Right: Product Details
                 Expanded(
                   flex: 4,
                   child: Column(
@@ -380,9 +373,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     );
   }
 
-  /// ═══════════════════════════════════════════════════════════════════════
-  /// 🖼️ IMAGE GALLERY (Mobile SliverAppBar)
-  /// ═══════════════════════════════════════════════════════════════════════
   Widget _buildSliverImageAppBar(InventoryItemModel item) {
     return SliverAppBar(
       expandedHeight: 380,
@@ -408,12 +398,24 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
   }
 
   /// ═══════════════════════════════════════════════════════════════════════
-  /// 🖼️ WEB IMAGE GALLERY
+  /// 🖼️ WEB IMAGE GALLERY — مع CarouselSlider + Thumbnails
   /// ═══════════════════════════════════════════════════════════════════════
   Widget _buildWebImageGallery(InventoryItemModel item) {
+    if (item.imagesList.isEmpty) {
+      return Container(
+        height: 500,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: _buildPlaceholder(),
+      );
+    }
+
     return Column(
       children: [
-        // Main Image
+        // Main Carousel
         Container(
           height: 500,
           decoration: BoxDecoration(
@@ -423,14 +425,76 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(20),
-            child: item.imagesList.isNotEmpty
-                ? WebImage(
-                    src: item.imagesList[_currentImage],
-                    width: double.infinity,
+            child: Stack(
+              children: [
+                CarouselSlider(
+                  carouselController: _carouselController,
+                  options: CarouselOptions(
                     height: 500,
-                    fit: BoxFit.contain,
-                  )
-                : _buildPlaceholder(),
+                    viewportFraction: 1,
+                    enableInfiniteScroll: item.imagesList.length > 1,
+                    onPageChanged: (index, _) {
+                      setState(() => _currentImage = index);
+                    },
+                  ),
+                  items: item.imagesList.map((url) {
+                    return WebImage(
+                      src: url,
+                      width: double.infinity,
+                      height: 500,
+                      fit: BoxFit.contain,
+                    );
+                  }).toList(),
+                ),
+                if (item.imagesList.length > 1)
+                  Positioned(
+                    bottom: 16,
+                    right: 16,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.6),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${_currentImage + 1} / ${item.imagesList.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                if (!item.isInStock)
+                  Container(
+                    color: Colors.black.withOpacity(0.5),
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 28,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade600,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          'غير متوفر حالياً',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 16),
@@ -445,7 +509,10 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
               itemBuilder: (context, index) {
                 final isSelected = _currentImage == index;
                 return InkWell(
-                  onTap: () => setState(() => _currentImage = index),
+                  onTap: () {
+                    setState(() => _currentImage = index);
+                    _carouselController.animateToPage(index);
+                  },
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     width: 80,
@@ -472,9 +539,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     );
   }
 
-  /// ═══════════════════════════════════════════════════════════════════════
-  /// 🎠 IMAGE CAROUSEL (Shared)
-  /// ═══════════════════════════════════════════════════════════════════════
   Widget _buildImageCarousel(
     InventoryItemModel item, {
     required double height,
@@ -544,12 +608,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                 decoration: BoxDecoration(
                   color: Colors.red.shade600,
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.red.withOpacity(0.3),
-                      blurRadius: 12,
-                    ),
-                  ],
                 ),
                 child: const Text(
                   'غير متوفر حالياً',
@@ -566,14 +624,10 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     );
   }
 
-  /// ═══════════════════════════════════════════════════════════════════════
-  /// 🏷️ PRODUCT HEADER (Name + Price)
-  /// ═══════════════════════════════════════════════════════════════════════
   Widget _buildProductHeader(InventoryItemModel item) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Store badge
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
@@ -590,8 +644,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
           ),
         ),
         const SizedBox(height: 12),
-
-        // Product Name
         Text(
           item.name,
           style: const TextStyle(
@@ -602,8 +654,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
           ),
         ),
         const SizedBox(height: 16),
-
-        // Price Row
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
@@ -647,8 +697,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
             ],
           ],
         ),
-
-        // Description
         if (item.storeDescription != null &&
             item.storeDescription!.isNotEmpty) ...[
           const SizedBox(height: 20),
@@ -674,9 +722,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     );
   }
 
-  /// ═══════════════════════════════════════════════════════════════════════
-  /// 🎨 COLORS SECTION
-  /// ═══════════════════════════════════════════════════════════════════════
   Widget _buildColorsSection(List<String> colors) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -788,9 +833,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     );
   }
 
-  /// ═══════════════════════════════════════════════════════════════════════
-  /// 📏 SIZES SECTION
-  /// ═══════════════════════════════════════════════════════════════════════
   Widget _buildSizesSection(List<String> sizes) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -867,9 +909,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     );
   }
 
-  /// ═══════════════════════════════════════════════════════════════════════
-  /// 🔢 QUANTITY SELECTOR
-  /// ═══════════════════════════════════════════════════════════════════════
   Widget _buildQuantitySelector(InventoryItemModel item) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -949,9 +988,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     );
   }
 
-  /// ═══════════════════════════════════════════════════════════════════════
-  /// ℹ️ ADDITIONAL INFO
-  /// ═══════════════════════════════════════════════════════════════════════
   Widget _buildAdditionalInfo(InventoryItemModel item) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -1008,9 +1044,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     );
   }
 
-  /// ═══════════════════════════════════════════════════════════════════════
-  /// 📱 MOBILE BOTTOM BAR
-  /// ═══════════════════════════════════════════════════════════════════════
   Widget _buildMobileBottomBar(
     InventoryItemModel item,
     bool hasColors,
@@ -1085,9 +1118,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     );
   }
 
-  /// ═══════════════════════════════════════════════════════════════════════
-  /// 💻 WEB ADD TO CART BUTTON
-  /// ═══════════════════════════════════════════════════════════════════════
   Widget _buildWebAddToCartButton(
     InventoryItemModel item,
     bool hasColors,
@@ -1110,7 +1140,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
       btnText = 'اختر المقاس أولاً';
     } else {
       btnText =
-          'إضافة للسلة - ${(item.effectiveStorePrice * _quantity).toStringAsFixed(2)}';
+          'إضافة للسلة - ${(item.effectiveStorePrice * _quantity).toStringAsFixed(2)} ر.س';
     }
 
     return SizedBox(
@@ -1146,9 +1176,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     );
   }
 
-  /// ═══════════════════════════════════════════════════════════════════════
-  /// 🔘 CIRCULAR ICON BUTTON (AppBar)
-  /// ═══════════════════════════════════════════════════════════════════════
   Widget _buildCircularButton({
     required IconData icon,
     required VoidCallback onTap,
@@ -1193,9 +1220,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     );
   }
 
-  /// ═══════════════════════════════════════════════════════════════════════
-  /// 🛒 ADD TO CART LOGIC
-  /// ═══════════════════════════════════════════════════════════════════════
   void _addToCart() async {
     if (FirebaseAuth.instance.currentUser == null) {
       final result = await Navigator.push(

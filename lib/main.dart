@@ -304,6 +304,7 @@ final GoRouter _router = GoRouter(
           isFromInvoice: state.uri.queryParameters['isFromInvoice'] == 'true',
           invoiceType: state.uri.queryParameters['invoiceType'] ?? '',
           customerId: state.uri.queryParameters['customerId'] ?? '',
+          isEditMode: state.uri.queryParameters['isEditMode'] == 'true',
         );
       },
     ),
@@ -318,6 +319,7 @@ final GoRouter _router = GoRouter(
           deletedItems: state.uri.queryParameters['deletedItems'] == 'true',
           invoiceType: state.uri.queryParameters['invoiceType'] ?? '',
           customerId: state.uri.queryParameters['customerId'] ?? '',
+          isEditMode: state.uri.queryParameters['isEditeMode'] == 'true',
         );
       },
     ),
@@ -373,6 +375,7 @@ final GoRouter _router = GoRouter(
         isFromWorkSpace: state.uri.queryParameters['isFromWorkSpace'] == 'true',
         type: state.uri.queryParameters['type'] ?? '',
         isFormStore: state.uri.queryParameters['isFormStore'] == 'true',
+        isEditMode: state.uri.queryParameters['isEditMode'] == 'true',
       ),
     ),
     GoRoute(
@@ -386,6 +389,7 @@ final GoRouter _router = GoRouter(
           itemsSale: [],
           itemsPruchase: [],
           invoiceType: state.uri.queryParameters['invoiceType'] ?? '',
+          isEditMode: state.uri.queryParameters['isEditMode'] == 'true',
         );
       },
     ),

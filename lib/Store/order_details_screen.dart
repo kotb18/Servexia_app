@@ -120,6 +120,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         MaterialPageRoute(
                           builder: (_) => InvoicePage(
                             groupId: widget.order.storeId,
+                            isEditMode: false,
                             itemsSale: widget.order.items
                                 .map(
                                   (item) => {

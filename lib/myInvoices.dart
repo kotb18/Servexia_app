@@ -166,7 +166,10 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
       ); // عد للوجهة مباشرة
     } else {
       if (!mounted) return;
-      Navigator.pop(context, invoice); // الوضع العادي
+      Navigator.pop(context, {
+        'invoice': invoice,
+        'isEditMode': true,
+      }); // الوضع العادي
     }
   }
 
@@ -1108,14 +1111,13 @@ class InvoiceCard extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     spacing: 10,
                     children: [
-                      if (onEdit != null && invoice.type != 'مرتجع')
+                      /*  if (onEdit != null && invoice.type != 'مرتجع')
                         _actionButton(
                           text: 'تعديل',
                           icon: Icons.edit_rounded,
                           color: Colors.blue,
                           onTap: onEdit!,
-                        ),
-
+                        ), */
                       if (onPrint != null)
                         _actionButton(
                           text: 'طباعة',

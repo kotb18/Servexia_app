@@ -18,12 +18,14 @@ class AddInventoryItemScreen extends StatefulWidget {
   final bool isFromInvoice;
   final String invoiceType;
   final String customerId;
+  final bool isEditMode;
   const AddInventoryItemScreen({
     super.key,
     required this.groupId,
     required this.isFromInvoice,
     required this.invoiceType,
     required this.customerId,
+    required this.isEditMode,
   });
   static const String screenroute = 'addInventoryItem';
 
@@ -274,6 +276,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
         MaterialPageRoute(
           builder: (_) => InvoicePage(
             groupId: widget.groupId,
+            isEditMode: widget.isEditMode,
             itemsSale: [],
             itemsPurchase: [
               {
