@@ -11,7 +11,6 @@ class InventoryStoreService {
   /// جلب كل الأصناف (للتاجر)
   Stream<List<InventoryItemModel>> getAllItems(String groupId) {
     return _itemsCollection(groupId)
-        .where('deleted', isEqualTo: false)
         .orderBy('name')
         .snapshots()
         .map(
@@ -33,17 +32,20 @@ class InventoryStoreService {
   }
 
   /// جلب الأصناف المُفعلة في المتجر فقط (للعملاء)
-  Stream<List<InventoryItemModel>> getStoreItems(String groupId) {
-    return _itemsCollection(groupId)
-        .where('deleted', isEqualTo: false)
+  Query getStoreItemsQuery(String groupId, {String? searchQuery}) {
+    Query query = _itemsCollection(groupId)
         .where('isInStore', isEqualTo: true)
         .where('quantity', isGreaterThan: 0.0)
-        .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => InventoryItemModel.fromFirestore(doc))
-              .toList(),
-        );
+        .orderBy('name');
+
+    if (searchQuery != null && searchQuery.isNotEmpty) {
+      final lower = searchQuery.toLowerCase();
+      query = query
+          .where('name', isGreaterThanOrEqualTo: lower)
+          .where('name', isLessThanOrEqualTo: '$lower\uf8ff');
+    }
+
+    return query;
   }
 
   /// تفعيل صنف في المتجر

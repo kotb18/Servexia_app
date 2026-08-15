@@ -69,7 +69,7 @@ class StoreOrderService {
   }
 
   // جلب طلبات المتجر (للتاجر)
-  Stream<List<StoreOrderModel>> getStoreOrders(
+  Query getStoreOrdersQuery(
     String storeId, {
     OrderStatus? status,
     DateTime? fromDate,
@@ -84,11 +84,15 @@ class StoreOrderService {
       query = query.where('status', isEqualTo: status.name);
     }
 
-    return query.snapshots().map(
-      (snapshot) => snapshot.docs
-          .map((doc) => StoreOrderModel.fromFirestore(doc))
-          .toList(),
-    );
+    if (fromDate != null) {
+      query = query.where('createdAt', isGreaterThanOrEqualTo: fromDate);
+    }
+
+    if (toDate != null) {
+      query = query.where('createdAt', isLessThanOrEqualTo: toDate);
+    }
+
+    return query;
   }
 
   // جلب طلبات العميل

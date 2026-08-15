@@ -19,6 +19,7 @@ class AddInventoryItemScreen extends StatefulWidget {
   final String invoiceType;
   final String customerId;
   final bool isEditMode;
+  final List itemsPurchase;
   const AddInventoryItemScreen({
     super.key,
     required this.groupId,
@@ -26,6 +27,7 @@ class AddInventoryItemScreen extends StatefulWidget {
     required this.invoiceType,
     required this.customerId,
     required this.isEditMode,
+    required this.itemsPurchase,
   });
   static const String screenroute = 'addInventoryItem';
 
@@ -284,19 +286,22 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                 'isInventoryItem': false,
                 'name': nameController.text.trim(),
                 'sku': skuController.text.trim(),
-                'quantity': int.parse(qtyController.text),
+                'quantity': double.parse(qtyController.text),
                 'unit': unitController.text.trim(),
                 'location': locationController.text.trim(),
                 'notes': notesController.text.trim(),
                 'createdAt': FieldValue.serverTimestamp(),
-                'deleted': false,
                 'price': priceController.text.isNotEmpty
                     ? double.parse(priceController.text)
                     : 0.0,
                 'coast': coastController.text.isNotEmpty
                     ? double.parse(coastController.text)
                     : 0.0,
+                'isInStore': false,
+                'imagesList': [],
+                'isNewlyAdded': true, // علامة على أن هذا الصنف جديد
               },
+              ...widget.itemsPurchase,
             ],
             isFormStore: false,
             name: '',
@@ -337,7 +342,6 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
         'location': locationController.text.trim(),
         'notes': notesController.text.trim(),
         'createdAt': FieldValue.serverTimestamp(),
-        'deleted': false,
         'price': priceController.text.isNotEmpty
             ? double.parse(priceController.text)
             : 0.0,
@@ -346,6 +350,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
             : 0.0,
         'isInStore': false,
         'imagesList': [],
+        'isNewlyAdded': false,
       });
 
       await docRef.collection('movements').add({

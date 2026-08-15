@@ -305,6 +305,9 @@ final GoRouter _router = GoRouter(
           invoiceType: state.uri.queryParameters['invoiceType'] ?? '',
           customerId: state.uri.queryParameters['customerId'] ?? '',
           isEditMode: state.uri.queryParameters['isEditMode'] == 'true',
+          itemsPurchase: state.uri.queryParameters['itemsPurchase'] == 'true'
+              ? []
+              : [],
         );
       },
     ),
@@ -320,6 +323,9 @@ final GoRouter _router = GoRouter(
           invoiceType: state.uri.queryParameters['invoiceType'] ?? '',
           customerId: state.uri.queryParameters['customerId'] ?? '',
           isEditMode: state.uri.queryParameters['isEditeMode'] == 'true',
+          itemsPurchase: state.uri.queryParameters['itemsPurchase'] == 'true'
+              ? []
+              : [],
         );
       },
     ),

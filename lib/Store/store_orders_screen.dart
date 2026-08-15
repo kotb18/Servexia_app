@@ -1,3 +1,4 @@
+import 'package:firebase_pagination/firebase_pagination.dart';
 import 'package:flutter/material.dart';
 import 'package:maintenance/Store/order_details_screen.dart';
 import 'package:maintenance/Store/order_status_badge.dart';
@@ -15,59 +16,107 @@ class StoreOrdersScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('طلبات المتجر')),
-      body: StreamBuilder<List<StoreOrderModel>>(
-        stream: orderService.getStoreOrders(storeId),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: Expanded(
+        child: FirestorePagination(
+          query: orderService.getStoreOrdersQuery(storeId),
 
-          final orders = snapshot.data ?? [];
+          limit: 2, // ✅ دفعة مناسبة (شاشة ونصف تقريباً)
 
-          if (orders.isEmpty) {
-            return const Center(child: Text('لا توجد طلبات حالياً'));
-          }
+          viewType: ViewType.list,
+          isLive: true, // ✅ التحديثات الفورية تظهر تلقائياً
 
-          return ListView.builder(
-            itemCount: orders.length,
-            itemBuilder: (context, index) {
-              final order = orders[index];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: _getStatusColor(order.status),
-                    child: Text(
-                      order.orderNumber,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+
+          // ✅ التحميل الأولي
+          initialLoader: const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: CircularProgressIndicator(),
+            ),
+          ),
+
+          // ✅ التحميل عند الوصول للنهاية
+          bottomLoader: const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+
+          // ✅ حالة عدم وجود طلبات
+          onEmpty: const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.receipt_long_outlined,
+                    size: 64,
+                    color: Colors.grey,
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'لا توجد طلبات حالياً',
+                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // ✅ بناء العنصر
+          itemBuilder: (context, docs, index) {
+            final order = StoreOrderModel.fromFirestore(docs[index]);
+
+            return Card(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              elevation: 1,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                leading: CircleAvatar(
+                  radius: 24,
+                  backgroundColor: _getStatusColor(order.status),
+                  child: Text(
+                    order.orderNumber,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  title: Text(order.customerInfo.name),
-                  subtitle: Text(
-                    '${order.total.toStringAsFixed(2)} - ${order.customerInfo.phone}',
-                  ),
-                  trailing: OrderStatusBadge(status: order.status),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => OrderDetailsScreen(
-                          order: order,
-                          isFromCustomerOrders: false,
-                        ),
-                      ),
-                    );
-                    // TODO: شاشة تفاصيل الطلب
-                  },
                 ),
-              );
-            },
-          );
-        },
+                title: Text(
+                  order.customerInfo.name,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    '${order.total.toStringAsFixed(2)} - ${order.customerInfo.phone}',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                  ),
+                ),
+                trailing: OrderStatusBadge(status: order.status),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => OrderDetailsScreen(
+                        order: order,
+                        isFromCustomerOrders: false,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        ),
       ),
     );
   }

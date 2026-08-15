@@ -959,6 +959,7 @@ class InvoicePageDesign extends StatefulWidget {
 class _InvoicePageDesignState extends State<InvoicePageDesign> {
   final List<String> paymentMethods = ['كاش', 'آجل', 'تقسيط'];
   late double netTotal = 0.0;
+
   @override
   void initState() {
     super.initState();
@@ -1420,21 +1421,43 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           .doc(widget.groupId)
           .collection('items')
           .doc(itemId);
+
+      if (widget.type == 'شراء' && item['isNewlyAdded'] == true) {
+        batch.set(ref, {
+          'name': item['name'] ?? '',
+          'sku': item['sku'] ?? '',
+          'unit': item['unit'] ?? '',
+          'location': item['location'] ?? '',
+          'notes': item['notes'] ?? '',
+          'createdAt': FieldValue.serverTimestamp(),
+          'deleted': false,
+          'price': item['price'] ?? 0.0,
+          'coast': item['coast'] ?? 0.0,
+          'isInStore': false,
+          'imagesList': [],
+          'quantity': FieldValue.increment(item['quantity']),
+          'isNewlyAdded': false,
+        }, SetOptions(merge: true));
+      } else if (widget.type == 'شراء' && item['isNewlyAdded'] == false) {
+        print(
+          'yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyrrrrrrrrrrrrrrrrrrrrrrrrrrrr',
+        );
+        batch.update(ref, {'quantity': FieldValue.increment(item['quantity'])});
+      } else if (widget.type == 'بيع') {
+        batch.update(ref, {
+          'quantity': FieldValue.increment(-item['quantity']),
+        });
+      }
       final ref2 = ref.collection('movements').doc();
       batch.set(ref2, {
         'type': widget.type == 'شراء' ? 'in' : 'out',
         'qty': item['quantity'],
-        'unit': 'unit',
+        'unit': item['unit'] ?? 'unit',
         'note': widget.type == 'شراء'
             ? 'تمت الإضافة عن طريق فاتورة الشراء رقم ${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}'
             : 'تم الصرف عن طريق فاتورة البيع رقم ${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}',
         'createdBy': 'currentUser',
         'createdAt': FieldValue.serverTimestamp(),
-      });
-      batch.update(ref, {
-        'quantity': FieldValue.increment(
-          widget.type == 'شراء' ? item['quantity'] : -item['quantity'],
-        ), // زيادة 5
       });
     }
 
@@ -1455,7 +1478,17 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           .doc(widget.groupId)
           .collection('items')
           .doc(itemId);
-
+      final ref2 = ref.collection('movements').doc();
+      batch.set(ref2, {
+        'type': returnType == 'شراء' ? 'out' : 'in',
+        'qty': item['quantity'],
+        'unit': item['unit'] ?? 'unit',
+        'note': returnType == 'شراء'
+            ? 'تم ارجاع الكمية المشتراة عن طريق فاتورة مرتجع رقم return-${widget.state.originalInvoiceNumber}'
+            : 'تم ارجاع الكمية المباعة عن طريق فاتورة مرتجع رقم return-${widget.state.originalInvoiceNumber}',
+        'createdBy': 'currentUser',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
       final doc = await ref.get();
       if (doc.exists) {
         final currentQty = (doc.data()?['quantity'] ?? 0) as num;
@@ -1616,7 +1649,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                   widget.itemsSale.add({
                     'name': nameCtrl.text,
                     'price': double.tryParse(priceCtrl.text) ?? 0,
-                    'quantity': int.tryParse(qtyCtrl.text) ?? 1,
+                    'quantity': double.tryParse(qtyCtrl.text) ?? 1.0,
                     'isManual': true,
                   });
                   _calculateTotals();
@@ -2215,6 +2248,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                     invoiceType: widget.type,
                     customerId: widget.customerId,
                     isEditMode: widget.isEditMode,
+                    itemsPurchase: widget.itemsPurchase,
                   ),
                 ),
               );
@@ -2251,6 +2285,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                     invoiceType: widget.type,
                     customerId: widget.customerId,
                     isEditMode: widget.isEditMode,
+                    itemsPurchase: widget.itemsPurchase,
                   ),
                 ),
               );
@@ -2275,6 +2310,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                         invoiceType: widget.type,
                         customerId: widget.customerId,
                         isEditMode: widget.isEditMode,
+                        itemsPurchase: widget.itemsPurchase,
                       ),
                     ),
                   );
@@ -2289,6 +2325,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                         isFromInvoice: true,
                         customerId: widget.customerId,
                         isEditMode: widget.isEditMode,
+                        itemsPurchase: widget.itemsPurchase,
                       ),
                     ),
                   );

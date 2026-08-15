@@ -157,7 +157,7 @@ class _SplashScreenState extends State<SplashScreen>
               Transform.scale(scale: _animation.value, child: child),
           child: SizedBox(
             height: size.height,
-            child: Image.asset('images/2.png', fit: BoxFit.fill),
+            child: Image.asset('images/222.png', fit: BoxFit.fill),
           ),
         ),
       ),

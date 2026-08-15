@@ -32,7 +32,7 @@ class InvoiceService {
     int pageSize = InvoiceService.pageSize,
   }) async {
     try {
-      Query query = _firestore
+      Query<Map<String, dynamic>> query = _firestore
           .collection('invoices')
           .doc(groupId)
           .collection('items')
@@ -52,18 +52,119 @@ class InvoiceService {
   }
 
   /// الحصول على جميع الفواتير من مجموعة معينة
-  Stream<List<Invoice>> getInvoices(String groupId) {
-    return _firestore
+  Query<Map<String, dynamic>> getInvoicesQuery(
+    String groupId, {
+    String? customerId, // لفلترة فواتير عميل محدد
+    String? type, // 'بيع', 'شراء', 'صيانة', 'مرتجع', 'عرض سعر'
+    String? paymentMethod, // 'كاش', 'شيك', 'تحويل بنكي'...
+    String? installmentStatus, // 'مدفوع', 'معلق', 'متأخر'
+    DateTime? fromDate,
+    DateTime? toDate,
+    String? searchText, // يتطلب حقل clientNameLower في Firestore
+    bool excludeReturns = false,
+    bool excludeMaintenance = false,
+    bool excludeQuotes = false,
+  }) {
+    Query<Map<String, dynamic>> query = _firestore
         .collection('invoices')
         .doc(groupId)
         .collection('items')
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => Invoice.fromFirestore(doc))
-              .toList();
-        });
+        .orderBy('createdAt', descending: true);
+
+    // فلترة العميل (للشاشة القادمة من شاشة العملاء)
+    if (customerId != null && customerId.isNotEmpty) {
+      query = query.where('customer.id', isEqualTo: customerId);
+    }
+
+    // فلترة النوع
+    if (type != null && type.isNotEmpty && type != 'الكل') {
+      query = query.where('type', isEqualTo: type);
+    }
+
+    // فلترة طريقة الدفع
+    if (paymentMethod != null &&
+        paymentMethod.isNotEmpty &&
+        paymentMethod != 'الكل') {
+      query = query.where('paymentMethod', isEqualTo: paymentMethod);
+    }
+
+    // فلترة الأقساط (يفترض وجود هذه الحقول في Firestore)
+    if (installmentStatus != null &&
+        installmentStatus.isNotEmpty &&
+        installmentStatus != 'الكل') {
+      if (installmentStatus == 'مدفوع') {
+        query = query.where('allInstallmentsPaid', isEqualTo: true);
+      } else if (installmentStatus == 'معلق') {
+        query = query
+            .where('hasInstallments', isEqualTo: true)
+            .where('allInstallmentsPaid', isEqualTo: false);
+      } else if (installmentStatus == 'متأخر') {
+        query = query.where('overdueInstallmentsCount', isGreaterThan: 0);
+      }
+    }
+
+    // فلترة التاريخ (createdAt يجب أن يكون Timestamp)
+    if (fromDate != null) {
+      query = query.where(
+        'createdAt',
+        isGreaterThanOrEqualTo: Timestamp.fromDate(
+          DateTime(fromDate.year, fromDate.month, fromDate.day),
+        ),
+      );
+    }
+    if (toDate != null) {
+      query = query.where(
+        'createdAt',
+        isLessThanOrEqualTo: Timestamp.fromDate(
+          DateTime(toDate.year, toDate.month, toDate.day + 1),
+        ),
+      );
+    }
+
+    // ✅ البحث النصي (يتطلب حقل clientNameLower محفوظ في الفاتورة)
+
+    // فلترة الاختيار (مرتجع/صيانة/عرض سعر تُستبعد في وضع الاختيار)
+    if (excludeReturns) {
+      query = query.where('type', isNotEqualTo: 'مرتجع');
+    }
+    if (excludeMaintenance) {
+      query = query.where('type', isNotEqualTo: 'صيانة');
+    }
+    if (excludeQuotes) {
+      query = query.where('type', isNotEqualTo: 'عرض سعر');
+    }
+
+    return query;
+  }
+
+  /// 🔍 Query منفصل للبحث النصي (اسم العميل أو رقم الفاتورة)
+  Query<Map<String, dynamic>> searchInvoicesQuery(
+    String groupId,
+    String searchText,
+  ) {
+    final search = searchText.trim().toLowerCase();
+
+    final isInvoiceNumber = RegExp(r'^[a-zA-Z0-9-]+$').hasMatch(search);
+
+    Query<Map<String, dynamic>> query = _firestore
+        .collection('invoices')
+        .doc(groupId)
+        .collection('items')
+        .orderBy('createdAt', descending: true);
+
+    if (isInvoiceNumber) {
+      // البحث برقم الفاتورة
+      query = query
+          .where('invoiceNumber', isGreaterThanOrEqualTo: search)
+          .where('invoiceNumber', isLessThanOrEqualTo: '$search\uf8ff');
+    } else {
+      // البحث باسم العميل
+      query = query
+          .where('customer.name', isGreaterThanOrEqualTo: search)
+          .where('customer.name', isLessThanOrEqualTo: '$search\uf8ff');
+    }
+
+    return query;
   }
 
   /// الحصول على فاتورة واحدة بناءً على معرفها

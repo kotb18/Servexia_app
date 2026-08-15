@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_pagination/firebase_pagination.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:maintenance/Store/customer_orders_screen.dart';
@@ -601,59 +602,65 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   /// 🛍️ PRODUCTS GRID
   /// ═══════════════════════════════════════════════════════════════════════
   Widget _buildProductsGrid() {
-    return StreamBuilder<List<InventoryItemModel>>(
-      stream: _service.getStoreItems(widget.groupId),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SliverFillRemaining(
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
+    return SliverLayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = constraints.crossAxisExtent > 1200
+            ? 5
+            : constraints.crossAxisExtent > 900
+            ? 4
+            : constraints.crossAxisExtent > 600
+            ? 3
+            : 2;
 
-        if (snapshot.hasError) {
-          return SliverFillRemaining(
-            child: _buildErrorState(snapshot.error.toString()),
-          );
-        }
+        return SliverToBoxAdapter(
+          // ❌ أزل SizedBox(height: ...) تماماً
+          // GridView مع shrinkWrap يحسب ارتفاعه ذاتياً
+          child: FirestorePagination(
+            // 🔑 مفتاح لإعادة البناء عند تغير البحث
+            key: ValueKey(_searchQuery),
 
-        final items = snapshot.data ?? [];
+            query: _service.getStoreItemsQuery(
+              widget.groupId,
+              searchQuery: _searchQuery.isEmpty ? null : _searchQuery,
+            ),
 
-        final filtered = _searchQuery.isEmpty
-            ? items
-            : items.where((item) {
-                final q = _searchQuery.toLowerCase();
+            limit: 2, // ✅ دفعة منطقية (صفين إلى ثلاثة)
+            viewType: ViewType.grid,
+            isLive: true,
+            padding: const EdgeInsets.all(16),
 
-                return item.name.toLowerCase().contains(q) ||
-                    item.sku.toLowerCase().contains(q);
-              }).toList();
+            // ✅ اترك shrinkWrap ليحسب الارتفاع ذاتياً
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
 
-        if (filtered.isEmpty) {
-          return SliverFillRemaining(child: _buildEmptyState());
-        }
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              childAspectRatio: 0.60,
+              crossAxisSpacing: 14,
+              mainAxisSpacing: 14,
+            ),
 
-        return SliverPadding(
-          padding: const EdgeInsets.all(16),
-          sliver: SliverLayoutBuilder(
-            builder: (context, constraints) {
-              final crossAxisCount = constraints.crossAxisExtent > 1200
-                  ? 5
-                  : constraints.crossAxisExtent > 900
-                  ? 4
-                  : constraints.crossAxisExtent > 600
-                  ? 3
-                  : 2;
+            initialLoader: const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: CircularProgressIndicator(),
+              ),
+            ),
 
-              return SliverGrid(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  childAspectRatio: 0.60,
-                  crossAxisSpacing: 14,
-                  mainAxisSpacing: 14,
-                ),
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  return _buildProductCard(filtered[index]);
-                }, childCount: filtered.length),
+            bottomLoader: const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+
+            onEmpty: _buildEmptyState(),
+
+            itemBuilder: (context, docs, index) {
+              debugPrint(
+                'Pagination: loaded ${docs.length} items, current index: $index',
               );
+              final doc = docs[index];
+              final item = InventoryItemModel.fromFirestore(doc);
+              return _buildProductCard(item);
             },
           ),
         );

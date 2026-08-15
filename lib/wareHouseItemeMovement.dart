@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_pagination/firebase_pagination.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -49,11 +50,16 @@ class InventoryService {
         as Stream<DocumentSnapshot<Map<String, dynamic>>>;
   }
 
-  Stream<QuerySnapshot> movementsStream() {
-    return _itemRef
+  Query movementsQuery({String? typeFilter}) {
+    Query query = _itemRef
         .collection('movements')
-        .orderBy('createdAt', descending: true)
-        .snapshots();
+        .orderBy('createdAt', descending: true);
+
+    if (typeFilter != null) {
+      query = query.where('type', isEqualTo: typeFilter);
+    }
+
+    return query;
   }
 
   Future<void> addMovement({
@@ -92,11 +98,18 @@ class InventoryService {
 // -----------------------------------------------------------------------------
 
 // 3.1. شاشة سجل الحركات (كشاشة منفصلة)
-class MovementHistoryScreen extends StatelessWidget {
+class MovementHistoryScreen extends StatefulWidget {
   final InventoryService service;
 
   const MovementHistoryScreen({super.key, required this.service});
 
+  @override
+  State<MovementHistoryScreen> createState() => _MovementHistoryScreenState();
+}
+
+String? _selectedType;
+
+class _MovementHistoryScreenState extends State<MovementHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -115,9 +128,9 @@ class MovementHistoryScreen extends StatelessWidget {
             // 2. جلب بيانات الصنف الحالية (للهيدر الخاص بالتقرير)
             final itemDoc = await FirebaseFirestore.instance
                 .collection('inventory')
-                .doc(service.groupId)
+                .doc(widget.service.groupId)
                 .collection('items')
-                .doc(service.itemId)
+                .doc(widget.service.itemId)
                 .get();
 
             if (!itemDoc.exists) {
@@ -129,9 +142,9 @@ class MovementHistoryScreen extends StatelessWidget {
             // 3. جلب جميع الحركات من الـ Sub-collection (بدون تكرار)
             final movementsSnap = await FirebaseFirestore.instance
                 .collection('inventory')
-                .doc(service.groupId)
+                .doc(widget.service.groupId)
                 .collection('items')
-                .doc(service.itemId)
+                .doc(widget.service.itemId)
                 .collection('movements')
                 .orderBy('createdAt', descending: true)
                 .get();
@@ -169,73 +182,132 @@ class MovementHistoryScreen extends StatelessWidget {
         // backgroundColor: Colors.blue.shade800,
       ),
       appBar: AppBar(title: const Text('سجل الحركات')),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: service.movementsStream(),
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) {
-            return Center(child: Text('خطأ: ${snap.error}'));
-          }
-          if (snap.data!.docs.isEmpty) {
-            return const Center(child: Text('لا توجد حركات مسجلة.'));
-          }
+      body: FirestorePagination(
+        key: ValueKey(_selectedType ?? 'all'),
+        query: widget.service.movementsQuery(typeFilter: _selectedType),
 
-          return ListView.builder(
-            itemCount: snap.data!.docs.length,
-            itemBuilder: (context, index) {
-              final movement = Movement.fromMap(
-                snap.data!.docs[index].data() as Map<String, dynamic>,
-              );
-              final isIncoming = movement.type;
-              final color = isIncoming == 'in'
-                  ? Colors.green.shade700
-                  : Colors.red.shade700;
-              final icon = isIncoming == 'in'
-                  ? Icons.arrow_downward
-                  : Icons.arrow_upward;
-              final formattedDate = DateFormat(
-                'dd/MM/yyyy - HH:mm',
-              ).format(movement.createdAt);
+        limit: 2, // ✅ دفعة مناسبة للسجلات الزمنية
 
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: color.withOpacity(0.1),
-                    child: Icon(icon, color: color),
+        viewType: ViewType.list,
+        isLive: true, // ✅ التحديثات الفورية (إضافة/حذف حركة)
+
+        padding: const EdgeInsets.symmetric(vertical: 8),
+
+        // ✅ حالة التحميل الأولي
+        initialLoader: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(32),
+            child: CircularProgressIndicator(),
+          ),
+        ),
+
+        // ✅ حالة التحميل عند الوصول للنهاية
+        bottomLoader: const Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+
+        // ✅ حالة عدم وجود سجلات
+        onEmpty: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.history, size: 64, color: Colors.grey),
+                SizedBox(height: 16),
+                Text(
+                  'لا توجد حركات مسجلة',
+                  style: TextStyle(fontSize: 18, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // ✅ بناء العنصر
+        itemBuilder: (context, docs, index) {
+          final movement = Movement.fromMap(
+            docs[index].data() as Map<String, dynamic>,
+          );
+
+          final isIncoming = movement.type;
+          final color = isIncoming == 'in'
+              ? Colors.green.shade700
+              : isIncoming == 'delete'
+              ? Colors.orange.shade700
+              : Colors.red.shade700;
+
+          final icon = isIncoming == 'in'
+              ? Icons.arrow_downward
+              : isIncoming == 'delete'
+              ? Icons.delete_outline
+              : Icons.arrow_upward;
+
+          final label = isIncoming == 'in'
+              ? 'إضافة'
+              : isIncoming == 'delete'
+              ? 'حذف'
+              : 'صرف';
+
+          final formattedDate = DateFormat(
+            'dd/MM/yyyy - HH:mm',
+          ).format(movement.createdAt);
+
+          return Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            elevation: 1,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 8,
+              ),
+              leading: CircleAvatar(
+                backgroundColor: color.withOpacity(0.1),
+                child: Icon(icon, color: color),
+              ),
+              title: Text(
+                '${movement.qty} ${movement.unit}',
+                style: TextStyle(fontWeight: FontWeight.bold, color: color),
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('بواسطة: ${movement.createdBy}'),
+                  if (movement.note.isNotEmpty)
+                    Text(
+                      'ملاحظة: ${movement.note}',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  const SizedBox(height: 4),
+                  Text(
+                    formattedDate,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
-                  title: Text(
-                    '${movement.qty} ${movement.unit}',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: color),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('بواسطة: ${movement.createdBy}'),
-                      if (movement.note.isNotEmpty)
-                        Text('ملاحظة: ${movement.note}'),
-                      Text(
-                        formattedDate,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                  trailing: Text(
-                    isIncoming == 'in'
-                        ? 'إضافة'
-                        : isIncoming == 'delete'
-                        ? 'حذف'
-                        : 'صرف',
-                    style: TextStyle(color: color, fontWeight: FontWeight.bold),
+                ],
+              ),
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
                   ),
                 ),
-              );
-            },
+              ),
+            ),
           );
         },
       ),

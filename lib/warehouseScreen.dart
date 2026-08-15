@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_pagination/firebase_pagination.dart';
@@ -26,6 +25,7 @@ class StoreScreen extends StatefulWidget {
   final String invoiceType;
   final String customerId;
   final bool isEditMode;
+  final List<Map<dynamic, dynamic>> itemsPurchase;
   const StoreScreen({
     super.key,
     required this.groupId,
@@ -34,6 +34,7 @@ class StoreScreen extends StatefulWidget {
     required this.invoiceType,
     required this.customerId,
     required this.isEditMode,
+    required this.itemsPurchase,
   });
   static const String screenroute = 'StoreScreen';
 
@@ -58,7 +59,6 @@ class _StoreScreenState extends State<StoreScreen> {
         .collection('inventory')
         .doc(widget.groupId)
         .collection('items')
-        .where('deleted', isEqualTo: false)
         .get();
 
     final set = <String>{};
@@ -76,7 +76,7 @@ class _StoreScreenState extends State<StoreScreen> {
         .collection('inventory')
         .doc(widget.groupId)
         .collection('items')
-        .where('deleted', isEqualTo: false);
+        .limit(2);
 
     /// لو لم يتم اختيار فلتر → لا تعرض بيانات
     if (selectedLocation == null) {
@@ -127,6 +127,10 @@ class _StoreScreenState extends State<StoreScreen> {
   void initState() {
     // TODO: implement initState
     super.initState();
+    if (widget.invoiceType == 'شراء') {
+      //  items.clear();
+      items = widget.itemsPurchase;
+    }
     counters = List.generate(20, (_) => 0);
     if (widget.deletedItems) {
       items.clear();
@@ -160,6 +164,26 @@ class _StoreScreenState extends State<StoreScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           if (widget.isFromInvoice) {
+            if (items.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('لم يتم اختيار أي صنف')),
+              );
+              return;
+            }
+            if (widget.invoiceType == 'بيع') {
+              for (var item in items) {
+                if (item['quantity'] > item['quantityInStock']) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'الكمية المطلوبة للصنف ${item['name']} أكبر من الكمية المخزنية',
+                      ),
+                    ),
+                  );
+                  return;
+                }
+              }
+            }
             await Navigator.push(
               context,
               MaterialPageRoute(
@@ -387,6 +411,7 @@ class _StoreScreenState extends State<StoreScreen> {
                         'coast': itemBuyController.text.isNotEmpty
                             ? double.tryParse(itemBuyController.text)
                             : 0.0,
+                        'isNewlyAdded': false,
                       });
                       selectedIndex.add(index);
                       buttonText = ' اضافة ${selectedIndex.length} عنصر';
@@ -647,6 +672,9 @@ class _StoreScreenState extends State<StoreScreen> {
                                                 itemBuyController.text,
                                               )
                                             : 0.0,
+                                        'isNewlyAdded': false,
+                                        'quantityInStock':
+                                            data['quantity'] ?? 0,
                                       });
                                       selectedIndex.add(index);
                                       buttonText =
@@ -873,6 +901,7 @@ class _StoreScreenState extends State<StoreScreen> {
                                                               .text,
                                                         )
                                                       : 0.0,
+                                                  'isNewlyAdded': false,
                                                 });
                                                 setState(() {
                                                   items
@@ -1060,6 +1089,7 @@ class _StoreScreenState extends State<StoreScreen> {
                       },
                     ),
             ),
+            SizedBox(height: 60),
           ],
         ),
       ),
