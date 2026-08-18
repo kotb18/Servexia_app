@@ -52,6 +52,7 @@ class _StoreScreenState extends State<StoreScreen> {
   final _formKey = GlobalKey<FormState>();
   String scannedId = '';
   double selectedQuantity = 0.0;
+  bool? _isWeighted;
 
   /// تحميل المواقع
   Future<List<String>> loadLocations() async {
@@ -72,30 +73,49 @@ class _StoreScreenState extends State<StoreScreen> {
 
   /// Query البحث
   Query<Map<String, dynamic>> itemsQuery() {
-    Query<Map<String, dynamic>> q = FirebaseFirestore.instance
+    final search = searchText.trim().toLowerCase();
+
+    Query<Map<String, dynamic>> query = FirebaseFirestore.instance
         .collection('inventory')
         .doc(widget.groupId)
-        .collection('items')
-        .limit(2);
+        .collection('items');
 
-    /// لو لم يتم اختيار فلتر → لا تعرض بيانات
+    // لا تعرض بيانات قبل اختيار الموقع.
     if (selectedLocation == null) {
-      return q.where('name', isEqualTo: '__EMPTY__');
+      return query.where('name', isEqualTo: '__EMPTY__').limit(2);
     }
 
-    /// فلتر الموقع
+    // فلتر الموقع.
     if (selectedLocation != 'all') {
-      q = q.where('location', isEqualTo: selectedLocation);
+      query = query.where('location', isEqualTo: selectedLocation);
     }
 
-    /// البحث
-    if (searchText.isNotEmpty) {
-      q = q.orderBy('name').startAt([searchText]).endAt(['$searchText\uf8ff']);
+    if (search.isNotEmpty) {
+      // إذا كان النص حروفًا إنجليزية/أرقامًا/شرطة، نعتبره SKU.
+      final isSku = RegExp(r'^[a-zA-Z0-9-]+$').hasMatch(search);
+
+      if (isSku) {
+        query = query
+            .where(
+              'sku',
+              isGreaterThanOrEqualTo: search,
+              isLessThanOrEqualTo: '$search\uf8ff',
+            )
+            .orderBy('sku');
+      } else {
+        query = query
+            .where(
+              'name',
+              isGreaterThanOrEqualTo: search,
+              isLessThanOrEqualTo: '$search\uf8ff',
+            )
+            .orderBy('name');
+      }
     } else {
-      q = q.orderBy('name');
+      query = query.orderBy('name');
     }
 
-    return q;
+    return query.limit(20);
   }
 
   Query<Map<String, dynamic>> itemsQueryDeleted() {
@@ -172,6 +192,7 @@ class _StoreScreenState extends State<StoreScreen> {
             }
             if (widget.invoiceType == 'بيع') {
               for (var item in items) {
+                print(item['quantityInStock']);
                 if (item['quantity'] > item['quantityInStock']) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -364,9 +385,7 @@ class _StoreScreenState extends State<StoreScreen> {
                 print("Barcode Detected");
 
                 skuController.text = raw;
-                setState(() {
-                  scannedId = raw;
-                });
+
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -384,7 +403,20 @@ class _StoreScreenState extends State<StoreScreen> {
                 skuController.text = raw;
                 setState(() {
                   scannedId = raw;
-
+                  if (raw.startsWith('21') ||
+                      raw.startsWith('20') ||
+                      raw.startsWith('25')) {
+                    setState(() {
+                      _isWeighted = true;
+                      scannedId = raw.substring(2, 7);
+                    });
+                  } else {
+                    setState(() {
+                      scannedId = raw;
+                      _isWeighted = false;
+                    });
+                  }
+                  print('ppppppppppppppppppppppppppp $scannedId');
                   final index = itemsList.indexWhere(
                     (item) => item['sku'] == scannedId,
                   );
@@ -392,12 +424,17 @@ class _StoreScreenState extends State<StoreScreen> {
                   if (index == -1) return;
 
                   setState(() {
-                    if (!selectedIndex.contains(index)) {
+                    if (!selectedIndex.contains(index) || _isWeighted == true) {
                       items.add({
                         'id': itemsList[index]['sku'],
                         'isInventoryItem': true,
                         'name': itemsList[index]['name'],
-                        'quantity': counters[index] > 0
+                        'quantity': _isWeighted!
+                            ? double.parse(
+                                (double.parse(raw.substring(7, 12)) / 1000)
+                                    .toStringAsFixed(2),
+                              )
+                            : counters[index] > 0
                             ? counters[index].toDouble()
                             : 1.0,
                         'unit': itemsList[index]['unit'],
@@ -412,18 +449,27 @@ class _StoreScreenState extends State<StoreScreen> {
                             ? double.tryParse(itemBuyController.text)
                             : 0.0,
                         'isNewlyAdded': false,
+                        'quantityInStock': itemsList[index]['quantity'] ?? 0,
                       });
+
                       selectedIndex.add(index);
                       buttonText = ' اضافة ${selectedIndex.length} عنصر';
                     }
-                    counters[index]++;
-                    items
-                        .where((item) => item['id'] == itemsList[index]['sku'])
-                        .forEach((item) {
-                          item['quantity'] = counters[index] > 0
-                              ? counters[index].toDouble()
-                              : 1;
-                        });
+                    print('kkkkkkkkkkkkkkkkkkkkkkk $items');
+                    counters[index] += _isWeighted!
+                        ? double.parse(raw.substring(7, 12)) / 1000
+                        : 1;
+                    if (!_isWeighted!) {
+                      items
+                          .where(
+                            (item) => item['id'] == itemsList[index]['sku'],
+                          )
+                          .forEach((item) {
+                            item['quantity'] = counters[index] > 0
+                                ? counters[index].toDouble()
+                                : 1;
+                          });
+                    }
                   });
                 });
               }
@@ -491,7 +537,7 @@ class _StoreScreenState extends State<StoreScreen> {
                 controller: searchController,
                 enabled: !deletedItems && selectedLocation != null,
                 decoration: const InputDecoration(
-                  hintText: 'ابحث باسم الصنف...',
+                  hintText: 'ابحث باسم الصنف او كود الصنف...',
                   prefixIcon: Icon(Icons.search),
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(vertical: 16),
@@ -902,6 +948,8 @@ class _StoreScreenState extends State<StoreScreen> {
                                                         )
                                                       : 0.0,
                                                   'isNewlyAdded': false,
+                                                  'quantityInStock':
+                                                      data['quantity'] ?? 0,
                                                 });
                                                 setState(() {
                                                   items

@@ -4,22 +4,21 @@ import 'inventory_item_model.dart';
 class InventoryStoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  CollectionReference _itemsCollection(String groupId) {
+  CollectionReference<Map<String, dynamic>> _itemsCollection(String groupId) {
     return _firestore.collection('inventory').doc(groupId).collection('items');
   }
 
-  /// جلب كل الأصناف (للتاجر)
-  Stream<List<InventoryItemModel>> getAllItems(String groupId) {
-    return _itemsCollection(groupId)
-        .orderBy('name')
-        .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => InventoryItemModel.fromFirestore(doc))
-              .toList(),
-        );
+  /// الاستعلام الأساسي المستخدم مع FirestorePagination.
+  ///
+  /// الترتيب حسب isInStore يجعل المنتجات الموجودة في المتجر تظهر أولًا،
+  /// ثم يتم ترتيب كل مجموعة حسب الاسم.
+  Query<Map<String, dynamic>> getAllItemsQuery(String groupId) {
+    return _itemsCollection(
+      groupId,
+    ).orderBy('isInStore', descending: true).orderBy('name');
   }
 
+  /// جلب صنف واحد عند الحاجة.
   Future<InventoryItemModel?> getItemById(String groupId, String itemId) async {
     try {
       final doc = await _itemsCollection(groupId).doc(itemId).get();
@@ -31,24 +30,19 @@ class InventoryStoreService {
     }
   }
 
-  /// جلب الأصناف المُفعلة في المتجر فقط (للعملاء)
-  Query getStoreItemsQuery(String groupId, {String? searchQuery}) {
-    Query query = _itemsCollection(groupId)
+  /// جلب الأصناف المُفعلة في المتجر فقط (للعملاء).
+  Query<Map<String, dynamic>> getStoreItemsQuery(
+    String groupId, {
+    String? searchQuery,
+  }) {
+    Query<Map<String, dynamic>> query = _itemsCollection(groupId)
         .where('isInStore', isEqualTo: true)
         .where('quantity', isGreaterThan: 0.0)
         .orderBy('name');
 
-    if (searchQuery != null && searchQuery.isNotEmpty) {
-      final lower = searchQuery.toLowerCase();
-      query = query
-          .where('name', isGreaterThanOrEqualTo: lower)
-          .where('name', isLessThanOrEqualTo: '$lower\uf8ff');
-    }
-
     return query;
   }
 
-  /// تفعيل صنف في المتجر
   Future<void> addToStore({
     required String groupId,
     required String sku,
@@ -56,18 +50,25 @@ class InventoryStoreService {
     String? storeDescription,
     List<String>? colors,
     List<String>? sizes,
-    List<String>? images, // <-- صور المتجر
+    List<String>? images,
   }) async {
     final updates = <String, dynamic>{
       'isInStore': true,
       'storePrice': storePrice,
     };
 
-    if (storeDescription != null)
+    if (storeDescription != null) {
       updates['storeDescription'] = storeDescription;
-    if (images != null && images.isNotEmpty) updates['imagesList'] = images;
-    if (colors != null && colors.isNotEmpty) updates['colors'] = colors;
-    if (sizes != null && sizes.isNotEmpty) updates['sizes'] = sizes;
+    }
+    if (images != null && images.isNotEmpty) {
+      updates['imagesList'] = images;
+    }
+    if (colors != null && colors.isNotEmpty) {
+      updates['colors'] = colors;
+    }
+    if (sizes != null && sizes.isNotEmpty) {
+      updates['sizes'] = sizes;
+    }
 
     await _itemsCollection(groupId).doc(sku).update(updates);
   }
@@ -92,11 +93,9 @@ class InventoryStoreService {
     if (images != null) {
       updates['imagesList'] = images;
     }
-
     if (colors != null && colors.isNotEmpty) {
       updates['colors'] = colors;
     }
-
     if (sizes != null && sizes.isNotEmpty) {
       updates['sizes'] = sizes;
     }
@@ -104,7 +103,6 @@ class InventoryStoreService {
     await _itemsCollection(groupId).doc(sku).update(updates);
   }
 
-  /// إلغاء تفعيل صنف من المتجر
   Future<void> removeFromStore(String groupId, String sku) async {
     await _itemsCollection(groupId).doc(sku).update({
       'isInStore': false,
@@ -113,11 +111,9 @@ class InventoryStoreService {
       'imagesList': [],
       'colors': [],
       'sizes': [],
-      // <-- تفريغ الصور
     });
   }
 
-  /// تحديث سعر المتجر
   Future<void> updateStorePrice(
     String groupId,
     String sku,
@@ -126,7 +122,6 @@ class InventoryStoreService {
     await _itemsCollection(groupId).doc(sku).update({'storePrice': newPrice});
   }
 
-  /// جلب صنف بالـ SKU
   Future<InventoryItemModel?> getItemBySku(String groupId, String sku) async {
     final doc = await _itemsCollection(groupId).doc(sku).get();
     if (!doc.exists) return null;

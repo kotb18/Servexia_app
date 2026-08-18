@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -49,7 +50,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
   // final barcodeController = TextEditingController();
 
   bool loading = false;
-
+  bool? isWeighted;
   @override
   void dispose() {
     nameController.dispose();
@@ -300,6 +301,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                 'isInStore': false,
                 'imagesList': [],
                 'isNewlyAdded': true, // علامة على أن هذا الصنف جديد
+                'isWeighted': isWeighted ?? false,
               },
               ...widget.itemsPurchase,
             ],
@@ -351,6 +353,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
         'isInStore': false,
         'imagesList': [],
         'isNewlyAdded': false,
+        'isWeighted': isWeighted ?? false,
       });
 
       await docRef.collection('movements').add({
@@ -625,7 +628,58 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
 
                         /// الكمية والموقع
                         _sectionTitle('المخزون والموقع'),
-
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.scale_outlined,
+                                color: Colors.blueAccent,
+                                size: 22,
+                              ),
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'هل المنتج يباع بالوزن؟',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                    Text(
+                                      'لتفعيل قراءة باركود الوزن',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.black54,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Switch.adaptive(
+                                value: isWeighted ?? false,
+                                onChanged: (value) {
+                                  setState(() {
+                                    isWeighted = value;
+                                  });
+                                },
+                                activeColor: Colors.blueAccent,
+                              ),
+                            ],
+                          ),
+                        ),
                         const SizedBox(height: 12),
 
                         _buildField(
@@ -801,6 +855,11 @@ class _QrScanScreenState extends State<QrScanScreen> {
   late final MobileScannerController controller;
 
   bool isProcessing = false;
+  final AudioPlayer _audioPlayer = AudioPlayer();
+
+  Future<void> playScanSound() async {
+    await _audioPlayer.play(AssetSource('sounds/beep.mp3'));
+  }
 
   @override
   void initState() {
@@ -837,7 +896,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
       await controller.stop(); // 👈 وقف الكاميرا فورًا
 
       if (!mounted) return;
-
+      playScanSound();
       Navigator.pop(context, {
         "raw": rawValue.trim(),
         "format": barcode?.format.name,

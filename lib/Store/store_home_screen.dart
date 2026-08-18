@@ -436,9 +436,14 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                         _buildContactChip(
                           icon: Icons.chat_bubble_outline,
                           label: 'واتساب',
-                          onTap: () => _launchUrl(
-                            'https://wa.me/${whatsapp!.replaceAll(RegExp(r'[^0-9]'), '')}',
-                          ),
+                          onTap: () {
+                            final String message =
+                                'اهلا $storeName اريد الاستفسار عن منتج';
+
+                            _launchUrl(
+                              'https://wa.me/+2$whatsapp?text=${Uri.encodeComponent(message)}',
+                            );
+                          },
                         ),
                       if (email != null && email!.isNotEmpty)
                         _buildContactChip(
@@ -624,7 +629,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
               searchQuery: _searchQuery.isEmpty ? null : _searchQuery,
             ),
 
-            limit: 2, // ✅ دفعة منطقية (صفين إلى ثلاثة)
+            limit: 20, // ✅ دفعة منطقية (صفين إلى ثلاثة)
             viewType: ViewType.grid,
             isLive: true,
             padding: const EdgeInsets.all(16),
@@ -811,14 +816,16 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                     // ✅ Description (only if exists)
                     if (hasDesc) ...[
                       const SizedBox(height: 4),
-                      Text(
-                        item.storeDescription!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
-                          height: 1.3,
-                          color: Colors.grey.shade500,
+                      Expanded(
+                        child: Text(
+                          item.storeDescription!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            height: 1,
+                            color: Colors.grey.shade500,
+                          ),
                         ),
                       ),
                     ],

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:firebase_pagination/firebase_pagination.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -114,6 +115,8 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   bool _isLoading = false;
+  bool _shownInStoreHeader = false;
+  bool _shownStockHeader = false;
 
   final ValueNotifier<int> _changesCountNotifier = ValueNotifier(0);
 
@@ -142,8 +145,6 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
   // 🔑 دالة مهمة: تحميل الألوان والمقاسات من Firestore لما الصفحة تفتح
   // ═══════════════════════════════════════════════════════════════════════════
   void _loadExistingStoreData(List<InventoryItemModel> items) {
-    if (_initialDataLoaded) return;
-
     for (final item in items) {
       if (item.isInStore) {
         // ✅ لو المنتج موجود في المتجر، نملأ البيانات المحفوظة
@@ -519,6 +520,8 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
               onChanged: (value) {
                 setState(() {
                   _searchQuery = value;
+                  _shownInStoreHeader = false;
+                  _shownStockHeader = false;
                 });
               },
               textDirection: TextDirection.rtl,
@@ -534,7 +537,11 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
                         icon: const Icon(Icons.clear, size: 20),
                         onPressed: () {
                           _searchController.clear();
-                          setState(() => _searchQuery = '');
+                          setState(() {
+                            _searchQuery = '';
+                            _shownInStoreHeader = false;
+                            _shownStockHeader = false;
+                          });
                         },
                       )
                     : null,
@@ -554,71 +561,74 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
             ),
           ),
           Expanded(
-            child: StreamBuilder<List<InventoryItemModel>>(
-              stream: _service.getAllItems(widget.groupId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+            child: FirestorePagination(
+              key: ValueKey('inventory-pagination-$_searchQuery'),
+              limit: 6,
+              isLive: true,
+              viewType: ViewType.list,
+              padding: const EdgeInsets.all(16),
+              query: _service.getAllItemsQuery(widget.groupId),
+              bottomLoader: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              onEmpty: _searchQuery.isEmpty
+                  ? _buildEmptyWidget()
+                  : _buildNoSearchResults(),
+              itemBuilder: (context, documentSnapshots, index) {
+                final documentSnapshot = documentSnapshots[index];
+                final item = InventoryItemModel.fromFirestore(documentSnapshot);
 
-                if (snapshot.hasError) {
-                  return _buildErrorWidget(snapshot.error.toString());
-                }
-
-                final allItems = snapshot.data ?? [];
-                if (allItems.isEmpty) return _buildEmptyWidget();
-
-                // 🔑 هنا بنحمل البيانات المحفوظة من Firestore
-                if (allItems.isNotEmpty && !_initialDataLoaded) {
+                // يتم استدعاؤها مرة لكل مستند، وتستخدم putIfAbsent لذلك لن
+                // تستبدل القيم التي عدّلها المستخدم أثناء التصفح.
+                if (!_initialDataLoaded || item.isInStore) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) {
-                      setState(() {
-                        _loadExistingStoreData(allItems);
-                      });
+                    if (!mounted) return;
+                    _loadExistingStoreData([item]);
+                    if (!_initialDataLoaded) {
+                      setState(() => _initialDataLoaded = true);
                     }
                   });
                 }
 
-                final items = _searchQuery.isEmpty
-                    ? allItems
-                    : allItems.where((item) {
-                        final query = _searchQuery.toLowerCase();
-                        return item.name.toLowerCase().contains(query) ||
-                            item.sku.toLowerCase().contains(query);
-                      }).toList();
+                final query = _searchQuery.trim().toLowerCase();
+                final matchesSearch =
+                    query.isEmpty ||
+                    item.name.toLowerCase().contains(query) ||
+                    item.sku.toLowerCase().contains(query);
 
-                final inStoreItems = items.where((i) => i.isInStore).toList();
-                final notInStoreItems = items
-                    .where((i) => !i.isInStore)
-                    .toList();
+                if (!matchesSearch) return const SizedBox.shrink();
 
-                return ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    if (inStoreItems.isNotEmpty) ...[
+                Widget card = _buildItemCard(
+                  item,
+                  isAlreadyInStore: item.isInStore,
+                );
+
+                if (item.isInStore && !_shownInStoreHeader) {
+                  _shownInStoreHeader = true;
+                  card = Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                       _buildSectionHeader(
                         '✅ منتجات في المتجر',
-                        '${inStoreItems.length} منتج',
+                        '',
                         Colors.green,
                       ),
-                      ...inStoreItems.map(
-                        (item) => _buildItemCard(item, isAlreadyInStore: true),
-                      ),
-                      const SizedBox(height: 24),
+                      card,
                     ],
-                    if (notInStoreItems.isNotEmpty) ...[
-                      _buildSectionHeader(
-                        '📦 أصناف المخزون',
-                        '${notInStoreItems.length} متاح',
-                        Colors.blue,
-                      ),
-                      ...notInStoreItems.map(
-                        (item) => _buildItemCard(item, isAlreadyInStore: false),
-                      ),
+                  );
+                } else if (!item.isInStore && !_shownStockHeader) {
+                  _shownStockHeader = true;
+                  card = Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildSectionHeader('📦 أصناف المخزون', '', Colors.blue),
+                      card,
                     ],
-                    if (items.isEmpty) _buildNoSearchResults(),
-                  ],
-                );
+                  );
+                }
+
+                return card;
               },
             ),
           ),
@@ -668,37 +678,6 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
       onConfirmRemoveFromStore: _confirmRemoveFromStore,
       onNotifyChange: _updateChangesCount,
       pickImages: _pickImages,
-    );
-  }
-
-  Widget _buildErrorWidget(String error) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(
-              'حدث خطأ في تحميل البيانات',
-              style: TextStyle(fontSize: 18, color: Colors.grey.shade700),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              error,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade500),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () => setState(() {}),
-              icon: const Icon(Icons.refresh),
-              label: const Text('إعادة المحاولة'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
