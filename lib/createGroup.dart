@@ -38,7 +38,7 @@ class _CreategroupState extends State<Creategroup> {
 
   String _selectedArea = 'Egypt';
   bool _loading = false;
-
+  String _selectedCountryCode = 'EG';
   // متغيرات الحالة (تم نقلها من النطاق العام إلى داخل الكلاس)
   bool isUsed = true;
   DateTime? expiredAt;
@@ -475,11 +475,14 @@ class _CreategroupState extends State<Creategroup> {
                             onTap: () {
                               showCountryPicker(
                                 context: context,
-                                showPhoneCode: false,
+                                showPhoneCode: true,
                                 onSelect: (Country country) {
                                   setState(() {
                                     _selectedArea = country.name;
                                     _areaController.text = country.name;
+
+                                    // كود الدولة ISO مثل EG
+                                    _selectedCountryCode = country.countryCode;
                                   });
                                 },
                               );
@@ -494,34 +497,18 @@ class _CreategroupState extends State<Creategroup> {
                           Directionality(
                             textDirection: TextDirection.ltr,
                             child: IntlPhoneField(
+                              key: ValueKey(_selectedCountryCode),
+
                               decoration: _inputDecoration(
                                 'رقم الهاتف',
                                 Icons.phone_android,
                               ),
-                              initialCountryCode: 'EG',
+
+                              initialCountryCode: _selectedCountryCode,
 
                               onChanged: (phone) {
                                 intPhone = phone.number;
                                 _completePhoneNumber = phone.completeNumber;
-                                // مثال: +201012345678
-                              },
-
-                              validator: (phone) {
-                                if (phone == null || phone.number.isEmpty) {
-                                  return 'رقم الهاتف مطلوب';
-                                }
-
-                                // ❌ منع البداية بـ 0
-                                if (phone.number.startsWith('0')) {
-                                  return 'لا تبدأ الرقم بـ 0 بعد كود الدولة';
-                                }
-
-                                // validation الخاص بالمكتبة
-                                if (!phone.isValidNumber()) {
-                                  return 'رقم غير صحيح';
-                                }
-
-                                return null;
                               },
                             ),
                           ),

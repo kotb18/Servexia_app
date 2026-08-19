@@ -79,6 +79,7 @@ dependencies:
   universal_html: ^2.2.0
   firebase_pagination: ^4.2.0
   audioplayers: ^6.5.0
+  csc_picker_plus: ^0.0.3
 
 dependency_overrides:
   image: ^4.1.3 

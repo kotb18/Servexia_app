@@ -1,7 +1,12 @@
+import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl_phone_field/countries.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:intl_phone_field/phone_number.dart';
 import 'package:maintenance/Store/store_model.dart';
 import 'package:maintenance/Store/store_service.dart';
+import 'package:maintenance/invoicePage.dart';
 
 class StoreSetupScreen extends StatefulWidget {
   final String groupId;
@@ -21,7 +26,10 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _storeService = StoreService();
   bool? _isClothes;
-
+  String _fullPhone = '';
+  String _phoneCode = '';
+  String _fullWhatsapp = '';
+  String _whatsCode = '';
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -57,14 +65,20 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
       setState(() {
         _nameController.text = store.name;
         _descriptionController.text = store.description ?? '';
-        _phoneController.text = store.phone ?? '';
-        _whatsappController.text = store.whatsapp ?? '';
+        _phoneController.text =
+            store.phone?.replaceFirst(store.phoneCode ?? '', '') ?? '';
+        _whatsappController.text =
+            store.whatsapp?.replaceFirst(store.whatsCode ?? '', '') ?? '';
         _emailController.text = store.email ?? '';
         _primaryColor = store.primaryColor;
         _isClothes = store.isClothes;
         _shippingFeeController.text = store.shippingFee.toString();
+        _phoneCode = store.phoneCode ?? '';
+        _whatsCode = store.whatsCode ?? '';
       });
     }
+
+    print(_phoneCode);
   }
 
   @override
@@ -80,8 +94,6 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
@@ -132,18 +144,41 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
               icon: Icons.contact_phone_outlined,
               title: 'معلومات التواصل',
               children: [
-                _buildTextField(
-                  controller: _phoneController,
-                  label: 'رقم الهاتف',
-                  keyboardType: TextInputType.phone,
-                  icon: Icons.phone,
+                Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: _buildPhoneField(
+                    controller: _phoneController,
+                    label: 'رقم الهاتف',
+                    phoneCode: _phoneCode, // مثال: +966
+                    icon: Icons.phone,
+                    required: true,
+                    onChanged: (phone) {
+                      setState(() {
+                        _phoneCode = phone.countryCode; // +966
+                        // phoneIsoCode = phone.countryISOCode; // SA
+                        _fullPhone = phone.completeNumber;
+                      });
+                    },
+                  ),
                 ),
-                _buildTextField(
-                  controller: _whatsappController,
-                  label: 'رقم الواتساب',
-                  keyboardType: TextInputType.phone,
-                  icon: Icons.chat_bubble_outline,
+                Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: _buildPhoneField(
+                    controller: _whatsappController,
+                    label: 'رقم الهاتف',
+                    phoneCode: _whatsCode, // مثال: +966
+                    icon: Icons.phone,
+                    required: true,
+                    onChanged: (phone) {
+                      setState(() {
+                        _whatsCode = phone.countryCode; // +966
+                        // phoneIsoCode = phone.countryISOCode; // SA
+                        _fullWhatsapp = phone.completeNumber;
+                      });
+                    },
+                  ),
                 ),
+
                 _buildTextField(
                   controller: _emailController,
                   label: 'البريد الإلكتروني',
@@ -345,6 +380,62 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
   // ───────────────────────────────────────────────
   // 📝 حقل نصي محسّن
   // ───────────────────────────────────────────────
+  Widget _buildPhoneField({
+    required TextEditingController controller,
+    required String label,
+    required String? phoneCode,
+    required IconData icon,
+    required ValueChanged<PhoneNumber> onChanged,
+    bool required = false,
+  }) {
+    final normalizedCode = phoneCode?.replaceAll('+', '').trim();
+    final selectedCountry = countries.firstWhere(
+      (item) => item.dialCode == normalizedCode,
+      orElse: () => countries.firstWhere((item) => item.code == 'EG'),
+    );
+    print('ddddddddddddddddddddddddddd ${selectedCountry.code}');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: IntlPhoneField(
+        key: ValueKey('${label}_$phoneCode'),
+        controller: controller,
+        initialCountryCode: selectedCountry.code,
+        languageCode: 'ar',
+        disableLengthCheck: false,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon),
+          filled: true,
+          fillColor: const Color(0xFFF9FAFB),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFE4E7EC)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: Theme.of(context).colorScheme.primary,
+              width: 1.5,
+            ),
+          ),
+        ),
+        validator: required
+            ? (phone) {
+                if (phone == null || phone.number.trim().isEmpty) {
+                  return 'هذا الحقل مطلوب';
+                }
+                return null;
+              }
+            : null,
+        onChanged: onChanged,
+      ),
+    );
+  }
+
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -549,6 +640,16 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
   // ───────────────────────────────────────────────
   // 💾 حفظ المتجر
   // ───────────────────────────────────────────────
+  void _showError(String msg) {
+    AwesomeDialog(
+      context: context,
+      dialogType: DialogType.error,
+      title: "خطأ",
+      desc: msg,
+      btnOkOnPress: () {},
+    ).show();
+  }
+
   Future<void> _saveStore() async {
     if (!_formKey.currentState!.validate()) return;
     if (_isClothes == null) {
@@ -557,7 +658,14 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
       ).showSnackBar(const SnackBar(content: Text('يرجى تحديد نوع المتجر')));
       return;
     }
-
+    if (_phoneController.text.startsWith('0')) {
+      _showError('لا تبدأ الرقم بـ 0 بعد كود الدولة');
+      return;
+    }
+    if (_whatsappController.text.startsWith('0')) {
+      _showError('لا تبدأ رقم الواتس بـ 0 بعد كود الدولة');
+      return;
+    }
     setState(() => _isLoading = true);
 
     try {
@@ -569,12 +677,16 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
             ? null
             : _descriptionController.text.trim(),
         storeSlug: 'slug',
-        phone: _phoneController.text.trim().isEmpty
-            ? null
-            : _phoneController.text.trim(),
-        whatsapp: _whatsappController.text.trim().isEmpty
-            ? null
-            : _whatsappController.text.trim(),
+        phone: _fullPhone.trim().isEmpty
+            ? '$_phoneCode'
+                  '${_phoneController.text}'
+            : _fullPhone,
+        phoneCode: _phoneCode,
+        whatsapp: _fullWhatsapp.trim().isEmpty
+            ? '$_whatsCode'
+                  '${_whatsappController.text}'
+            : _fullWhatsapp,
+        whatsCode: _whatsCode,
         email: _emailController.text.trim().isEmpty
             ? null
             : _emailController.text.trim(),

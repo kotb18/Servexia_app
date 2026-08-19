@@ -9,7 +9,9 @@ class StoreModel {
   final String? bannerUrl;
   final String primaryColor;
   final String? phone;
+  final String? phoneCode;
   final String? whatsapp;
+  final String? whatsCode;
   final String? email;
   final String? facebookUrl;
   final String? instagramUrl;
@@ -43,6 +45,8 @@ class StoreModel {
     required this.settings,
     required this.isClothes,
     required this.shippingFee,
+    this.phoneCode,
+    this.whatsCode,
   });
 
   factory StoreModel.fromFirestore(DocumentSnapshot doc) {
@@ -56,7 +60,9 @@ class StoreModel {
       bannerUrl: data['bannerUrl'],
       primaryColor: data['primaryColor'] ?? '#2196F3',
       phone: data['phone'],
+      phoneCode: data['phoneCode'],
       whatsapp: data['whatsapp'],
+      whatsCode: data['whatsCode'],
       email: data['email'],
       facebookUrl: data['facebookUrl'],
       instagramUrl: data['instagramUrl'],
@@ -80,7 +86,9 @@ class StoreModel {
       'bannerUrl': bannerUrl,
       'primaryColor': primaryColor,
       'phone': phone,
+      'phoneCode': phoneCode,
       'whatsapp': whatsapp,
+      'whatsCode': whatsCode,
       'email': email,
       'facebookUrl': facebookUrl,
       'instagramUrl': instagramUrl,

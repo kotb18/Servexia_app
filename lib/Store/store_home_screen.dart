@@ -90,7 +90,9 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   String get storeName => _store?.name ?? 'متجر';
   String? get storeDescription => _store?.description;
   String? get phone => _store?.phone;
+  String? get phoneCode => _store?.phoneCode;
   String? get whatsapp => _store?.whatsapp;
+  String? get whatsCode => _store?.whatsCode;
   String? get email => _store?.email;
   double get shippingFee => _store?.shippingFee ?? 0.0;
   bool get isClothes => _store?.isClothes ?? false;
@@ -429,8 +431,8 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                       if (phone != null && phone!.isNotEmpty)
                         _buildContactChip(
                           icon: Icons.phone,
-                          label: phone!,
-                          onTap: () => _launchUrl('tel:$phone'),
+                          label: phone!.replaceFirst(phoneCode ?? '', '0'),
+                          onTap: () => _launchUrl('tel:${phone ?? ''}'),
                         ),
                       if (whatsapp != null && whatsapp!.isNotEmpty)
                         _buildContactChip(
@@ -441,7 +443,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                                 'اهلا $storeName اريد الاستفسار عن منتج';
 
                             _launchUrl(
-                              'https://wa.me/+2$whatsapp?text=${Uri.encodeComponent(message)}',
+                              'https://wa.me/${whatsapp ?? ''}?text=${Uri.encodeComponent(message)}',
                             );
                           },
                         ),

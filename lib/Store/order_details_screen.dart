@@ -843,7 +843,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           ),
           Expanded(
             child: InkWell(
-              onTap: () => _makePhoneCall(phone),
+              onTap: () =>
+                  !widget.isFromCustomerOrders ? _makePhoneCall(phone) : null,
               borderRadius: BorderRadius.circular(8),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
@@ -884,7 +885,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           ),
           Expanded(
             child: InkWell(
-              onTap: () => _openWhatsApp(whatsapp),
+              onTap: () =>
+                  !widget.isFromCustomerOrders ? _openWhatsApp(whatsapp) : null,
               borderRadius: BorderRadius.circular(8),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
