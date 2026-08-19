@@ -363,7 +363,7 @@ class _StoreCheckoutScreenState extends State<StoreCheckoutScreen> {
       children: [
         CSCPickerPlus(
           layout: Layout.vertical,
-          // defaultCountry: CscCountry.Egypt,
+          //  currentCountry: 'مصر',
           showStates: true,
           showCities: true,
           flagState: CountryFlag.ENABLE,

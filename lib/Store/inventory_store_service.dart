@@ -37,8 +37,17 @@ class InventoryStoreService {
   }) {
     Query<Map<String, dynamic>> query = _itemsCollection(groupId)
         .where('isInStore', isEqualTo: true)
-        .where('quantity', isGreaterThan: 0.0)
-        .orderBy('name');
+        .where('quantity', isGreaterThan: 0.0);
+
+    if (searchQuery != null && searchQuery.isNotEmpty) {
+      query = query.where(
+        'name',
+        isGreaterThanOrEqualTo: searchQuery,
+        isLessThan: '${searchQuery}\uf8ff',
+      );
+    }
+
+    query = query.orderBy('name');
 
     return query;
   }
