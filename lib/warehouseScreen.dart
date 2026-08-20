@@ -52,7 +52,6 @@ class _StoreScreenState extends State<StoreScreen> {
   final _formKey = GlobalKey<FormState>();
   String scannedId = '';
   double selectedQuantity = 0.0;
-  bool? _isWeighted;
 
   /// تحميل المواقع
   Future<List<String>> loadLocations() async {
@@ -115,16 +114,7 @@ class _StoreScreenState extends State<StoreScreen> {
       query = query.orderBy('name');
     }
 
-    return query.limit(20);
-  }
-
-  Query<Map<String, dynamic>> itemsQueryDeleted() {
-    return FirebaseFirestore.instance
-        .collection('inventory')
-        .doc(widget.groupId)
-        .collection('items')
-        .where('deleted', isEqualTo: true)
-        .orderBy('name');
+    return query;
   }
 
   TextEditingController itemNameController = TextEditingController();
@@ -238,7 +228,7 @@ class _StoreScreenState extends State<StoreScreen> {
 
             try {
               // جلب البيانات الحالية بناءً على الفلتر المختار بدقة
-              final query = !deletedItems ? itemsQuery() : itemsQueryDeleted();
+              final query = itemsQuery();
               final snapshot = await query.get();
 
               // تحويل المستندات إلى قائمة من الخرائط (Maps)
@@ -403,33 +393,40 @@ class _StoreScreenState extends State<StoreScreen> {
                 skuController.text = raw;
                 setState(() {
                   scannedId = raw;
-                  if (raw.startsWith('21') ||
-                      raw.startsWith('20') ||
-                      raw.startsWith('25')) {
+                  final weighteId = raw.substring(2, 7);
+                  print('yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy $weighteId');
+                  final index = itemsList.indexWhere(
+                    (item) => item['sku'] == raw || item['sku'] == weighteId,
+                  );
+
+                  if (index == -1) {
+                    _showError("المنتج غير موجود في القائمة");
+                    return;
+                  }
+
+                  final bool isWeighted =
+                      itemsList[index]['isWeighted'] ?? false;
+                  if (isWeighted == true) {
                     setState(() {
-                      _isWeighted = true;
+                      print('trueeeeeeeeeeeeeeeeeeeeeeeeeeeeee');
                       scannedId = raw.substring(2, 7);
                     });
                   } else {
                     setState(() {
                       scannedId = raw;
-                      _isWeighted = false;
                     });
                   }
                   print('ppppppppppppppppppppppppppp $scannedId');
-                  final index = itemsList.indexWhere(
-                    (item) => item['sku'] == scannedId,
-                  );
 
                   if (index == -1) return;
 
                   setState(() {
-                    if (!selectedIndex.contains(index) || _isWeighted == true) {
+                    if (!selectedIndex.contains(index) || isWeighted == true) {
                       items.add({
                         'id': itemsList[index]['sku'],
                         'isInventoryItem': true,
                         'name': itemsList[index]['name'],
-                        'quantity': _isWeighted!
+                        'quantity': isWeighted
                             ? double.parse(
                                 (double.parse(raw.substring(7, 12)) / 1000)
                                     .toStringAsFixed(2),
@@ -456,10 +453,10 @@ class _StoreScreenState extends State<StoreScreen> {
                       buttonText = ' اضافة ${selectedIndex.length} عنصر';
                     }
                     print('kkkkkkkkkkkkkkkkkkkkkkk $items');
-                    counters[index] += _isWeighted!
+                    counters[index] += isWeighted
                         ? double.parse(raw.substring(7, 12)) / 1000
                         : 1;
-                    if (!_isWeighted!) {
+                    if (!isWeighted) {
                       items
                           .where(
                             (item) => item['id'] == itemsList[index]['sku'],
@@ -650,8 +647,8 @@ class _StoreScreenState extends State<StoreScreen> {
                       key: ValueKey(
                         '$selectedLocation-$searchText-$deletedItems',
                       ),
-                      limit: 10,
-                      query: !deletedItems ? itemsQuery() : itemsQueryDeleted(),
+                      limit: widget.isFromInvoice ? 1000 : 10,
+                      query: itemsQuery(),
                       viewType: ViewType.list,
                       onEmpty: Center(
                         child: Text(
