@@ -662,9 +662,6 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
             onEmpty: _buildEmptyState(),
 
             itemBuilder: (context, docs, index) {
-              debugPrint(
-                'Pagination: loaded ${docs.length} items, current index: $index',
-              );
               final doc = docs[index];
               final item = InventoryItemModel.fromFirestore(doc);
               return _buildProductCard(item);

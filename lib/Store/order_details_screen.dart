@@ -321,7 +321,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               _buildWhatsAppRow(
                 Icons.message,
                 'واتساب',
-                '+2${widget.order.customerInfo.whatsapp!}',
+                widget.order.customerInfo.whatsapp!,
               ),
             ],
           ],

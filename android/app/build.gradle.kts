@@ -22,7 +22,7 @@ android {
 
     namespace = "com.example.maintenance"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "28.0.13004108" // دعم 16KB page size
+    ndkVersion = "28.2.13676358"// دعم 16KB page size
      packaging {
              jniLibs {
                useLegacyPackaging = true
