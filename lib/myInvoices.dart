@@ -1140,15 +1140,8 @@ class _FilterPanelState extends State<FilterPanel> {
               items: [
                 const DropdownMenuItem(value: 'الكل', child: Text('الكل')),
                 const DropdownMenuItem(value: 'كاش', child: Text('كاش')),
-                const DropdownMenuItem(value: 'شيك', child: Text('شيك')),
-                const DropdownMenuItem(
-                  value: 'تحويل بنكي',
-                  child: Text('تحويل بنكي'),
-                ),
-                const DropdownMenuItem(
-                  value: 'بطاقة ائتمان',
-                  child: Text('بطاقة ائتمان'),
-                ),
+                const DropdownMenuItem(value: 'آجل', child: Text('آجل')),
+                const DropdownMenuItem(value: 'تقسيط', child: Text('تقسيط')),
               ],
               onChanged: (value) {
                 setState(() {
@@ -1357,6 +1350,7 @@ class _FilterPanelState extends State<FilterPanel> {
                 ),
               ],
             ),
+            SizedBox(height: 60),
           ],
         ),
       ),
@@ -2316,6 +2310,18 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                 icon: Icons.check_circle,
                 onTap: () {
                   _updateInstallmentStatus(installment.number, 'تم');
+                  if (_currentInvoice.allInstallmentsPaid) {
+                    FirebaseFirestore.instance
+                        .collection('invoices')
+                        .doc(widget.groupId)
+                        .collection('items')
+                        .doc(_currentInvoice.id)
+                        .update({
+                          'isPaid': true,
+                          'isPending': false,
+                          'isDelayed': false,
+                        });
+                  }
                   Navigator.pop(context);
                 },
               ),
@@ -2327,6 +2333,12 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                 icon: Icons.schedule,
                 onTap: () {
                   _updateInstallmentStatus(installment.number, '!');
+                  FirebaseFirestore.instance
+                      .collection('invoices')
+                      .doc(widget.groupId)
+                      .collection('items')
+                      .doc(_currentInvoice.id)
+                      .update({'isPending': true, 'isDelayed': false});
                   Navigator.pop(context);
                 },
               ),
@@ -2338,6 +2350,12 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                 icon: Icons.warning,
                 onTap: () {
                   _updateInstallmentStatus(installment.number, 'متأخر');
+                  FirebaseFirestore.instance
+                      .collection('invoices')
+                      .doc(widget.groupId)
+                      .collection('items')
+                      .doc(_currentInvoice.id)
+                      .update({'isPending': false, 'isDelayed': true});
                   Navigator.pop(context);
                 },
               ),

@@ -93,13 +93,13 @@ class InvoiceService {
         installmentStatus.isNotEmpty &&
         installmentStatus != 'الكل') {
       if (installmentStatus == 'مدفوع') {
-        query = query.where('allInstallmentsPaid', isEqualTo: true);
-      } else if (installmentStatus == 'معلق') {
         query = query
-            .where('hasInstallments', isEqualTo: true)
-            .where('allInstallmentsPaid', isEqualTo: false);
+            .where('isPaid', isEqualTo: true)
+            .where('isPending', isEqualTo: false);
+      } else if (installmentStatus == 'معلق') {
+        query = query.where('isPending', isEqualTo: true);
       } else if (installmentStatus == 'متأخر') {
-        query = query.where('overdueInstallmentsCount', isGreaterThan: 0);
+        query = query.where('isDelayed', isEqualTo: true);
       }
     }
 

@@ -1317,6 +1317,9 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           : 'return-${widget.state.originalInvoiceNumber ?? ''}',
       "createdAt": DateTime.now().toIso8601String(),
       'paymentMethod': selectedPaymentMethod,
+      'isPaid': selectedPaymentMethod == 'كاش' ? true : false,
+      'isPending': selectedPaymentMethod == 'كاش' ? false : true,
+      'isDelayed': false,
       'thereIsReturn': false,
       if (widget.type == 'مرتجع') ...{
         'originalInvoiceId': widget.state.originalInvoiceId,
@@ -1358,6 +1361,16 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
           "status": widget.state.paymentScheduleData[i]['status'],
         };
       }
+      /*  dataFinal['paymentSchedule'] = [
+        for (int i = 0; i < widget.state.paymentScheduleData.length; i++)
+          {
+            "type": widget.state.paymentScheduleData[i]['type'],
+            "value": widget.state.paymentScheduleData[i]['value'],
+            "date": (widget.state.paymentScheduleData[i]['date'] as DateTime)
+                .toIso8601String(),
+            "status": widget.state.paymentScheduleData[i]['status'],
+          },
+      ]; */
     }
 
     final batch = firestore.batch();
@@ -2638,11 +2651,67 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
       height: 52,
       child: ElevatedButton.icon(
         onPressed: isValid
-            ? () => showCustomDialog(
-                context: context,
-                title: 'تأكيد الحفظ',
-                message: 'إختر نوع الفاتوره',
-              )
+            ? () async {
+                try {
+                  setState(() => widget.state.loading = true);
+                  int toCents(double value) => (value * 100).round();
+
+                  // Validate payment schedule sums
+                  if (selectedPaymentMethod != 'كاش' &&
+                      widget.type != 'عرض سعر') {
+                    final sum = widget.state.paymentScheduleData.fold<double>(
+                      0.0,
+                      (sum, item) {
+                        final value = item['value'];
+                        return sum + (value is num ? value.toDouble() : 0.0);
+                      },
+                    );
+
+                    final sumInCents = toCents(sum);
+                    final totalInCents = toCents(widget.state.total);
+
+                    if (sumInCents != totalInCents) {
+                      AwesomeDialog(
+                        context: context,
+                        dialogType: DialogType.error,
+                        title: 'خطأ',
+                        desc:
+                            'لا يمكن أن يكون مجموع الأقساط غير مساوي للمجموع الكلي',
+                        btnOkText: 'حسنًا',
+                        btnOkOnPress: () {},
+                      ).show();
+                      setState(() => widget.state.loading = false);
+                      return;
+                    }
+                  }
+                  await saveInvoice();
+                  setState(() => widget.state.loading = false);
+                  if (!mounted) return;
+
+                  await showCustomDialog(
+                    context: context,
+                    title: 'تم الحفظ بنجاح',
+                    message: 'اختر نوع طباعة الفاتورة',
+                  );
+
+                  if (!mounted) return;
+
+                  Navigator.popUntil(
+                    context,
+                    ModalRoute.withName(WorkspaceHomeScreen.screenroute),
+                  );
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('خطأ: $e'),
+                        backgroundColor: AppColors.danger,
+                      ),
+                    );
+                  }
+                  setState(() => widget.state.loading = false);
+                }
+              }
             : null,
         icon: const Icon(Icons.save_outlined, color: Colors.white),
         label: Text(
@@ -2661,65 +2730,78 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     required BuildContext context,
     required String title,
     required String message,
-
-    VoidCallback? onConfirm,
   }) async {
     await showDialog(
       context: context,
-      //  barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(title),
-          content: Text(message),
-          actions: [
-            ElevatedButton(
-              onPressed: () async {
-                final navigator = Navigator.of(context);
-                if (!mounted) return;
-                navigator.pop();
-                await _handleSave(true);
-              },
-              child: Text('طابعة حرارية'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final navigator = Navigator.of(context);
-                if (!mounted) return;
-                navigator.pop();
-                await _handleSave(false);
-              },
-              child: Text('طابعة A4'),
-            ),
-          ],
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return PopScope(
+          canPop: false,
+          child: AlertDialog(
+            title: Text(title),
+            content: Text(message),
+            actions: [
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    setState(() => widget.state.loading = true);
+                    if (dialogContext.mounted) {
+                      Navigator.of(dialogContext).pop();
+                      setState(() => widget.state.loading = false);
+                    }
+                    await _printMode(true);
+                  } catch (e) {
+                    if (dialogContext.mounted) {
+                      ScaffoldMessenger.of(dialogContext).showSnackBar(
+                        SnackBar(content: Text('حدث خطأ أثناء الطباعة: $e')),
+                      );
+                      setState(() => widget.state.loading = false);
+                    }
+                  }
+                },
+                child: const Text('حرارية'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    setState(() => widget.state.loading = true);
+                    if (dialogContext.mounted) {
+                      Navigator.of(dialogContext).pop();
+                      setState(() => widget.state.loading = false);
+                    }
+                    await _printMode(false);
+                  } catch (e) {
+                    if (dialogContext.mounted) {
+                      ScaffoldMessenger.of(dialogContext).showSnackBar(
+                        SnackBar(content: Text('حدث خطأ أثناء الطباعة: $e')),
+                      );
+                      setState(() => widget.state.loading = false);
+                    }
+                  }
+                },
+                child: const Text('A4'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  if (!mounted) return;
+
+                  Navigator.popUntil(
+                    context,
+                    ModalRoute.withName(WorkspaceHomeScreen.screenroute),
+                  );
+                },
+                child: const Text('الغاء'),
+              ),
+            ],
+          ),
         );
       },
     );
   }
 
-  Future<void> _handleSave(bool thermalInvoice) async {
-    // Validate payment schedule sums
-    if (selectedPaymentMethod != 'كاش' && widget.type != 'عرض سعر') {
-      double sum = widget.state.paymentScheduleData.fold(
-        0.0,
-        (sum, item) => sum + ((item['value'] ?? 0.0) as num).toDouble(),
-      );
-      if (sum != widget.state.total) {
-        AwesomeDialog(
-          context: context,
-          dialogType: DialogType.error,
-          title: 'خطأ',
-          desc: 'لا يمكن ان يكون مجموع الأقساط لا يساوي المجموع الكلي',
-          btnOkText: 'حسنا',
-          btnOkOnPress: () {},
-        ).show();
-        return;
-      }
-    }
-
+  Future<void> _printMode(bool thermalInvoice) async {
     try {
       setState(() => widget.state.loading = true);
-      await saveInvoice();
-
       // Prepare items for PDF
       List<Map<String, dynamic>> pdfItems = [];
       if (widget.type == 'صيانة') {
@@ -2841,10 +2923,6 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
       returnItems.clear();
 
       if (mounted) {
-        Navigator.popUntil(
-          context,
-          ModalRoute.withName(WorkspaceHomeScreen.screenroute),
-        );
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -3282,7 +3360,7 @@ class InvoiceTypeStyles {
   }
 }
 
-// Helper widget for bullet points
+/* // Helper widget for bullet points
 pw.Widget _pdfBullet(PdfColor color, {double size = 8}) {
   return pw.Container(
     width: size,
@@ -3311,7 +3389,7 @@ pw.Widget _pdfIconLabel(String label, PdfColor color, {double fontSize = 8}) {
       ),
     ),
   );
-}
+} */
 
 class InvoiceGenerator {
   const InvoiceGenerator._();
