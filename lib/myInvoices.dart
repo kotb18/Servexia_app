@@ -2316,11 +2316,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                         .doc(widget.groupId)
                         .collection('items')
                         .doc(_currentInvoice.id)
-                        .update({
-                          'isPaid': true,
-                          'isPending': false,
-                          'isDelayed': false,
-                        });
+                        .update({'isPaid': true});
                   }
                   Navigator.pop(context);
                 },
@@ -2331,14 +2327,21 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                 label: 'معلق',
                 color: const Color(0xFFF59E0B),
                 icon: Icons.schedule,
-                onTap: () {
-                  _updateInstallmentStatus(installment.number, '!');
+                onTap: () async {
+                  await _updateInstallmentStatus(installment.number, '!');
+                  final hasLateInstallment = _currentInvoice.installments.any(
+                    // ignore: unrelated_type_equality_checks
+                    (installmentMap) => installmentMap.isOverdue == 'متأخر',
+                  );
                   FirebaseFirestore.instance
                       .collection('invoices')
                       .doc(widget.groupId)
                       .collection('items')
                       .doc(_currentInvoice.id)
-                      .update({'isPending': true, 'isDelayed': false});
+                      .update({
+                        'isPending': true,
+                        'isDelayed': !hasLateInstallment ? false : true,
+                      });
                   Navigator.pop(context);
                 },
               ),
@@ -2348,14 +2351,22 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                 label: 'متأخر',
                 color: const Color(0xFFEF4444),
                 icon: Icons.warning,
-                onTap: () {
-                  _updateInstallmentStatus(installment.number, 'متأخر');
+                onTap: () async {
+                  await _updateInstallmentStatus(installment.number, 'متأخر');
+                  final hasPendingInstallment = _currentInvoice.installments
+                      .any(
+                        // ignore: unrelated_type_equality_checks
+                        (installmentMap) => installmentMap.isOverdue == 'معلق',
+                      );
                   FirebaseFirestore.instance
                       .collection('invoices')
                       .doc(widget.groupId)
                       .collection('items')
                       .doc(_currentInvoice.id)
-                      .update({'isPending': false, 'isDelayed': true});
+                      .update({
+                        'isPending': !hasPendingInstallment ? false : true,
+                        'isDelayed': true,
+                      });
                   Navigator.pop(context);
                 },
               ),
