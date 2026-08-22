@@ -93,9 +93,7 @@ class InvoiceService {
         installmentStatus.isNotEmpty &&
         installmentStatus != 'الكل') {
       if (installmentStatus == 'مدفوع') {
-        query = query
-            .where('isPaid', isEqualTo: true)
-            .where('isPending', isEqualTo: false);
+        query = query.where('isPaid', isEqualTo: true);
       } else if (installmentStatus == 'معلق') {
         query = query.where('isPending', isEqualTo: true);
       } else if (installmentStatus == 'متأخر') {

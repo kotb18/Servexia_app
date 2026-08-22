@@ -252,6 +252,7 @@ class Installment {
 
   /// التحقق من أن القسط مدفوع
   bool get isPaid => status == 'تم';
+  bool get isPending => status == '!';
 
   /// التحقق من أن القسط متأخر
   bool get isOverdue =>
@@ -261,6 +262,7 @@ class Installment {
   String get statusColor {
     if (isPaid) return '#10B981'; // أخضر
     if (isOverdue) return '#EF4444'; // أحمر
+    if (isPending) return '#F59E0B';
     return '#F59E0B'; // برتقالي (معلق)
   }
 

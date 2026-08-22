@@ -2308,15 +2308,19 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                 label: 'مدفوع',
                 color: const Color(0xFF10B981),
                 icon: Icons.check_circle,
-                onTap: () {
-                  _updateInstallmentStatus(installment.number, 'تم');
+                onTap: () async {
+                  await _updateInstallmentStatus(installment.number, 'تم');
                   if (_currentInvoice.allInstallmentsPaid) {
                     FirebaseFirestore.instance
                         .collection('invoices')
                         .doc(widget.groupId)
                         .collection('items')
                         .doc(_currentInvoice.id)
-                        .update({'isPaid': true});
+                        .update({
+                          'isPaid': true,
+                          'isPending': false,
+                          'isDelayed': false,
+                        });
                   }
                   Navigator.pop(context);
                 },
@@ -2331,7 +2335,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                   await _updateInstallmentStatus(installment.number, '!');
                   final hasLateInstallment = _currentInvoice.installments.any(
                     // ignore: unrelated_type_equality_checks
-                    (installmentMap) => installmentMap.isOverdue == 'متأخر',
+                    (installmentMap) => installmentMap.isOverdue == true,
                   );
                   FirebaseFirestore.instance
                       .collection('invoices')
@@ -2356,7 +2360,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                   final hasPendingInstallment = _currentInvoice.installments
                       .any(
                         // ignore: unrelated_type_equality_checks
-                        (installmentMap) => installmentMap.isOverdue == 'معلق',
+                        (installmentMap) => installmentMap.isPending == true,
                       );
                   FirebaseFirestore.instance
                       .collection('invoices')
