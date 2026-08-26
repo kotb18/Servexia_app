@@ -15,9 +15,8 @@ import 'package:intl/intl.dart';
 List<Map<String, dynamic>> itemsList = [];
 String buttonText = '';
 List<Map> items = [];
-Set<String> selectedIds = {}; // ← تغيير: Set<String> بدلاً من List<int>
-Map<String, double> itemCounters =
-    {}; // ← تغيير: Map<sku, count> بدلاً من List<double>
+Set<String> selectedIds = {};
+Map<String, double> itemCounters = {};
 
 class StoreScreen extends StatefulWidget {
   final String groupId;
@@ -61,6 +60,9 @@ class _StoreScreenState extends State<StoreScreen> {
   final Color textPrimary = const Color(0xFF1E293B);
   final Color textSecondary = const Color(0xFF64748B);
   final Color dangerColor = const Color(0xFFEF4444);
+
+  // ═══ حالة إظهار/إخفاء الهيدر ═══
+  bool _showHeader = true;
 
   // ─── تحميل المواقع ───
   Future<List<String>> loadLocations() async {
@@ -198,7 +200,6 @@ class _StoreScreenState extends State<StoreScreen> {
       itemCounters.clear();
       buttonText = ' اضافة ${selectedIds.length} عنصر';
     }
-    // مزامنة الـ selectedIds و itemCounters من items الموجودة مسبقاً (Edit mode)
     for (var item in items) {
       final sku = item['sku']?.toString() ?? item['id']?.toString();
       if (sku != null && sku.isNotEmpty) {
@@ -221,195 +222,289 @@ class _StoreScreenState extends State<StoreScreen> {
     super.dispose();
   }
 
+  // ═══ معالج السكرول ═══
+  void _handleScroll(ScrollNotification notification) {
+    if (notification is ScrollUpdateNotification) {
+      final delta = notification.scrollDelta ?? 0;
+      final pos = notification.metrics.pixels;
+
+      // سكرول لأسفل → إخفاء
+      if (delta > 3 && pos > 20 && _showHeader) {
+        setState(() => _showHeader = false);
+      }
+      // سكرول لأعلى → إظهار
+      else if (delta < -3 && !_showHeader) {
+        setState(() => _showHeader = true);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: bgColor,
-      appBar: AppBar(
-        elevation: 0,
-        centerTitle: true,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [primaryColor, secondaryColor],
-              begin: Alignment.topRight,
-              end: Alignment.bottomLeft,
-            ),
-          ),
-        ),
-        title: const Text(
-          'المخزن',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-            color: Colors.white,
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          if (widget.isFromInvoice && items.isNotEmpty)
-            Container(
-              margin: const EdgeInsets.only(left: 8),
-              child: Chip(
-                backgroundColor: Colors.white.withOpacity(0.2),
-                label: Text(
-                  '${items.length} صنف',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // ─── Header: Search + Filters ───
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            decoration: BoxDecoration(
-              color: cardColor,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: bgColor,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: TextField(
-                    controller: searchController,
-                    enabled: !deletedItems && selectedLocation != null,
-                    textAlign: TextAlign.right,
-                    decoration: InputDecoration(
-                      hintText: 'ابحث باسم الصنف أو كود الصنف...',
-                      hintStyle: TextStyle(color: textSecondary, fontSize: 14),
-                      prefixIcon: Icon(Icons.search, color: primaryColor),
-                      suffixIcon: searchText.isNotEmpty
-                          ? IconButton(
-                              icon: Icon(
-                                Icons.clear,
-                                color: textSecondary,
-                                size: 18,
-                              ),
-                              onPressed: () {
-                                searchController.clear();
-                                setState(() => searchText = '');
-                                _refreshItemsList();
-                              },
-                            )
-                          : null,
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                        vertical: 16,
-                        horizontal: 16,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ═══════════════════════════════════════
+            //  الهيدر (AppBar + Search + Filters)
+            //  يختفي بالكامل مع السكرول لأسفل
+            //  ويظهر فوراً مع السكرول لأعلى
+            // ═══════════════════════════════════════
+            ClipRect(
+              child: AnimatedCrossFade(
+                firstCurve: Curves.fastOutSlowIn,
+                secondCurve: Curves.fastOutSlowIn,
+                sizeCurve: Curves.fastOutSlowIn,
+                duration: const Duration(milliseconds: 350),
+                crossFadeState: _showHeader
+                    ? CrossFadeState.showFirst
+                    : CrossFadeState.showSecond,
+                firstChild: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // ─── AppBar ───
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [primaryColor, secondaryColor],
+                          begin: Alignment.topRight,
+                          end: Alignment.bottomLeft,
+                        ),
                       ),
-                    ),
-                    onChanged: (value) {
-                      setState(() => searchText = value.trim());
-                      _refreshItemsList();
-                    },
-                  ),
-                ),
-                const SizedBox(height: 12),
-                FutureBuilder<List<String>>(
-                  future: loadLocations(),
-                  builder: (context, snap) {
-                    if (!snap.hasData) {
-                      return const SizedBox(
-                        height: 40,
-                        child: Center(
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                      child: AppBar(
+                        elevation: 0,
+                        backgroundColor: Colors.transparent,
+                        centerTitle: true,
+                        title: const Text(
+                          'المخـــــازن',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 20,
+                            color: Colors.white,
                           ),
                         ),
-                      );
-                    }
-                    final locations = snap.data!;
-                    return SizedBox(
-                      height: 44,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        reverse: true,
-                        children: [
-                          _buildFilterChip('الكل', 'all'),
-                          ...locations.map((loc) => _buildFilterChip(loc, loc)),
+                        leading: IconButton(
+                          icon: const Icon(
+                            Icons.arrow_back_ios,
+                            color: Colors.white,
+                          ),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        actions: [
+                          if (widget.isFromInvoice && items.isNotEmpty)
+                            Container(
+                              margin: const EdgeInsets.only(left: 8),
+                              child: Chip(
+                                backgroundColor: Colors.white.withOpacity(0.2),
+                                label: Text(
+                                  '${items.length} صنف',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          // ─── List ───
-          Expanded(
-            child:
-                (selectedLocation == null &&
-                    searchText.isEmpty &&
-                    !deletedItems)
-                ? _buildEmptySearch()
-                : FirestorePagination(
-                    key: ValueKey(
-                      '$selectedLocation-$searchText-$deletedItems',
                     ),
-                    limit: widget.isFromInvoice ? 1000 : 10,
-                    query: itemsQuery(),
-                    viewType: ViewType.list,
-                    onEmpty: _buildEmptyList(),
-                    bottomLoader: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: primaryColor,
-                        ),
+
+                    // ─── Search + Filters ───
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      decoration: BoxDecoration(
+                        color: cardColor,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.03),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          // Search
+                          Container(
+                            decoration: BoxDecoration(
+                              color: bgColor,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            child: TextField(
+                              controller: searchController,
+                              enabled:
+                                  !deletedItems && selectedLocation != null,
+                              textAlign: TextAlign.right,
+                              decoration: InputDecoration(
+                                hintText: 'ابحث باسم الصنف أو كود الصنف...',
+                                hintStyle: TextStyle(
+                                  color: textSecondary,
+                                  fontSize: 14,
+                                ),
+                                prefixIcon: Icon(
+                                  Icons.search,
+                                  color: primaryColor,
+                                ),
+                                suffixIcon: searchText.isNotEmpty
+                                    ? IconButton(
+                                        icon: Icon(
+                                          Icons.clear,
+                                          color: textSecondary,
+                                          size: 18,
+                                        ),
+                                        onPressed: () {
+                                          searchController.clear();
+                                          setState(() => searchText = '');
+                                          _refreshItemsList();
+                                        },
+                                      )
+                                    : null,
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                  horizontal: 16,
+                                ),
+                              ),
+                              onChanged: (value) {
+                                setState(() => searchText = value.trim());
+                                _refreshItemsList();
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Locations
+                          FutureBuilder<List<String>>(
+                            future: loadLocations(),
+                            builder: (context, snap) {
+                              if (!snap.hasData) {
+                                return const SizedBox(
+                                  height: 40,
+                                  child: Center(
+                                    child: SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                              final locations = snap.data!;
+                              return SizedBox(
+                                height: 44,
+                                child: ListView(
+                                  scrollDirection: Axis.horizontal,
+                                  reverse: true,
+                                  children: [
+                                    _buildFilterChip('الكل', 'all'),
+                                    ...locations.map(
+                                      (loc) => _buildFilterChip(loc, loc),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
                     ),
-                    itemBuilder: (context, docs, index) {
-                      final doc = docs[index];
-                      final data = doc.data() as Map<String, dynamic>;
-                      final String sku = data['sku']?.toString() ?? doc.id;
-                      final bool itemSelected = selectedIds.contains(sku);
-                      final double currentQty = itemCounters[sku] ?? 0.0;
-                      final bool isWeightedItem = data['isWeighted'] ?? false;
-                      final String unitText = data['unit']?.toString() ?? '';
+                  ],
+                ),
+                secondChild: const SizedBox.shrink(),
+              ),
+            ),
 
-                      return _buildItemCard(
-                        data,
-                        doc.id,
-                        sku,
-                        itemSelected,
-                        currentQty,
-                        isWeightedItem,
-                        unitText,
-                      );
-                    },
-                  ),
-          ),
+            // ═══════════════════════════════════════
+            //  القائمة مع مراقب السكرول
+            // ═══════════════════════════════════════
+            Expanded(
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  _handleScroll(notification);
+                  return false;
+                },
+                child:
+                    (selectedLocation == null &&
+                        searchText.isEmpty &&
+                        !deletedItems)
+                    ? _buildEmptySearch()
+                    : FirestorePagination(
+                        key: ValueKey(
+                          '$selectedLocation-$searchText-$deletedItems',
+                        ),
+                        limit: widget.isFromInvoice ? 1000 : 10,
+                        query: itemsQuery(),
+                        viewType: ViewType.list,
+                        onEmpty: _buildEmptyList(),
+                        bottomLoader: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: primaryColor,
+                            ),
+                          ),
+                        ),
+                        itemBuilder: (context, docs, index) {
+                          final doc = docs[index];
+                          final data = doc.data() as Map<String, dynamic>;
+                          final String sku = data['sku']?.toString() ?? doc.id;
+                          final bool itemSelected = selectedIds.contains(sku);
+                          final double currentQty = itemCounters[sku] ?? 0.0;
+                          final bool isWeightedItem =
+                              data['isWeighted'] ?? false;
+                          final String unitText =
+                              data['unit']?.toString() ?? '';
 
-          // ─── Bottom Bar ───
-          if (widget.isFromInvoice)
-            _buildInvoiceActionBar()
-          else
-            _buildStoreActionBar(),
-        ],
+                          return _buildItemCard(
+                            data,
+                            doc.id,
+                            sku,
+                            itemSelected,
+                            currentQty,
+                            isWeightedItem,
+                            unitText,
+                          );
+                        },
+                      ),
+              ),
+            ),
+          ],
+        ),
       ),
+
+      // ═══ Bottom Bar ثابت ═══
+      bottomNavigationBar: widget.isFromInvoice
+          ? ClipRRect(
+              child: AnimatedCrossFade(
+                firstCurve: Curves.fastOutSlowIn,
+                secondCurve: Curves.fastOutSlowIn,
+                sizeCurve: Curves.fastOutSlowIn,
+                duration: const Duration(milliseconds: 350),
+                crossFadeState: _showHeader
+                    ? CrossFadeState.showFirst
+                    : CrossFadeState.showSecond,
+                firstChild: _buildInvoiceActionBar(),
+                secondChild: const SizedBox.shrink(),
+              ),
+            )
+          : ClipRRect(
+              child: AnimatedCrossFade(
+                firstCurve: Curves.fastOutSlowIn,
+                secondCurve: Curves.fastOutSlowIn,
+                sizeCurve: Curves.fastOutSlowIn,
+                duration: const Duration(milliseconds: 350),
+                crossFadeState: _showHeader
+                    ? CrossFadeState.showFirst
+                    : CrossFadeState.showSecond,
+                firstChild: _buildStoreActionBar(),
+                secondChild: const SizedBox.shrink(),
+              ),
+            ),
     );
   }
 
@@ -488,7 +583,6 @@ class _StoreScreenState extends State<StoreScreen> {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                // Selection Indicator
                 if (widget.isFromInvoice)
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
@@ -534,7 +628,6 @@ class _StoreScreenState extends State<StoreScreen> {
                     ),
                   ),
                 const SizedBox(width: 16),
-                // Content
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -598,7 +691,6 @@ class _StoreScreenState extends State<StoreScreen> {
                     ],
                   ),
                 ),
-                // Quantity Badge
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -697,7 +789,6 @@ class _StoreScreenState extends State<StoreScreen> {
     );
   }
 
-  // ─── Tap Handler ───
   void _handleItemTap(
     Map<String, dynamic> data,
     String docId,
@@ -730,7 +821,6 @@ class _StoreScreenState extends State<StoreScreen> {
         }
 
         itemCounters[sku] = (itemCounters[sku] ?? 0) + 1;
-        // update existing item quantity in items list
         for (var item in items.where(
           (i) => i['sku'] == sku || i['id'] == sku,
         )) {
@@ -751,7 +841,6 @@ class _StoreScreenState extends State<StoreScreen> {
     }
   }
 
-  // ─── Long Press (Dialog) ───
   void _handleItemLongPress(
     Map<String, dynamic> data,
     String docId,
@@ -976,7 +1065,6 @@ class _StoreScreenState extends State<StoreScreen> {
                             selectedIds.add(sku);
                             itemCounters[sku] = qty;
                             buttonText = ' اضافة ${selectedIds.length} عنصر';
-                            // remove old then add new
                             items.removeWhere(
                               (item) => item['sku'] == sku || item['id'] == sku,
                             );
@@ -1024,6 +1112,7 @@ class _StoreScreenState extends State<StoreScreen> {
                   ),
                 ],
               ),
+              SizedBox(height: 60),
             ],
           ),
         ),
@@ -1041,7 +1130,6 @@ class _StoreScreenState extends State<StoreScreen> {
     _showSnackBar('تم إزالة الصنف');
   }
 
-  // ─── Bottom Bars ───
   Widget _buildInvoiceActionBar() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1242,14 +1330,17 @@ class _StoreScreenState extends State<StoreScreen> {
     );
   }
 
-  // ─── Scan Handler ───
   Future<void> _handleScan() async {
     T? getDynamicValue<T>(Map<String, dynamic> data, List<String> keys) {
       for (String key in keys) {
         if (data.containsKey(key) && data[key] != null) {
           if (T == String) return data[key].toString() as T;
-          if (T == double) return double.tryParse(data[key].toString()) as T?;
-          if (T == int) return int.tryParse(data[key].toString()) as T?;
+          if (T == double) {
+            return double.tryParse(data[key].toString()) as T?;
+          }
+          if (T == int) {
+            return int.tryParse(data[key].toString()) as T?;
+          }
           return data[key] as T;
         }
       }
@@ -1268,7 +1359,6 @@ class _StoreScreenState extends State<StoreScreen> {
       return;
     }
 
-    // JSON QR
     try {
       final data = jsonDecode(raw);
       if (data is Map<String, dynamic>) {
@@ -1296,14 +1386,11 @@ class _StoreScreenState extends State<StoreScreen> {
       }
     } catch (_) {}
 
-    // Barcode (أرقام فقط)
     if (RegExp(r'^[0-9]+$').hasMatch(raw)) {
       skuController.text = raw;
 
       if (!widget.isFromInvoice) {
-        // ─── وضع المخزن: الذهاب لتفاصيل المنتج ───
         final weighteId = raw.substring(2, 7);
-        // نبحث في itemsList لنعرف إذا كان موزوناً أم لا
         final idx = itemsList.indexWhere(
           (item) => item['sku'] == raw || item['sku'] == weighteId,
         );
@@ -1323,7 +1410,6 @@ class _StoreScreenState extends State<StoreScreen> {
           ),
         );
       } else {
-        // ─── وضع الفاتورة: إضافة للفاتورة ───
         setState(() {
           scannedId = raw;
           final weighteId = raw.substring(2, 7);
@@ -1390,14 +1476,12 @@ class _StoreScreenState extends State<StoreScreen> {
       return;
     }
 
-    // Link
     if (raw.startsWith("http")) {
       skuController.text = raw;
       _showSnackBar("تم قراءة رابط، تأكد من استخدامه بشكل صحيح");
       return;
     }
 
-    // Plain Text
     nameController.text = raw;
     _showSnackBar("تم ملء الاسم من الكود، راجع البيانات");
   }
@@ -1468,7 +1552,6 @@ class _StoreScreenState extends State<StoreScreen> {
   }
 }
 
-// ─── PDF Generator (بدون تغيير) ───
 Future<void> generateInventoryPdf(List<Map<String, dynamic>> itemsList) async {
   final pdf = pw.Document();
   final arabicFont = await PdfGoogleFonts.cairoRegular();

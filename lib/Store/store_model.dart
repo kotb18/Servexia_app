@@ -23,6 +23,7 @@ class StoreModel {
   final StoreSettings settings;
   final bool isClothes; // <-- علم الملابس
   final double shippingFee; // <-- رسوم الشحن
+  final String deviceToken;
 
   StoreModel({
     required this.id,
@@ -47,6 +48,7 @@ class StoreModel {
     required this.shippingFee,
     this.phoneCode,
     this.whatsCode,
+    required this.deviceToken,
   });
 
   factory StoreModel.fromFirestore(DocumentSnapshot doc) {
@@ -74,6 +76,7 @@ class StoreModel {
       settings: StoreSettings.fromMap(data['settings'] ?? {}),
       isClothes: data['isClothes'] ?? false,
       shippingFee: (data['shippingFee'] ?? 0).toDouble(),
+      deviceToken: data['deviceToken'],
     );
   }
 
@@ -100,6 +103,7 @@ class StoreModel {
       'settings': settings.toMap(),
       'isClothes': isClothes,
       'shippingFee': shippingFee,
+      'deviceToken': deviceToken,
     };
   }
 
@@ -121,7 +125,7 @@ class StoreSettings {
     this.minOrderAmount,
     this.freeShippingThreshold,
     this.shippingFee = 0,
-    this.currency = 'EGP',
+    this.currency = '',
     this.termsAndConditions,
   });
 
@@ -132,7 +136,7 @@ class StoreSettings {
       minOrderAmount: map['minOrderAmount']?.toDouble(),
       freeShippingThreshold: map['freeShippingThreshold']?.toDouble(),
       shippingFee: (map['shippingFee'] ?? 0).toDouble(),
-      currency: map['currency'] ?? 'EGP',
+      currency: map['currency'] ?? '',
       termsAndConditions: map['termsAndConditions'],
     );
   }

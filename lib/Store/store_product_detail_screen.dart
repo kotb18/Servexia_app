@@ -20,6 +20,7 @@ class StoreProductDetailScreen extends StatefulWidget {
   final String groupId;
   final bool isPreview;
   final double shippingFee;
+  final String deviceToken;
 
   const StoreProductDetailScreen({
     super.key,
@@ -27,6 +28,7 @@ class StoreProductDetailScreen extends StatefulWidget {
     required this.groupId,
     this.isPreview = false,
     required this.shippingFee,
+    required this.deviceToken,
   });
 
   @override
@@ -1066,7 +1068,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
       btnText = 'اختر المقاس أولاً';
     } else {
       btnText =
-          'إضافة للسلة - ${(item.effectiveStorePrice * _quantity).toStringAsFixed(2)} ر.س';
+          'إضافة للسلة - ${(item.effectiveStorePrice * _quantity).toStringAsFixed(2)}';
     }
 
     return Container(
@@ -1140,7 +1142,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
       btnText = 'اختر المقاس أولاً';
     } else {
       btnText =
-          'إضافة للسلة - ${(item.effectiveStorePrice * _quantity).toStringAsFixed(2)} ر.س';
+          'إضافة للسلة - ${(item.effectiveStorePrice * _quantity).toStringAsFixed(2)}';
     }
 
     return SizedBox(
@@ -1272,6 +1274,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                     groupId: widget.groupId,
                     makeSetStateOnCartChange: false,
                     shippingFee: widget.shippingFee,
+                    deviceTokrn: widget.deviceToken,
                   ),
                 ),
               );

@@ -9,12 +9,14 @@ class StoreCartScreen extends StatefulWidget {
   final String groupId;
   final double shippingFee;
   final bool makeSetStateOnCartChange;
+  final String deviceTokrn;
 
   const StoreCartScreen({
     super.key,
     required this.groupId,
     required this.shippingFee,
     required this.makeSetStateOnCartChange,
+    required this.deviceTokrn,
   });
 
   @override
@@ -284,6 +286,7 @@ class _StoreCartScreenState extends State<StoreCartScreen> {
                                     cartService: cart,
                                     groupId: widget.groupId,
                                     shippingFee: widget.shippingFee,
+                                    deviceTokrn: widget.deviceTokrn,
                                   ),
                                 ),
                               );

@@ -1,4 +1,5 @@
 import 'package:awesome_dialog/awesome_dialog.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl_phone_field/countries.dart';
@@ -6,7 +7,6 @@ import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:intl_phone_field/phone_number.dart';
 import 'package:maintenance/Store/store_model.dart';
 import 'package:maintenance/Store/store_service.dart';
-import 'package:maintenance/invoicePage.dart';
 
 class StoreSetupScreen extends StatefulWidget {
   final String groupId;
@@ -39,6 +39,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
 
   String _primaryColor = '#2196F3';
   bool _isLoading = false;
+  String? _deviceToken;
 
   final List<Map<String, dynamic>> _colorOptions = [
     {'hex': '#2196F3', 'name': 'أزرق'},
@@ -54,9 +55,10 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
   ];
 
   @override
-  void initState() {
+  Future<void> initState() async {
     super.initState();
     getStoreData();
+    _deviceToken = await FirebaseMessaging.instance.getToken();
   }
 
   Future<void> getStoreData() async {
@@ -696,6 +698,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
         settings: StoreSettings(),
         isClothes: _isClothes ?? false,
         shippingFee: double.tryParse(_shippingFeeController.text) ?? 0.0,
+        deviceToken: _deviceToken ?? '',
       );
 
       await _storeService.createOrUpdateStore(store);

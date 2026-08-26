@@ -176,6 +176,7 @@ final GoRouter _router = GoRouter(
               item: snapshot.data!,
               shippingFee:
                   0.0, // <-- يمكنك تعديل قيمة رسوم الشحن هنا إذا لزم الأمر
+              deviceToken: '',
             );
           },
         );

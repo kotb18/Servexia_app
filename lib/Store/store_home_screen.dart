@@ -96,6 +96,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   String? get email => _store?.email;
   double get shippingFee => _store?.shippingFee ?? 0.0;
   bool get isClothes => _store?.isClothes ?? false;
+  String? get deviceToken => _store!.deviceToken;
 
   String _generateStoreLink() {
     const baseUrl = 'https://maintenance-b7282.web.app';
@@ -196,6 +197,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                     groupId: widget.groupId,
                     shippingFee: shippingFee,
                     makeSetStateOnCartChange: true,
+                    deviceTokrn: deviceToken!,
                   ),
                 ),
               ),
@@ -308,6 +310,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                   groupId: widget.groupId,
                   shippingFee: shippingFee,
                   makeSetStateOnCartChange: true,
+                  deviceTokrn: deviceToken!,
                 ),
               ),
             ),
@@ -579,6 +582,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                     groupId: widget.groupId,
                     shippingFee: shippingFee,
                     makeSetStateOnCartChange: true,
+                    deviceTokrn: deviceToken!,
                   ),
                 ),
               ),
@@ -687,6 +691,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
             groupId: widget.groupId,
             isPreview: widget.isPreview,
             shippingFee: shippingFee,
+            deviceToken: deviceToken!,
           ),
         ),
       ),
@@ -1168,6 +1173,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
               groupId: widget.groupId,
               isPreview: widget.isPreview,
               shippingFee: shippingFee,
+              deviceToken: deviceToken!,
             ),
           ),
         );
@@ -1184,6 +1190,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
             groupId: widget.groupId,
             isPreview: widget.isPreview,
             shippingFee: shippingFee,
+            deviceToken: deviceToken!,
           ),
         ),
       );
