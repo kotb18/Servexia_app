@@ -634,7 +634,7 @@ class _StoreCheckoutScreenState extends State<StoreCheckoutScreen> {
       await sendNotificationToDevice(
         title: 'طلب جديد في متجرك',
         body: 'هناك طلب على ${widget.cartService.items.length} منتج',
-        deviceToken: '',
+        deviceToken: widget.deviceTokrn,
       );
 
       if (!mounted) return;

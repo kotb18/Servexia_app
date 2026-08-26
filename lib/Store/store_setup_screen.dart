@@ -53,12 +53,15 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
     {'hex': '#607D8B', 'name': 'رمادي'},
     {'hex': '#FFEB3B', 'name': 'أصفر'},
   ];
+  getDeviceToken() async {
+    _deviceToken = await FirebaseMessaging.instance.getToken();
+  }
 
   @override
-  Future<void> initState() async {
+  initState() {
     super.initState();
     getStoreData();
-    _deviceToken = await FirebaseMessaging.instance.getToken();
+    getDeviceToken();
   }
 
   Future<void> getStoreData() async {
