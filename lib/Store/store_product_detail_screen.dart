@@ -431,14 +431,6 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
               children: [
                 CarouselSlider(
                   carouselController: _carouselController,
-                  options: CarouselOptions(
-                    height: 500,
-                    viewportFraction: 1,
-                    enableInfiniteScroll: item.imagesList.length > 1,
-                    onPageChanged: (index, _) {
-                      setState(() => _currentImage = index);
-                    },
-                  ),
                   items: item.imagesList.map((url) {
                     return WebImage(
                       src: url,
@@ -447,6 +439,14 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                       fit: BoxFit.contain,
                     );
                   }).toList(),
+                  options: CarouselOptions(
+                    height: 500,
+                    viewportFraction: 1,
+                    enableInfiniteScroll: item.imagesList.length > 1,
+                    onPageChanged: (index, _) {
+                      setState(() => _currentImage = index);
+                    },
+                  ),
                 ),
                 if (item.imagesList.length > 1)
                   Positioned(

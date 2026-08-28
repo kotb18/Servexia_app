@@ -129,9 +129,7 @@ class _StoreScreenState extends State<StoreScreen> {
     try {
       final query = itemsQuery();
       final snap = await query.get();
-      itemsList = snap.docs
-          .map((d) => d.data() as Map<String, dynamic>)
-          .toList();
+      itemsList = snap.docs.map((d) => d.data()).toList();
       if (mounted) setState(() {});
     } catch (e) {
       debugPrint('Error loading itemsList: $e');
@@ -453,7 +451,8 @@ class _StoreScreenState extends State<StoreScreen> {
                           final doc = docs[index];
                           final data = doc.data() as Map<String, dynamic>;
                           final String sku = data['sku']?.toString() ?? doc.id;
-                          final bool itemSelected = selectedIds.contains(sku);
+                          final bool itemSelected =
+                              selectedIds.contains(sku) && widget.isFromInvoice;
                           final double currentQty = itemCounters[sku] ?? 0.0;
                           final bool isWeightedItem =
                               data['isWeighted'] ?? false;
@@ -473,6 +472,7 @@ class _StoreScreenState extends State<StoreScreen> {
                       ),
               ),
             ),
+            !_showHeader ? SizedBox(height: 60) : SizedBox.shrink(),
           ],
         ),
       ),
@@ -761,6 +761,24 @@ class _StoreScreenState extends State<StoreScreen> {
                       size: 14,
                       color: Colors.grey.shade400,
                     ),
+
+                    /// ممكن اشيلها في اي وقت
+                    if (widget.isFromInvoice)
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.touch_app,
+                            size: 12,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.arrow_back_ios,
+                            size: 14,
+                            color: Colors.grey.shade400,
+                          ),
+                        ],
+                      ),
                   ],
                 ),
               ],

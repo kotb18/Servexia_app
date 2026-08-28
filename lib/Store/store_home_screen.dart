@@ -635,7 +635,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
               searchQuery: _searchQuery.isEmpty ? null : _searchQuery,
             ),
 
-            limit: 20, // ✅ دفعة منطقية (صفين إلى ثلاثة)
+            limit: 2, // ✅ دفعة منطقية (صفين إلى ثلاثة)
             viewType: ViewType.grid,
             isLive: true,
             padding: const EdgeInsets.all(16),
@@ -682,196 +682,192 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   Widget _buildProductCard(InventoryItemModel item) {
     final hasDesc = item.storeDescription?.trim().isNotEmpty == true;
 
-    return InkWell(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => StoreProductDetailScreen(
-            item: item,
-            groupId: widget.groupId,
-            isPreview: widget.isPreview,
-            shippingFee: shippingFee,
-            deviceToken: deviceToken!,
-          ),
-        ),
-      ),
+    return Material(
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade100),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ═══════════════ IMAGE ═══════════════
-            Expanded(
-              flex: 3,
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(16),
-                    ),
-                    child: item.imagesList.isNotEmpty
-                        ? WebImage(
-                            src: item.imagesList.first,
-                            width: double.infinity,
-                            height: double.infinity,
-                            fit: BoxFit.cover,
-                          )
-                        : _buildPlaceholder(),
-                  ),
-                  if (item.hasDiscount)
-                    Positioned(
-                      top: 10,
-                      left: 10,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Colors.red.shade600, Colors.red.shade400],
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.red.withOpacity(0.3),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Text(
-                          '-${item.discountPercentage?.toInt()}%',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (!item.isInStock)
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.5),
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(16),
-                        ),
-                      ),
-                      child: const Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.hide_image,
-                              color: Colors.white70,
-                              size: 32,
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              'غير متوفر',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => StoreProductDetailScreen(
+                item: item,
+                groupId: widget.groupId,
+                isPreview: widget.isPreview,
+                shippingFee: shippingFee,
+                deviceToken: deviceToken!,
               ),
             ),
-
-            // ═══════════════ INFO ═══════════════
-            Expanded(
-              flex: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          );
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade100),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: Stack(
                   children: [
-                    // Name
-                    Text(
-                      item.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        color: Color(0xFF1F2937),
-                        height: 1.3,
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(16),
                       ),
+                      child: item.imagesList.isNotEmpty
+                          ? WebImage(
+                              src: item.imagesList.first,
+                              width: double.infinity,
+                              height: double.infinity,
+                              fit: BoxFit.cover,
+                            )
+                          : _buildPlaceholder(),
                     ),
 
-                    // ✅ Description (only if exists)
-                    if (hasDesc) ...[
-                      const SizedBox(height: 4),
-                      Expanded(
-                        child: Text(
-                          item.storeDescription!,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11,
-                            height: 1,
-                            color: Colors.grey.shade500,
+                    if (item.hasDiscount)
+                      Positioned(
+                        top: 10,
+                        left: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.red.shade600,
+                                Colors.red.shade400,
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '-${item.discountPercentage?.toInt()}%',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                       ),
-                    ],
 
-                    const Spacer(),
-
-                    // Price + Cart
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
+                    if (!item.isInStock)
+                      Container(
+                        decoration: const BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(16),
+                          ),
+                        ),
+                        child: const Center(
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
+                              Icon(
+                                Icons.hide_image,
+                                color: Colors.white70,
+                                size: 32,
+                              ),
+                              SizedBox(height: 8),
                               Text(
-                                '${item.effectiveStorePrice.toStringAsFixed(2)}',
+                                'غير متوفر',
                                 style: TextStyle(
+                                  color: Colors.white,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: primaryColor,
+                                  fontSize: 14,
                                 ),
                               ),
-                              if (item.hasDiscount)
-                                Text(
-                                  '${item.price.toStringAsFixed(2)}',
-                                  style: TextStyle(
-                                    decoration: TextDecoration.lineThrough,
-                                    color: Colors.grey.shade500,
-                                    fontSize: 12,
-                                  ),
-                                ),
                             ],
                           ),
                         ),
-                        if (item.isInStock) _buildAddToCartButton(item),
-                      ],
-                    ),
+                      ),
                   ],
                 ),
               ),
-            ),
-          ],
+
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          color: Color(0xFF1F2937),
+                        ),
+                      ),
+
+                      if (hasDesc) ...[
+                        const SizedBox(height: 4),
+                        Expanded(
+                          child: Text(
+                            item.storeDescription!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ),
+                      ] else
+                        const Spacer(),
+
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.effectiveStorePrice.toStringAsFixed(2),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: primaryColor,
+                                  ),
+                                ),
+                                if (item.hasDiscount)
+                                  Text(
+                                    item.price.toStringAsFixed(2),
+                                    style: TextStyle(
+                                      decoration: TextDecoration.lineThrough,
+                                      color: Colors.grey.shade500,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          if (item.isInStock) _buildAddToCartButton(item),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
