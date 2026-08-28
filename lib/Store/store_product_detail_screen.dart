@@ -458,7 +458,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
+                        color: Colors.black.withValues(alpha: 0.6),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -473,7 +473,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                   ),
                 if (!item.isInStock)
                   Container(
-                    color: Colors.black.withOpacity(0.5),
+                    color: Colors.black.withValues(alpha: 0.5),
                     child: Center(
                       child: Container(
                         padding: const EdgeInsets.symmetric(

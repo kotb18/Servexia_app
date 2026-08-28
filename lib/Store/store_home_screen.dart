@@ -635,7 +635,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
               searchQuery: _searchQuery.isEmpty ? null : _searchQuery,
             ),
 
-            limit: 2, // ✅ دفعة منطقية (صفين إلى ثلاثة)
+            limit: 20, // ✅ دفعة منطقية (صفين إلى ثلاثة)
             viewType: ViewType.grid,
             isLive: true,
             padding: const EdgeInsets.all(16),
@@ -682,25 +682,23 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   Widget _buildProductCard(InventoryItemModel item) {
     final hasDesc = item.storeDescription?.trim().isNotEmpty == true;
 
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => StoreProductDetailScreen(
-                item: item,
-                groupId: widget.groupId,
-                isPreview: widget.isPreview,
-                shippingFee: shippingFee,
-                deviceToken: deviceToken!,
-              ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => StoreProductDetailScreen(
+              item: item,
+              groupId: widget.groupId,
+              isPreview: widget.isPreview,
+              shippingFee: shippingFee,
+              deviceToken: deviceToken!,
             ),
-          );
-        },
+          ),
+        );
+      },
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -714,83 +712,109 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
               ),
             ],
           ),
+          clipBehavior: Clip.antiAlias,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ═══════════════════════════════════════
+              // IMAGE
+              // ═══════════════════════════════════════
+
               Expanded(
                 flex: 3,
                 child: Stack(
+                  fit: StackFit.expand,
                   children: [
+                    // الصورة
                     ClipRRect(
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(16),
                       ),
                       child: item.imagesList.isNotEmpty
-                          ? WebImage(
-                              src: item.imagesList.first,
-                              width: double.infinity,
-                              height: double.infinity,
-                              fit: BoxFit.cover,
+                          ? IgnorePointer(
+                              child: WebImage(
+                                src: item.imagesList.first,
+                                width: double.infinity,
+                                height: double.infinity,
+                                fit: BoxFit.cover,
+                              ),
                             )
-                          : _buildPlaceholder(),
+                          : IgnorePointer(child: _buildPlaceholder()),
                     ),
 
+                    // ═══════════════════════════════════════
+                    // DISCOUNT
+                    // ═══════════════════════════════════════
                     if (item.hasDiscount)
                       Positioned(
                         top: 10,
                         left: 10,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.red.shade600,
-                                Colors.red.shade400,
+                        child: IgnorePointer(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.red.shade600,
+                                  Colors.red.shade400,
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.red.withOpacity(0.3),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
                               ],
                             ),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '-${item.discountPercentage?.toInt()}%',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
+                            child: Text(
+                              '-${item.discountPercentage?.toInt()}%',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                         ),
                       ),
 
+                    // ═══════════════════════════════════════
+                    // OUT OF STOCK
+                    // ═══════════════════════════════════════
                     if (!item.isInStock)
-                      Container(
-                        decoration: const BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.vertical(
-                            top: Radius.circular(16),
+                      IgnorePointer(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.5),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(16),
+                            ),
                           ),
-                        ),
-                        child: const Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.hide_image,
-                                color: Colors.white70,
-                                size: 32,
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                'غير متوفر',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
+                          child: const Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.hide_image,
+                                  color: Colors.white70,
+                                  size: 32,
                                 ),
-                              ),
-                            ],
+                                SizedBox(height: 8),
+                                Text(
+                                  'غير متوفر',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -798,6 +822,9 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                 ),
               ),
 
+              // ═══════════════════════════════════════
+              // INFO
+              // ═══════════════════════════════════════
               Expanded(
                 flex: 2,
                 child: Padding(
@@ -805,6 +832,10 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // ═══════════════════════════════════════
+                      // NAME
+                      // ═══════════════════════════════════════
+
                       Text(
                         item.name,
                         maxLines: 2,
@@ -813,11 +844,16 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                           fontWeight: FontWeight.w700,
                           fontSize: 13,
                           color: Color(0xFF1F2937),
+                          height: 1.3,
                         ),
                       ),
 
+                      // ═══════════════════════════════════════
+                      // DESCRIPTION
+                      // ═══════════════════════════════════════
                       if (hasDesc) ...[
                         const SizedBox(height: 4),
+
                         Expanded(
                           child: Text(
                             item.storeDescription!,
@@ -825,6 +861,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 11,
+                              height: 1.2,
                               color: Colors.grey.shade500,
                             ),
                           ),
@@ -832,9 +869,13 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                       ] else
                         const Spacer(),
 
+                      // ═══════════════════════════════════════
+                      // PRICE + CART
+                      // ═══════════════════════════════════════
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
+                          // PRICE
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -847,6 +888,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                                     color: primaryColor,
                                   ),
                                 ),
+
                                 if (item.hasDiscount)
                                   Text(
                                     item.price.toStringAsFixed(2),
@@ -859,7 +901,13 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                               ],
                             ),
                           ),
-                          if (item.isInStock) _buildAddToCartButton(item),
+
+                          // ADD TO CART
+                          if (item.isInStock)
+                            IgnorePointer(
+                              ignoring: false,
+                              child: _buildAddToCartButton(item),
+                            ),
                         ],
                       ),
                     ],
