@@ -4,6 +4,7 @@ import 'package:maintenance/Store/order_status_badge.dart';
 import 'package:maintenance/Store/store_order_model.dart';
 import 'package:maintenance/Store/store_order_service.dart';
 import 'package:maintenance/Store/order_details_screen.dart';
+import 'package:maintenance/imageControl/platform_image.dart';
 
 class MyOrdersScreen extends StatefulWidget {
   final String customerId;
@@ -182,13 +183,11 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                             order.items.first.image != null
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              order.items.first.image!,
+                            child: WebImage(
+                              src: order.items.first.image!,
+                              width: 80,
+                              height: 80,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                Icons.shopping_bag,
-                                color: Colors.grey,
-                              ),
                             ),
                           )
                         : const Icon(Icons.shopping_bag, color: Colors.grey),
