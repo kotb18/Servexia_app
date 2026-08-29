@@ -51,7 +51,11 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadStoreData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadStoreData();
+      }
+    });
   }
 
   @override
@@ -63,15 +67,30 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   /// ─── جلب بيانات المتجر الكاملة ───
   Future<void> _loadStoreData() async {
     try {
-      final store = await _storeService.getStoreById(widget.groupId);
-      if (mounted) {
-        setState(() {
-          _store = store;
-          _isLoadingStore = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _isLoadingStore = false);
+      final storeId = widget.groupId.trim();
+
+      debugPrint('🔵 Loading storeId: $storeId');
+
+      final store = await _storeService.getStoreById(storeId);
+
+      debugPrint('🟢 Store loaded: ${store != null}');
+
+      if (!mounted) return;
+
+      setState(() {
+        _store = store;
+        _isLoadingStore = false;
+      });
+    } catch (e, stack) {
+      debugPrint('🔴 Store loading error: $e');
+      debugPrintStack(stackTrace: stack);
+
+      if (!mounted) return;
+
+      setState(() {
+        _store = null;
+        _isLoadingStore = false;
+      });
     }
   }
 
@@ -96,7 +115,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   String? get email => _store?.email;
   double get shippingFee => _store?.shippingFee ?? 0.0;
   bool get isClothes => _store?.isClothes ?? false;
-  String? get deviceToken => _store!.deviceToken;
+  String? get deviceToken => _store?.deviceToken;
 
   String _generateStoreLink() {
     const baseUrl = 'https://maintenance-b7282.web.app';
@@ -171,7 +190,33 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
     if (_store == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('خطأ')),
-        body: const Center(child: Text('تعذر تحميل بيانات المتجر')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, size: 70, color: Colors.red),
+                const SizedBox(height: 16),
+                const Text(
+                  'تعذر تحميل بيانات المتجر',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Store ID: ${widget.groupId}',
+                  textAlign: TextAlign.center,
+                  textDirection: TextDirection.ltr,
+                ),
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: _loadStoreData,
+                  child: const Text('إعادة المحاولة'),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
     }
 
@@ -197,7 +242,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                     groupId: widget.groupId,
                     shippingFee: shippingFee,
                     makeSetStateOnCartChange: true,
-                    deviceTokrn: deviceToken!,
+                    deviceTokrn: deviceToken ?? '',
                   ),
                 ),
               ),
@@ -310,7 +355,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                   groupId: widget.groupId,
                   shippingFee: shippingFee,
                   makeSetStateOnCartChange: true,
-                  deviceTokrn: deviceToken!,
+                  deviceTokrn: deviceToken ?? '',
                 ),
               ),
             ),
@@ -582,7 +627,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                     groupId: widget.groupId,
                     shippingFee: shippingFee,
                     makeSetStateOnCartChange: true,
-                    deviceTokrn: deviceToken!,
+                    deviceTokrn: deviceToken ?? "",
                   ),
                 ),
               ),
@@ -692,7 +737,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
               groupId: widget.groupId,
               isPreview: widget.isPreview,
               shippingFee: shippingFee,
-              deviceToken: deviceToken!,
+              deviceToken: deviceToken ?? '',
             ),
           ),
         );

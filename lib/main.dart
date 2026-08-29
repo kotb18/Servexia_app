@@ -110,7 +110,14 @@ final GoRouter _router = GoRouter(
       path: '/shop/:groupId',
       name: 'shop',
       builder: (context, state) {
-        final groupId = state.pathParameters['groupId'] ?? 'default';
+        final groupId = Uri.decodeComponent(
+          (state.pathParameters['groupId'] ?? '').trim(),
+        );
+
+        debugPrint('🌐 SHOP ROUTE');
+        debugPrint('📍 Location: ${state.uri}');
+        debugPrint('🆔 groupId: "$groupId"');
+
         return StoreHomeScreen(groupId: groupId);
       },
     ),

@@ -1,9 +1,8 @@
-// ✅ ملف للـ Web فقط - مش هيتاستورد على Mobile
 import 'package:flutter/material.dart';
 import 'package:universal_html/universal_html.dart' as html;
 import 'dart:ui_web' as ui_web;
 
-class WebImage extends StatelessWidget {
+class WebImage extends StatefulWidget {
   final String src;
   final double? width;
   final double? height;
@@ -18,23 +17,40 @@ class WebImage extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final viewId =
-        'web-image-${src.hashCode}-${DateTime.now().millisecondsSinceEpoch}';
+  State<WebImage> createState() => _WebImageState();
+}
 
-    ui_web.platformViewRegistry.registerViewFactory(viewId, (int viewId) {
-      final img = html.ImageElement()
-        ..src = src
+class _WebImageState extends State<WebImage> {
+  static int _counter = 0;
+  late final String _viewId;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _viewId = 'web-image-${_counter++}';
+
+    ui_web.platformViewRegistry.registerViewFactory(_viewId, (int id) {
+      final image = html.ImageElement()
+        ..src = widget.src
         ..style.width = '100%'
         ..style.height = '100%'
-        ..style.objectFit = _getObjectFit(fit);
-      return img;
-    });
+        ..style.objectFit = _getObjectFit(widget.fit)
+        ..style.pointerEvents = 'none';
 
+      return image;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return SizedBox(
-      width: width,
-      height: height,
-      child: HtmlElementView(viewType: viewId),
+      width: widget.width,
+      height: widget.height,
+      child: IgnorePointer(
+        ignoring: true,
+        child: HtmlElementView(viewType: _viewId),
+      ),
     );
   }
 
@@ -46,6 +62,10 @@ class WebImage extends StatelessWidget {
         return 'contain';
       case BoxFit.fill:
         return 'fill';
+      case BoxFit.fitWidth:
+        return 'fill';
+      case BoxFit.fitHeight:
+        return 'contain';
       default:
         return 'cover';
     }

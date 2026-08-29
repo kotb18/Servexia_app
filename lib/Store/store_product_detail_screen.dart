@@ -509,26 +509,35 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
               itemCount: item.imagesList.length,
               separatorBuilder: (_, __) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
-                final isSelected = _currentImage == index;
+                //    final isSelected = _currentImage == index;
                 return InkWell(
+                  borderRadius: BorderRadius.circular(12),
                   onTap: () {
-                    setState(() => _currentImage = index);
+                    if (_currentImage != index) {
+                      setState(() {
+                        _currentImage = index;
+                      });
+                    }
+
                     _carouselController.animateToPage(index);
                   },
-                  borderRadius: BorderRadius.circular(12),
                   child: Container(
                     width: 80,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isSelected ? primaryColor : Colors.grey.shade300,
-                        width: isSelected ? 2.5 : 1,
+                        color: _currentImage == index
+                            ? primaryColor
+                            : Colors.grey.shade300,
+                        width: _currentImage == index ? 2.5 : 1,
                       ),
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(11),
                       child: WebImage(
                         src: item.imagesList[index],
+                        width: 80,
+                        height: 80,
                         fit: BoxFit.cover,
                       ),
                     ),
