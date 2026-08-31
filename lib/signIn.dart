@@ -145,7 +145,7 @@ class _LoginState extends State<Login> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: Image.asset('images/1.PNG'),
+                    child: Image.asset('images/1.png'),
                   ),
 
                   const SizedBox(height: 24),

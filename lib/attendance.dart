@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
@@ -38,6 +39,9 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
   bool loading = false;
   Map<String, Map<String, dynamic>> todaysAttendance = {};
   User? currentUser;
+  bool _isFaceEmbeddingFound = false;
+  static String _localKey(String uid) => 'face_data_$uid';
+  String get uid => FirebaseAuth.instance.currentUser!.uid;
 
   // ألوان مخصصة للتصميم
   final Color primaryColor = const Color(0xFF1A237E); // أزرق داكن
@@ -703,9 +707,8 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
-                            onPressed: () => checkedIn
-                                ? _checkOut(member)
-                                : _checkIn(member),
+                            onPressed: () =>
+                                handleFaceEmbedding(checkedIn, member),
                             icon: Icon(checkedIn ? Icons.logout : Icons.login),
                             label: Text(
                               checkedIn
@@ -769,6 +772,171 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
       ],
     );
   }
+
+  /// ================================
+  /// 📥 تحميل بصمة الوجه (Local → Firebase)
+  /// ================================
+  Future<List<dynamic>?> loadFaceEmbedding() async {
+    final firestore = FirebaseFirestore.instance;
+    final auth = FirebaseAuth.instance;
+
+    /// 🔑 Key خاص بكل مستخدم
+    String localKey(String uid) => 'face_data_$uid';
+
+    final user = auth.currentUser;
+
+    if (user == null) return null;
+
+    final prefs = await SharedPreferences.getInstance();
+    final localData = prefs.getString(localKey('$groupId0 ${user.uid}'));
+
+    // ✅ 1. لو موجود محليًا
+    if (localData != null) {
+      final List decoded = jsonDecode(localData);
+      setState(() {
+        _isFaceEmbeddingFound = true;
+        print('yessssssssssssssssssssssssssss');
+      });
+      return decoded.map((e) => e.toDouble()).toList();
+    }
+
+    // ☁️ 2. مش موجود محليًا → Firebase
+    final doc = await firestore
+        .collection('faceEmbedding')
+        .doc(groupId0)
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    if (!doc.exists || doc.data()?['faceEmbedding'] == null) {
+      return null;
+    }
+
+    final List cloudData = doc['faceEmbedding'];
+
+    final embedding = cloudData.map((e) => (e as num).toDouble()).toList();
+
+    // 💾 خزنه محليًا
+    await prefs.setString(
+      localKey('$groupId0 ${user.uid}'),
+      jsonEncode(embedding),
+    );
+    if (embedding.isNotEmpty) {
+      setState(() {
+        _isFaceEmbeddingFound = true;
+        //  print('yessssssssssssssssssssssssssss');
+      });
+      return embedding;
+    }
+    return embedding;
+  }
+
+  void handleFaceEmbedding(bool checkedIn, Map<String, dynamic> member) {
+    if (kIsWeb) {
+      print('المستخدم فاتح من Web');
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('بصمة الوجه متاحة عبر تطبيق الاندرويد فقط'),
+            content: const Text(
+              'لتسجيل الحضور الرجاء تحميل التطبيق (للاندرويد).',
+            ),
+            actions: [
+              TextButton(
+                child: const Text('الغاء'),
+                onPressed: () async {
+                  Navigator.pop(context);
+                },
+              ),
+              ElevatedButton(
+                child: const Text('تحميل'),
+                onPressed: () async {
+                  Navigator.pop(context);
+                  openGooglePlay();
+                },
+              ),
+            ],
+          );
+        },
+      );
+    } else {
+      print('المستخدم فاتح من App');
+      if (!_isFaceEmbeddingFound) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) {
+            return AlertDialog(
+              title: const Text('بصمة الوجه ليست مسجله.'),
+              content: const Text('سجل بصمة الوجه الاْن.'),
+              actions: [
+                TextButton(
+                  child: const Text('الغاء'),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                  },
+                ),
+                ElevatedButton(
+                  child: const Text('تسجيل'),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    final result = await Navigator.push<List<double>>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const FaceRegisterScreen(),
+                      ),
+                    );
+
+                    if (result != null) {
+                      setState(() {
+                        faceEmbeddingLive = result;
+                        _isFaceEmbeddingFound = true;
+                        _showSnackBar('تم تسجيل بصمة الوجه بنجاح.');
+                      });
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setString(
+                        _localKey('${widget.groupId} $uid'),
+                        jsonEncode(faceEmbeddingLive),
+                      );
+
+                      // إنشاء Batch
+                      final batch = FirebaseFirestore.instance.batch();
+
+                      // faceEmbedding
+                      final faceRef = FirebaseFirestore.instance
+                          .collection('faceEmbedding')
+                          .doc(widget.groupId)
+                          .collection('users')
+                          .doc(uid);
+
+                      batch.set(faceRef, {
+                        'faceEmbedding': faceEmbeddingLive,
+                        'updatedAt': FieldValue.serverTimestamp(),
+                      });
+                    }
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      } else {
+        checkedIn ? _checkOut(member) : _checkIn(member);
+      }
+    }
+  }
+
+  void openGooglePlay() {
+    launchUrl(
+      Uri.parse(
+        'https://play.google.com/store/apps/details?id=com.masry.maintenance',
+      ),
+      mode: LaunchMode.externalApplication,
+    );
+  }
 }
 
 List<dynamic>? storedEmbeddingDynamic = [
@@ -798,55 +966,6 @@ List<dynamic>? storedEmbeddingDynamic = [
     'ar',
   ).format(DateTime.now().subtract(Duration(days: 6))),
 ];
-
-/// ================================
-/// 📥 تحميل بصمة الوجه (Local → Firebase)
-/// ================================
-Future<List<dynamic>?> loadFaceEmbedding() async {
-  final firestore = FirebaseFirestore.instance;
-  final auth = FirebaseAuth.instance;
-
-  /// 🔑 Key خاص بكل مستخدم
-  String localKey(String uid) => 'face_data_$uid';
-
-  final user = auth.currentUser;
-
-  if (user == null) return null;
-
-  final prefs = await SharedPreferences.getInstance();
-  final localData = prefs.getString(localKey('$groupId0 ${user.uid}'));
-
-  // ✅ 1. لو موجود محليًا
-  if (localData != null) {
-    final List decoded = jsonDecode(localData);
-
-    return decoded.map((e) => e.toDouble()).toList();
-  }
-
-  // ☁️ 2. مش موجود محليًا → Firebase
-  final doc = await firestore
-      .collection('faceEmbedding')
-      .doc(groupId0)
-      .collection('users')
-      .doc(user.uid)
-      .get();
-
-  if (!doc.exists || doc.data()?['faceEmbedding'] == null) {
-    return null;
-  }
-
-  final List cloudData = doc['faceEmbedding'];
-
-  final embedding = cloudData.map((e) => (e as num).toDouble()).toList();
-
-  // 💾 خزنه محليًا
-  await prefs.setString(
-    localKey('$groupId0 ${user.uid}'),
-    jsonEncode(embedding),
-  );
-
-  return embedding;
-}
 
 double cosineSimilarity(List<dynamic> v1, List<dynamic> v2) {
   double dot = 0.0;

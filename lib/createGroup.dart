@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:country_picker/country_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:maintenance/JoinGroup.dart';
@@ -11,7 +12,7 @@ import 'package:maintenance/services/billing_service.dart';
 import 'package:maintenance/workSpace.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-List faceEmbeddingAdmin = [];
+List? faceEmbeddingAdmin = [];
 String? intPhone;
 
 final BillingService billingService = BillingService();
@@ -91,7 +92,7 @@ class _CreategroupState extends State<Creategroup> {
   void initState() {
     _checkSubscriptionStatus();
     super.initState();
-    faceEmbeddingAdmin.clear();
+    faceEmbeddingAdmin!.clear();
     billingService.init();
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -109,7 +110,7 @@ class _CreategroupState extends State<Creategroup> {
     _phoneController.dispose();
     _areaController.dispose();
     billingService.dispose();
-    faceEmbeddingAdmin.clear();
+    faceEmbeddingAdmin!.clear();
     super.dispose();
   }
 
@@ -272,26 +273,26 @@ class _CreategroupState extends State<Creategroup> {
     // عمليات خارج الباتش
     final String? token = await FirebaseMessaging.instance.getToken();
     final prefs = await SharedPreferences.getInstance();
+    final batch = firestore.batch();
+    if (faceEmbeddingAdmin!.isNotEmpty) {
+      await prefs.setString(
+        _localKey('$groupId $uid'),
+        jsonEncode(faceEmbeddingAdmin ?? []),
+      );
+      // faceEmbedding
+      final faceRef = firestore
+          .collection('faceEmbedding')
+          .doc(groupId)
+          .collection('users')
+          .doc(uid);
 
-    await prefs.setString(
-      _localKey('$groupId $uid'),
-      jsonEncode(faceEmbeddingAdmin),
-    );
+      batch.set(faceRef, {
+        'faceEmbedding': faceEmbeddingAdmin ?? [],
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
 
     // إنشاء Batch
-    final batch = firestore.batch();
-
-    // faceEmbedding
-    final faceRef = firestore
-        .collection('faceEmbedding')
-        .doc(groupId)
-        .collection('users')
-        .doc(uid);
-
-    batch.set(faceRef, {
-      'faceEmbedding': faceEmbeddingAdmin,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
 
     // groups
     batch.set(docRef, {
@@ -356,7 +357,7 @@ class _CreategroupState extends State<Creategroup> {
       'updatedAt': FieldValue.serverTimestamp(),
     });
 
-    if (mounted) {
+    /*  if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('تم حفظ الصلاحيات بنجاح ✅'),
@@ -365,7 +366,7 @@ class _CreategroupState extends State<Creategroup> {
         ),
       );
     }
-
+ */
     // تنفيذ كل العمليات مرة واحدة
     await batch.commit();
 
@@ -523,35 +524,37 @@ class _CreategroupState extends State<Creategroup> {
                             required: false,
                           ),
                           const SizedBox(height: 15),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 55,
-                            child: ElevatedButton.icon(
-                              icon: const Icon(Icons.face),
-                              label: Text(
-                                faceEmbeddingAdmin.isEmpty
-                                    ? 'التقاط بصمة الوجه'
-                                    : 'تم تسجيل الوجه ✔',
-                              ),
-                              onPressed: () async {
-                                FocusManager.instance.primaryFocus?.unfocus();
-                                final result =
-                                    await Navigator.push<List<double>>(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const FaceRegisterScreen(),
-                                      ),
-                                    );
+                          // ممكن الغي الزر ده لاحقا
+                          if (!kIsWeb)
+                            SizedBox(
+                              width: double.infinity,
+                              height: 55,
+                              child: ElevatedButton.icon(
+                                icon: const Icon(Icons.face),
+                                label: Text(
+                                  faceEmbeddingAdmin!.isEmpty
+                                      ? 'التقاط بصمة الوجه (اختياري)'
+                                      : 'تم تسجيل الوجه ✔',
+                                ),
+                                onPressed: () async {
+                                  FocusManager.instance.primaryFocus?.unfocus();
+                                  final result =
+                                      await Navigator.push<List<double>>(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const FaceRegisterScreen(),
+                                        ),
+                                      );
 
-                                if (result != null) {
-                                  setState(() {
-                                    faceEmbeddingAdmin = result;
-                                  });
-                                }
-                              },
+                                  if (result != null) {
+                                    setState(() {
+                                      faceEmbeddingAdmin = result;
+                                    });
+                                  }
+                                },
+                              ),
                             ),
-                          ),
                           const SizedBox(height: 15),
                           SizedBox(
                             width: double.infinity,
@@ -600,10 +603,10 @@ class _CreategroupState extends State<Creategroup> {
                                         );
                                         return;
                                       }
-                                      if (faceEmbeddingAdmin.isEmpty) {
+                                      /*   if (faceEmbeddingAdmin.isEmpty) {
                                         _showError("بصمة الوجه مطلوبة");
                                         return;
-                                      }
+                                      } */
                                       if (_formKey.currentState!.validate()) {
                                         intPhone = null;
                                         _showPreview();

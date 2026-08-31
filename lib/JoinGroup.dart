@@ -257,6 +257,16 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
     }
 
     final String groupId = data['groupId'];
+    final checkDoc = await FirebaseFirestore.instance
+        .collection('teams')
+        .doc(groupId)
+        .collection('members')
+        .doc(uid)
+        .get();
+    if (checkDoc.exists) {
+      _showError('انت موجود بالفعل في هذه المجموعه.');
+      return;
+    }
 
     setState(() => isLoading = true);
     final prefs = await SharedPreferences.getInstance();
