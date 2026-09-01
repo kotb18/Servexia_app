@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
@@ -42,6 +44,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
   bool _isFaceEmbeddingFound = false;
   static String _localKey(String uid) => 'face_data_$uid';
   String get uid => FirebaseAuth.instance.currentUser!.uid;
+  File? _image;
 
   // ألوان مخصصة للتصميم
   final Color primaryColor = const Color(0xFF1A237E); // أزرق داكن
@@ -883,17 +886,19 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                   onPressed: () async {
                     Navigator.pop(context);
                     FocusManager.instance.primaryFocus?.unfocus();
-                    final result = await Navigator.push<List<double>>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const FaceRegisterScreen(),
-                      ),
-                    );
+                    final FaceRegisterResult? result =
+                        await Navigator.push<FaceRegisterResult>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const FaceRegisterScreen(),
+                          ),
+                        );
 
                     if (result != null) {
                       setState(() {
-                        faceEmbeddingLive = result;
+                        faceEmbeddingLive = result as List<double>;
                         _isFaceEmbeddingFound = true;
+                        _image = result.image;
                         _showSnackBar('تم تسجيل بصمة الوجه بنجاح.');
                       });
                       final prefs = await SharedPreferences.getInstance();
@@ -901,9 +906,34 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                         _localKey('${widget.groupId} $uid'),
                         jsonEncode(faceEmbeddingLive),
                       );
+                      await prefs.setString(
+                        _localKey('faceImage${widget.groupId} $uid'),
+                        jsonEncode(_image),
+                      );
 
                       // إنشاء Batch
                       final batch = FirebaseFirestore.instance.batch();
+                      final memberRef = FirebaseFirestore.instance
+                          .collection('teams')
+                          .doc(widget.groupId)
+                          .collection('members')
+                          .doc(uid);
+                      final storageRef = FirebaseStorage.instance
+                          .ref()
+                          .child('users')
+                          .child(widget.groupId)
+                          .child('faces')
+                          .child(uid);
+
+                      await storageRef.putFile(
+                        _image!,
+                        SettableMetadata(contentType: 'image/jpeg'),
+                      );
+
+                      final imageUrl = await storageRef.getDownloadURL();
+                      await memberRef.set({
+                        'faceImageUrl': imageUrl,
+                      }, SetOptions(merge: true));
 
                       // faceEmbedding
                       final faceRef = FirebaseFirestore.instance
@@ -916,6 +946,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                         'faceEmbedding': faceEmbeddingLive,
                         'updatedAt': FieldValue.serverTimestamp(),
                       });
+                      await batch.commit();
                     }
                   },
                 ),

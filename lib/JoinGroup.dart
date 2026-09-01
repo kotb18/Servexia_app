@@ -3,6 +3,8 @@ import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'dart:io';
@@ -34,6 +36,7 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
   bool isLoading = false;
   String? scannedGroupId;
   String? _completePhoneNumber;
+  File? _image;
 
   List<double> faceEmbedding = [];
 
@@ -63,11 +66,21 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
           children: [
             const SizedBox(height: 20),
 
-            Icon(
-              Icons.group_add,
-              size: 70,
-              color: Theme.of(context).primaryColor,
-            ),
+            _image == null
+                ? Icon(
+                    Icons.group_add,
+                    size: 70,
+                    color: Theme.of(context).primaryColor,
+                  )
+                : ClipRRect(
+                    borderRadius: BorderRadius.circular(50),
+                    child: Image.file(
+                      _image!,
+                      width: 100,
+                      height: 100,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
 
             const SizedBox(height: 10),
 
@@ -144,32 +157,42 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
                       const SizedBox(height: 20),
 
                       /// زر تسجيل الوجه
-                      SizedBox(
-                        width: double.infinity,
-                        height: 55,
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.face),
-                          label: Text(
-                            faceEmbedding.isEmpty
-                                ? 'التقاط بصمة الوجه'
-                                : 'تم تسجيل الوجه ✔',
-                          ),
-                          onPressed: () async {
-                            final result = await Navigator.push<List<double>>(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const FaceRegisterScreen(),
-                              ),
-                            );
+                      if (!kIsWeb)
+                        SizedBox(
+                          width: double.infinity,
+                          height: 55,
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.face),
+                            label: Text(
+                              faceEmbedding.isEmpty
+                                  ? 'التقاط بصمة الوجه (اختياري)'
+                                  : 'تم تسجيل الوجه ✔',
+                            ),
+                            onPressed: () async {
+                              FocusManager.instance.primaryFocus?.unfocus();
+                              final FaceRegisterResult? result =
+                                  await Navigator.push<FaceRegisterResult>(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const FaceRegisterScreen(),
+                                    ),
+                                  );
 
-                            if (result != null) {
-                              setState(() {
-                                faceEmbedding = result;
-                              });
-                            }
-                          },
+                              if (result != null) {
+                                setState(() {
+                                  _image = result.image;
+                                  faceEmbedding = result.embedding;
+
+                                  print('مسار الصورة: ${_image!.path}');
+                                  print(
+                                    'عدد قيم embedding: ${faceEmbedding.length}',
+                                  );
+                                });
+                              }
+                            },
+                          ),
                         ),
-                      ),
 
                       const SizedBox(height: 25),
 
@@ -224,10 +247,10 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
       _showError('لا تبدأ الرقم بـ 0 بعد كود الدولة');
       return;
     }
-    if (faceEmbedding.isEmpty) {
+    /* if (faceEmbedding.isEmpty) {
       _showError("بصمة الوجه مطلوبة");
       return;
-    }
+    } */
     intPhone = null;
     final scanResult = await Navigator.push<String>(
       context,
@@ -274,13 +297,29 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
       _localKey('$groupId $uid'),
       jsonEncode(faceEmbedding),
     );
+    await prefs.setString(
+      _localKey('faceImage$groupId $uid'),
+      jsonEncode(_image),
+    );
 
     final memberRef = FirebaseFirestore.instance
         .collection('teams')
         .doc(groupId)
         .collection('members')
         .doc(uid);
+    final storageRef = FirebaseStorage.instance
+        .ref()
+        .child('users')
+        .child(groupId)
+        .child('faces')
+        .child(uid);
 
+    await storageRef.putFile(
+      _image!,
+      SettableMetadata(contentType: 'image/jpeg'),
+    );
+
+    final imageUrl = await storageRef.getDownloadURL();
     await memberRef.set({
       'id': uid,
       'name': nameController.text.trim(),
@@ -289,6 +328,7 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
       'joinedAt': Timestamp.now(),
       'confirm': false,
       'photoURL': FirebaseAuth.instance.currentUser!.photoURL ?? '',
+      'faceImageUrl': imageUrl,
     });
     FirebaseFirestore.instance
         .collection('faceEmbedding')
@@ -299,7 +339,9 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
           'faceEmbedding': faceEmbedding,
           'updatedAt': FieldValue.serverTimestamp(),
         });
-    await FirebaseMessaging.instance.subscribeToTopic(groupId);
+    if (!kIsWeb) {
+      await FirebaseMessaging.instance.subscribeToTopic(groupId);
+    }
 
     setState(() => isLoading = false);
 
@@ -327,6 +369,13 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
       },
     ).show();
   }
+}
+
+class FaceRegisterResult {
+  final File image;
+  final List<double> embedding;
+
+  FaceRegisterResult({required this.image, required this.embedding});
 }
 
 class FaceRegisterScreen extends StatefulWidget {
@@ -418,7 +467,10 @@ class _FaceRegisterScreenState extends State<FaceRegisterScreen> {
     await _cameraController.dispose();
 
     if (mounted) {
-      Navigator.pop(context, embedding);
+      Navigator.pop(
+        context,
+        FaceRegisterResult(image: file, embedding: embedding),
+      );
     }
   }
 

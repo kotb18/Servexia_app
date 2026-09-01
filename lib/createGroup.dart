@@ -1,13 +1,16 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:country_picker/country_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:maintenance/JoinGroup.dart';
+import 'package:maintenance/homePage.dart';
 import 'package:maintenance/services/billing_service.dart';
 import 'package:maintenance/workSpace.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -36,7 +39,7 @@ class _CreategroupState extends State<Creategroup> {
   final _purposeController = TextEditingController();
   final _adminController = TextEditingController();
   final _phoneController = TextEditingController();
-
+  File? _image;
   String _selectedArea = 'Egypt';
   bool _loading = false;
   String _selectedCountryCode = 'EG';
@@ -188,6 +191,23 @@ class _CreategroupState extends State<Creategroup> {
     setState(() => _loading = true);
 
     try {
+      final docs = await FirebaseFirestore.instance
+          .collection('groups')
+          .where('members', arrayContains: uid)
+          .get();
+      final groups = docs.docs;
+      int? currentGroupsCount = groups.length;
+      if (currentGroupsCount >= maxGroup!) {
+        AwesomeDialog(
+          context: context,
+          dialogType: DialogType.warning,
+          animType: AnimType.bottomSlide,
+          title: 'لقد وصلت إلى الحد الأقصى للمجموعات',
+          /*  desc:
+              'لا يمكنك إنشاء مجموعات جديدة. يرجى الترقية للاستمتاع بخدمات إضافية.', */
+        ).show();
+        return;
+      }
       // 1. حالة انتهاء الاشتراك
       if (isUsed && expiredAt != null && expiredAt!.isBefore(DateTime.now())) {
         _showExpiredDialog();
@@ -279,6 +299,10 @@ class _CreategroupState extends State<Creategroup> {
         _localKey('$groupId $uid'),
         jsonEncode(faceEmbeddingAdmin ?? []),
       );
+      await prefs.setString(
+        _localKey('faceImage$groupId $uid'),
+        jsonEncode(_image),
+      );
       // faceEmbedding
       final faceRef = firestore
           .collection('faceEmbedding')
@@ -317,7 +341,19 @@ class _CreategroupState extends State<Creategroup> {
       'admins': [uid],
       'adminToken': token,
     });
+    final storageRef = FirebaseStorage.instance
+        .ref()
+        .child('users')
+        .child(groupId)
+        .child('faces')
+        .child(uid);
 
+    await storageRef.putFile(
+      _image!,
+      SettableMetadata(contentType: 'image/jpeg'),
+    );
+
+    final imageUrl = await storageRef.getDownloadURL();
     // team members
     final memberRef = firestore
         .collection('teams')
@@ -333,6 +369,7 @@ class _CreategroupState extends State<Creategroup> {
       'joinedAt': DateTime.now(),
       'confirm': true,
       'photoURL': FirebaseAuth.instance.currentUser?.photoURL ?? '',
+      'faceImageUrl': imageUrl,
     });
 
     // attendance
@@ -371,8 +408,10 @@ class _CreategroupState extends State<Creategroup> {
     await batch.commit();
 
     // الاشتراك في التوبيك (خارج الباتش)
-    await FirebaseMessaging.instance.subscribeToTopic('${groupId}admin');
-    await FirebaseMessaging.instance.subscribeToTopic(groupId);
+    if (!kIsWeb) {
+      await FirebaseMessaging.instance.subscribeToTopic('${groupId}admin');
+      await FirebaseMessaging.instance.subscribeToTopic(groupId);
+    }
 
     if (!mounted) return;
 
@@ -530,7 +569,17 @@ class _CreategroupState extends State<Creategroup> {
                               width: double.infinity,
                               height: 55,
                               child: ElevatedButton.icon(
-                                icon: const Icon(Icons.face),
+                                icon: _image == null
+                                    ? const Icon(Icons.face)
+                                    : ClipRRect(
+                                        borderRadius: BorderRadius.circular(50),
+                                        child: Image.file(
+                                          _image!,
+                                          width: 40,
+                                          height: 40,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
                                 label: Text(
                                   faceEmbeddingAdmin!.isEmpty
                                       ? 'التقاط بصمة الوجه (اختياري)'
@@ -538,8 +587,8 @@ class _CreategroupState extends State<Creategroup> {
                                 ),
                                 onPressed: () async {
                                   FocusManager.instance.primaryFocus?.unfocus();
-                                  final result =
-                                      await Navigator.push<List<double>>(
+                                  final FaceRegisterResult? result =
+                                      await Navigator.push<FaceRegisterResult>(
                                         context,
                                         MaterialPageRoute(
                                           builder: (_) =>
@@ -549,7 +598,13 @@ class _CreategroupState extends State<Creategroup> {
 
                                   if (result != null) {
                                     setState(() {
-                                      faceEmbeddingAdmin = result;
+                                      _image = result.image;
+                                      faceEmbeddingAdmin = result.embedding;
+
+                                      print('مسار الصورة: ${_image!.path}');
+                                      print(
+                                        'عدد قيم embedding: ${faceEmbeddingAdmin!.length}',
+                                      );
                                     });
                                   }
                                 },
