@@ -251,14 +251,24 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            data['name'] ?? 'مساحة العمل',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.5,
-            ),
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.of(context).maybePop(),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  data['name'] ?? 'مساحة العمل',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Row(
@@ -367,6 +377,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                           customerId: '',
                           isEditMode: false,
                           itemsPurchase: [],
+                          isFromWarehouseScreen: true,
                         ),
                       ),
                     ),

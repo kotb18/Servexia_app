@@ -274,13 +274,55 @@ class _StoreScreenState extends State<StoreScreen> {
                         elevation: 0,
                         backgroundColor: Colors.transparent,
                         centerTitle: true,
-                        title: const Text(
-                          'المخـــــازن',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 20,
-                            color: Colors.white,
-                          ),
+                        title: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'المخـــــازن',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 20,
+                                color: Colors.white,
+                              ),
+                            ),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white.withOpacity(0.2),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                              ),
+                              onPressed: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => AddInventoryItemScreen(
+                                      groupId: widget.groupId,
+                                      invoiceType: '',
+                                      isFromInvoice: false,
+                                      customerId: '',
+                                      isEditMode: false,
+                                      itemsPurchase: [],
+                                      isFromWarehouseScreen: true,
+                                    ),
+                                  ),
+                                );
+                                _refreshItemsList();
+                              },
+                              child: const Text(
+                                'اضافة صنف جديد',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         leading: IconButton(
                           icon: const Icon(
@@ -435,6 +477,7 @@ class _StoreScreenState extends State<StoreScreen> {
                           '$selectedLocation-$searchText-$deletedItems',
                         ),
                         limit: widget.isFromInvoice ? 1000 : 10,
+                        isLive: true,
                         query: itemsQuery(),
                         viewType: ViewType.list,
                         onEmpty: _buildEmptyList(),

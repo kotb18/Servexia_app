@@ -15,9 +15,6 @@ import 'package:maintenance/services/billing_service.dart';
 import 'package:maintenance/workSpace.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-List? faceEmbeddingAdmin = [];
-String? intPhone;
-
 final BillingService billingService = BillingService();
 String? _completePhoneNumber;
 //String? _selectedCountryCode;
@@ -47,7 +44,9 @@ class _CreategroupState extends State<Creategroup> {
   bool isUsed = true;
   DateTime? expiredAt;
   String? status;
-
+  List? faceEmbeddingAdmin = [];
+  String? intPhone;
+  String? _imageUrl;
   // الحصول على معرف المستخدم الحالي بسهولة
   String get uid => FirebaseAuth.instance.currentUser!.uid;
 
@@ -341,19 +340,21 @@ class _CreategroupState extends State<Creategroup> {
       'admins': [uid],
       'adminToken': token,
     });
-    final storageRef = FirebaseStorage.instance
-        .ref()
-        .child('users')
-        .child(groupId)
-        .child('faces')
-        .child(uid);
+    if (_image != null && faceEmbeddingAdmin!.isNotEmpty) {
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('users')
+          .child(groupId)
+          .child('faces')
+          .child(uid);
 
-    await storageRef.putFile(
-      _image!,
-      SettableMetadata(contentType: 'image/jpeg'),
-    );
+      await storageRef.putFile(
+        _image!,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+      _imageUrl = await storageRef.getDownloadURL();
+    }
 
-    final imageUrl = await storageRef.getDownloadURL();
     // team members
     final memberRef = firestore
         .collection('teams')
@@ -369,7 +370,7 @@ class _CreategroupState extends State<Creategroup> {
       'joinedAt': DateTime.now(),
       'confirm': true,
       'photoURL': FirebaseAuth.instance.currentUser?.photoURL ?? '',
-      'faceImageUrl': imageUrl,
+      'faceImageUrl': _imageUrl ?? [],
     });
 
     // attendance

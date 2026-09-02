@@ -2339,6 +2339,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                         customerId: widget.customerId,
                         isEditMode: widget.isEditMode,
                         itemsPurchase: widget.itemsPurchase,
+                        isFromWarehouseScreen: false,
                       ),
                     ),
                   );

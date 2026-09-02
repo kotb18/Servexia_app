@@ -316,6 +316,8 @@ final GoRouter _router = GoRouter(
           itemsPurchase: state.uri.queryParameters['itemsPurchase'] == 'true'
               ? []
               : [],
+          isFromWarehouseScreen:
+              state.uri.queryParameters['isFromWarehouseScreen'] == 'true',
         );
       },
     ),

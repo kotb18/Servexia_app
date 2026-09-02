@@ -21,6 +21,7 @@ class AddInventoryItemScreen extends StatefulWidget {
   final String customerId;
   final bool isEditMode;
   final List itemsPurchase;
+  final bool isFromWarehouseScreen;
   const AddInventoryItemScreen({
     super.key,
     required this.groupId,
@@ -29,6 +30,7 @@ class AddInventoryItemScreen extends StatefulWidget {
     required this.customerId,
     required this.isEditMode,
     required this.itemsPurchase,
+    required this.isFromWarehouseScreen,
   });
   static const String screenroute = 'addInventoryItem';
 
@@ -698,13 +700,10 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
 
                           validator: (v) =>
                               v == null || v.isEmpty ? 'مطلوب' : null,
-                          decoration:
-                              _inputDecoration(
-                                'وحدة القياس (عدد، كيلو، متر...)',
-                                Icons.straighten,
-                              ).copyWith(
-                                // إضافة زر لمسح النص أو فتح الخيارات الشائعة
-                              ),
+                          decoration: _inputDecoration(
+                            'وحدة القياس (عدد، كيلو، متر...)',
+                            Icons.straighten,
+                          ),
                           onTap: () async {
                             setState(() {
                               showUnits = !showUnits;
@@ -714,9 +713,11 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                             print("Units >>> $units");
                             if (!mounted) return;
                           },
-                          onChanged: (v) {
-                            unitController.text = v;
-                          },
+                          /*  onChanged: (v) {
+                            setState(() {
+                              unitController.text = v;
+                            });
+                          }, */
                         ),
                         showUnits ? _showUnitsPicker() : SizedBox.shrink(),
                         // دالة مساعدة لعرض الخيارات بشكل منظم
@@ -740,7 +741,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
 
                             if (!mounted) return;
                           },
-                          onChanged: (v) => locationController.text = v,
+                          /* onChanged: (v) => locationController.text = v, */
                         ),
                         showLocations
                             ? _showLocationsPicker()
