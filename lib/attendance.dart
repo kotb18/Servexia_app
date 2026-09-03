@@ -121,6 +121,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
             'name': data['name'],
             'job': data['job'],
             'photoURL': data['photoURL'] ?? '',
+            'faceImageUrl': data['faceImageUrl'] ?? '',
           };
         }).toList();
       });
@@ -206,14 +207,14 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
 
   Future<void> _checkIn(Map<String, dynamic> member) async {
     final List<dynamic>? storedEmbeddingDynamic = await loadFaceEmbedding();
-    final result = await Navigator.push<List<double>>(
+    final result = await Navigator.push<FaceRegisterResult>(
       context,
       MaterialPageRoute(builder: (_) => const FaceRegisterScreen()),
     );
 
     if (result != null) {
       setState(() {
-        faceEmbeddingLive = result;
+        faceEmbeddingLive = result.embedding;
       });
     }
     double similarity = cosineSimilarity(
@@ -291,14 +292,14 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
 
   Future<void> _checkOut(Map<String, dynamic> member) async {
     final List<dynamic>? storedEmbeddingDynamic = await loadFaceEmbedding();
-    final result = await Navigator.push<List<double>>(
+    final result = await Navigator.push<FaceRegisterResult>(
       context,
       MaterialPageRoute(builder: (_) => const FaceRegisterScreen()),
     );
 
     if (result != null) {
       setState(() {
-        faceEmbeddingLive = result;
+        faceEmbeddingLive = result.embedding;
       });
     }
     double similarity = cosineSimilarity(
@@ -514,6 +515,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
     bool checkedIn,
     bool checkedOut,
   ) {
+    print(member['faceImageUrl']);
     String checkInTimeStr = '';
     String checkOutTimeStr = '';
 
@@ -564,7 +566,12 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                           CircleAvatar(
                             radius: 28,
                             backgroundColor: primaryColor.withOpacity(0.1),
-                            backgroundImage: member['photoURL'] != ''
+                            backgroundImage:
+                                member['faceImageUrl'] != null &&
+                                    member['faceImageUrl'].toString().isNotEmpty
+                                ? NetworkImage(member['faceImageUrl'])
+                                : member['photoURL'] != null &&
+                                      member['photoURL'].toString().isNotEmpty
                                 ? NetworkImage(member['photoURL'])
                                 : null,
                             child: member['photoURL'] == ''
@@ -896,7 +903,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
 
                     if (result != null) {
                       setState(() {
-                        faceEmbeddingLive = result as List<double>;
+                        faceEmbeddingLive = result.embedding;
                         _isFaceEmbeddingFound = true;
                         _image = result.image;
                         _showSnackBar('تم تسجيل بصمة الوجه بنجاح.');
@@ -905,10 +912,6 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                       await prefs.setString(
                         _localKey('${widget.groupId} $uid'),
                         jsonEncode(faceEmbeddingLive),
-                      );
-                      await prefs.setString(
-                        _localKey('faceImage${widget.groupId} $uid'),
-                        jsonEncode(_image),
                       );
 
                       // إنشاء Batch
@@ -931,10 +934,13 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                       );
 
                       final imageUrl = await storageRef.getDownloadURL();
-                      await memberRef.set({
+                      batch.set(memberRef, {
                         'faceImageUrl': imageUrl,
                       }, SetOptions(merge: true));
-
+                      await prefs.setString(
+                        _localKey('faceImage${widget.groupId} $uid'),
+                        jsonEncode(imageUrl),
+                      );
                       // faceEmbedding
                       final faceRef = FirebaseFirestore.instance
                           .collection('faceEmbedding')

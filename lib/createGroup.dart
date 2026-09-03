@@ -298,10 +298,7 @@ class _CreategroupState extends State<Creategroup> {
         _localKey('$groupId $uid'),
         jsonEncode(faceEmbeddingAdmin ?? []),
       );
-      await prefs.setString(
-        _localKey('faceImage$groupId $uid'),
-        jsonEncode(_image),
-      );
+
       // faceEmbedding
       final faceRef = firestore
           .collection('faceEmbedding')
@@ -354,7 +351,10 @@ class _CreategroupState extends State<Creategroup> {
       );
       _imageUrl = await storageRef.getDownloadURL();
     }
-
+    await prefs.setString(
+      _localKey('faceImage$groupId $uid'),
+      jsonEncode(_imageUrl ?? []),
+    );
     // team members
     final memberRef = firestore
         .collection('teams')

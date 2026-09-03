@@ -237,8 +237,11 @@ class _TeamScreenState extends State<TeamScreen> {
                             radius: 26,
                             backgroundColor: Colors.grey.shade300,
                             backgroundImage:
-                                member['photoURL'] != null &&
-                                    member['photoURL'].toString().isNotEmpty
+                                member['faceImageUrl'] != null &&
+                                    member['faceImageUrl'].toString().isNotEmpty
+                                ? NetworkImage(member['faceImageUrl'])
+                                : member['photoURL'] != null &&
+                                      member['photoURL'].toString().isNotEmpty
                                 ? NetworkImage(member['photoURL'])
                                 : null,
                             child:

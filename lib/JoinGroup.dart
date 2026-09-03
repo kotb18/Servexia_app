@@ -293,10 +293,7 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
 
     setState(() => isLoading = true);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _localKey('$groupId $uid'),
-      jsonEncode(faceEmbedding),
-    );
+
     await prefs.setString(
       _localKey('faceImage$groupId $uid'),
       jsonEncode(_image),
@@ -320,6 +317,10 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
     );
 
     final imageUrl = await storageRef.getDownloadURL();
+    await prefs.setString(
+      _localKey('faceImage$groupId $uid'),
+      jsonEncode(imageUrl),
+    );
     await memberRef.set({
       'id': uid,
       'name': nameController.text.trim(),
