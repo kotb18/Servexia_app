@@ -8,6 +8,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:maintenance/JoinGroup.dart';
 import 'package:maintenance/homePage.dart';
@@ -350,11 +351,12 @@ class _CreategroupState extends State<Creategroup> {
         SettableMetadata(contentType: 'image/jpeg'),
       );
       _imageUrl = await storageRef.getDownloadURL();
+      await prefs.setString(
+        _localKey('faceImage$groupId $uid'),
+        jsonEncode(_imageUrl ?? []),
+      );
     }
-    await prefs.setString(
-      _localKey('faceImage$groupId $uid'),
-      jsonEncode(_imageUrl ?? []),
-    );
+
     // team members
     final memberRef = firestore
         .collection('teams')
@@ -370,7 +372,7 @@ class _CreategroupState extends State<Creategroup> {
       'joinedAt': DateTime.now(),
       'confirm': true,
       'photoURL': FirebaseAuth.instance.currentUser?.photoURL ?? '',
-      'faceImageUrl': _imageUrl ?? [],
+      'faceImageUrl': _imageUrl ?? '',
     });
 
     // attendance
@@ -416,12 +418,7 @@ class _CreategroupState extends State<Creategroup> {
 
     if (!mounted) return;
 
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (_) => WorkspaceHomeScreen(workspaceId: groupId),
-      ),
-      (route) => route.isFirst,
-    );
+    context.go('/workspace/${Uri.encodeComponent(groupId)}');
   }
 
   @override
@@ -483,12 +480,24 @@ class _CreategroupState extends State<Creategroup> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
-                            'إنشاء مجموعة جديدة',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.arrow_back,
+                                  color: Colors.black,
+                                ),
+                                onPressed: () =>
+                                    Navigator.of(context).maybePop(),
+                              ),
+                              const Text(
+                                'إنشاء مجموعة جديدة',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 25),
 

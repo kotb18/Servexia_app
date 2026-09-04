@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:maintenance/Store/store_dashboard_screen.dart';
 import 'package:maintenance/addAsset.dart';
@@ -45,7 +48,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
     print("Device FCM Token: $deviceToken");
   }
 
-  Map<String, bool> permissions = {
+  final Map<String, bool> permissions = {
     'المخازن': false,
     'إضافة صنف مخزني': false,
     'الفواتير والمشتريات': false,
@@ -56,34 +59,44 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
     'إضافة مهمة': false,
     'طلبات الانضمام': false,
   };
-  Future<void> _loadExistingPermissions() async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('employees_permissions')
-          .doc(widget.workspaceId)
-          .collection('items')
-          .doc(FirebaseAuth.instance.currentUser!.uid)
-          .get();
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+  _permissionsSubscription;
 
-      if (doc.exists && doc.data() != null) {
-        final data = doc.data()!;
-        setState(() {
-          permissions.forEach((key, value) {
-            if (data.containsKey(key)) {
-              permissions[key] = data[key] ?? false;
+  void _listenToPermissions() {
+    print('Listening to permissions: ${widget.workspaceId}');
+
+    _permissionsSubscription = FirebaseFirestore.instance
+        .collection('employees_permissions')
+        .doc(widget.workspaceId)
+        .collection('items')
+        .doc(FirebaseAuth.instance.currentUser!.uid)
+        .snapshots()
+        .listen(
+          (doc) {
+            if (!mounted) return;
+
+            if (doc.exists && doc.data() != null) {
+              final data = doc.data()!;
+
+              setState(() {
+                permissions.forEach((key, value) {
+                  if (data.containsKey(key)) {
+                    permissions[key] = data[key] ?? false;
+                  }
+                });
+              });
             }
-          });
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading permissions: \$e');
-    }
+          },
+          onError: (error) {
+            debugPrint('Error loading permissions: $error');
+          },
+        );
   }
 
   @override
   void initState() {
     super.initState();
-    _loadExistingPermissions(); // Load existing permissions
+    _listenToPermissions(); // Load existing permissions
     _initializeAnimations();
     _loadWorkspace();
     getDeviceToken(); // Call the method to get the device token
@@ -104,6 +117,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
 
   @override
   void dispose() {
+    _permissionsSubscription?.cancel();
     _animationController.dispose();
     super.dispose();
   }
@@ -255,7 +269,15 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
             children: [
               IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.of(context).maybePop(),
+                onPressed: () {
+                  final isAdmin = data['admins'][0] == uid;
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (_) => Homepage(isAdmin: isAdmin),
+                    ),
+                    (route) => false,
+                  );
+                },
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -347,84 +369,45 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                 ),
                 children: [
                   // Admin Cards for Inventory and Sales
-                  if (isAdmin && permissions['المخازن'] == true)
+                  if (permissions['المخازن'] == true)
                     _buildDashboardCard(
                       icon: Icons.warehouse,
                       title: 'المخازن',
                       color: const Color.fromARGB(255, 14, 9, 141),
-                      onTap: () => _navigateTo(
-                        StoreScreen(
-                          groupId: widget.workspaceId,
-                          isFromInvoice: false,
-                          deletedItems: false,
-                          invoiceType: '',
-                          customerId: '',
-                          isEditMode: false,
-                          itemsPurchase: [],
-                        ),
-                      ),
+                      onTap: () => _goTo('/store/${widget.workspaceId}'),
                     ),
-                  if (isAdmin && permissions['إضافة صنف مخزني'] == true)
+                  if (permissions['إضافة صنف مخزني'] == true)
                     _buildDashboardCard(
                       icon: Icons.warehouse_outlined,
                       title: 'إضافة صنف مخزني',
                       color: const Color.fromARGB(255, 9, 72, 233),
-                      onTap: () => _navigateTo(
-                        AddInventoryItemScreen(
-                          groupId: widget.workspaceId,
-                          invoiceType: '',
-                          isFromInvoice: false,
-                          customerId: '',
-                          isEditMode: false,
-                          itemsPurchase: [],
-                          isFromWarehouseScreen: true,
-                        ),
+                      onTap: () => _goTo(
+                        '/add-inventory/${widget.workspaceId}?isFromWarehouseScreen=true',
                       ),
                     ),
-                  if (isAdmin && permissions['الفواتير والمشتريات'] == true)
+                  if (permissions['الفواتير والمشتريات'] == true)
                     _buildDashboardCard(
                       icon: Icons.receipt_long,
                       title: 'الفواتير والمشتريات',
                       color: const Color.fromARGB(255, 66, 121, 3),
-                      onTap: () => _navigateTo(
-                        InvoicePage(
-                          groupId: widget.workspaceId,
-                          itemsSale: [],
-                          itemsPurchase: [],
-                          name: '',
-                          phone: '',
-                          address: '',
-                          customerId: '',
-                          isFromConstCustomers: false,
-                          isFromWorkSpace: true,
-                          type: 'بيع',
-                          isFormStore: false,
-                          isEditMode: false,
-                        ),
+                      onTap: () => _goTo(
+                        '/invoice?groupId=${Uri.encodeQueryComponent(widget.workspaceId)}&isFromWorkSpace=true&type=${Uri.encodeQueryComponent('بيع')}',
                       ),
                     ),
-                  if (isAdmin && permissions['العملاء والموردين'] == true)
+                  if (permissions['العملاء والموردين'] == true)
                     _buildDashboardCard(
                       icon: Icons.account_balance_wallet,
                       title: 'العملاء والموردين',
                       color: const Color.fromARGB(255, 7, 108, 162),
-                      onTap: () => _navigateTo(
-                        CustomersSuppliers(
-                          groupId: widget.workspaceId,
-                          isFromInvoice: false,
-                          itemsSale: [],
-                          itemsPruchase: [],
-                          invoiceType: '',
-                          isEditMode: false,
-                        ),
-                      ),
+                      onTap: () =>
+                          _goTo('/customers-suppliers/${widget.workspaceId}'),
                     ),
                 ],
               ),
 
               SizedBox(height: 10),
 
-              if (isAdmin && permissions['المتجر الإليكتروني'] == true)
+              if (permissions['المتجر الإليكتروني'] == true)
                 Container(
                   width: double.infinity,
                   decoration: BoxDecoration(
@@ -447,9 +430,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                     child: InkWell(
                       borderRadius: BorderRadius.circular(18),
                       onTap: () {
-                        _navigateTo(
-                          StoreDashboardScreen(groupId: widget.workspaceId),
-                        );
+                        _goTo('/store-dashboard/${widget.workspaceId}');
                       },
                       child: const Padding(
                         padding: EdgeInsets.symmetric(
@@ -489,51 +470,36 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                 ),
                 children: [
                   // Admin Cards for Maintenance and HR
-                  if (isAdmin && permissions['الأصول والمعدات'] == true)
+                  if (permissions['الأصول والمعدات'] == true)
                     _buildDashboardCard(
                       icon: Iconsax.building_4,
                       title: 'الأصول والمعدات',
                       color: const Color.fromARGB(255, 126, 6, 98),
-                      onTap: () => _navigateTo(
-                        AssetsScreen(groupId: widget.workspaceId),
-                      ),
+                      onTap: () => _goTo('/assets/${widget.workspaceId}'),
                     ),
-                  if (isAdmin && permissions['إضافة أصل أو معدة'] == true)
+                  if (permissions['إضافة أصل أو معدة'] == true)
                     _buildDashboardCard(
                       icon: Icons.precision_manufacturing,
                       title: 'إضافة أصل أو معدة',
                       color: const Color.fromARGB(255, 139, 10, 194),
-                      onTap: () => _navigateTo(
-                        AddAssetScreen(groupId: widget.workspaceId),
-                      ),
+                      onTap: () => _goTo('/add-asset/${widget.workspaceId}'),
                     ),
                   // Common Cards
                   _buildDashboardCard(
                     icon: Icons.assignment,
                     title: 'المهام والأعطال',
                     color: Colors.blue,
-                    onTap: () => _navigateTo(
-                      TasksScreen(
-                        groupId: widget.workspaceId,
-                        isAdmin: isAdmin,
-                      ),
-                    ),
+                    onTap: () =>
+                        _goTo('/tasks/${widget.workspaceId}?isAdmin=$isAdmin'),
                   ),
                   // Admin Add Task Card
-                  if (isAdmin && permissions['إضافة مهمة'] == true)
+                  if (permissions['إضافة مهمة'] == true)
                     _buildDashboardCard(
                       icon: Icons.add_circle,
                       title: 'إضافة مهمة',
                       color: const Color.fromARGB(255, 97, 12, 108),
                       onTap: () {
-                        _navigateTo(
-                          AddTaskScreen(
-                            groupId: widget.workspaceId,
-                            fromConstTasks: false,
-                            description: TextEditingController(),
-                            title: TextEditingController(),
-                          ),
-                        );
+                        _goTo('/add-task?groupId=${widget.workspaceId}');
                         print(
                           '111111111111111111111 ${'aa'}',
                         ); // Debug: Print FCM token
@@ -543,35 +509,26 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                     icon: Icons.handyman,
                     title: 'الابلاغ عن الاعطال',
                     color: const Color.fromARGB(255, 126, 34, 34),
-                    onTap: () =>
-                        _navigateTo(AddReportPage(groupId: widget.workspaceId)),
+                    onTap: () => _goTo('/add-report/${widget.workspaceId}'),
                   ),
                   _buildDashboardCard(
                     icon: Icons.group,
                     title: 'الفريق',
                     color: Colors.green,
-                    onTap: () => _navigateTo(
-                      TeamScreen(
-                        groupId: widget.workspaceId,
-                        adminId: workspaceData!['adminId'] ?? '',
-                        isXadmin: workspaceData!['adminId'] == uid,
-                        isAdmin: isAdmin,
-                      ),
+                    onTap: () => _goTo(
+                      '/team/${widget.workspaceId}?adminId=${Uri.encodeQueryComponent((workspaceData!['adminId'] ?? '').toString())}&isXadmin=${workspaceData!['adminId'] == uid}&isAdmin=$isAdmin',
                     ),
                   ),
                   _buildDashboardCard(
                     icon: Icons.badge,
                     title: 'الحضور والانصراف',
                     color: const Color.fromARGB(255, 6, 104, 160),
-                    onTap: () => _navigateTo(
-                      DailyAttendanceScreen(
-                        groupId: widget.workspaceId,
-                        isAdmin: isAdmin,
-                      ),
+                    onTap: () => _goTo(
+                      '/attendance/${widget.workspaceId}?isAdmin=$isAdmin',
                     ),
                   ),
                   // Admin Join Requests Card with Badge
-                  if (isAdmin && permissions['طلبات الانضمام'] == true)
+                  if (permissions['طلبات الانضمام'] == true)
                     StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance
                           .collection('teams')
@@ -594,9 +551,8 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                           title: 'طلبات الانضمام',
                           color: const Color.fromARGB(255, 16, 10, 194),
                           badgeCount: notificationCount,
-                          onTap: () => _navigateTo(
-                            AdminApprovalPage(groupId: widget.workspaceId),
-                          ),
+                          onTap: () =>
+                              _goTo('/admin-approval/${widget.workspaceId}'),
                         );
                       },
                     ),
@@ -609,9 +565,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
     );
   }
 
-  Future<void> _navigateTo(Widget screen) async {
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
-  }
+  void _goTo(String location) => context.push(location);
 
   Widget _buildDashboardCard({
     required IconData icon,

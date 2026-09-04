@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_pagination/firebase_pagination.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:maintenance/Store/customer_orders_screen.dart';
 import 'package:maintenance/Store/inventory_item_model.dart';
@@ -155,14 +156,23 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
       _showSnackBar('⚠ يجب تسجيل الدخول أولاً لعرض طلباتك');
       return;
     }
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => MyOrdersScreen(
-          customerId: FirebaseAuth.instance.currentUser!.uid,
-          groupId: widget.groupId,
-        ),
-      ),
+    context.push(
+      Uri(
+        path: '/shop/${Uri.encodeComponent(widget.groupId)}/orders',
+        queryParameters: {'customerId': FirebaseAuth.instance.currentUser!.uid},
+      ).toString(),
+    );
+  }
+
+  void _openCart() {
+    context.push(
+      Uri(
+        path: '/shop/${Uri.encodeComponent(widget.groupId)}/cart',
+        queryParameters: {
+          'shippingFee': shippingFee.toString(),
+          'deviceToken': deviceToken ?? '',
+        },
+      ).toString(),
     );
   }
 
@@ -235,17 +245,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
       ),
       floatingActionButton: (!widget.isPreview && isMobile)
           ? FloatingActionButton.extended(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => StoreCartScreen(
-                    groupId: widget.groupId,
-                    shippingFee: shippingFee,
-                    makeSetStateOnCartChange: true,
-                    deviceTokrn: deviceToken ?? '',
-                  ),
-                ),
-              ),
+              onPressed: _openCart,
               backgroundColor: primaryColor,
               icon: const Icon(
                 Icons.shopping_bag_outlined,
@@ -348,17 +348,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
           _buildAppBarAction(
             icon: Icons.shopping_cart_outlined,
             tooltip: 'السلة',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => StoreCartScreen(
-                  groupId: widget.groupId,
-                  shippingFee: shippingFee,
-                  makeSetStateOnCartChange: true,
-                  deviceTokrn: deviceToken ?? '',
-                ),
-              ),
-            ),
+            onTap: _openCart,
           ),
         const SizedBox(width: 8),
       ],
@@ -620,17 +610,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
             child: _buildQuickActionButton(
               icon: Icons.shopping_bag_outlined,
               label: 'السلة',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => StoreCartScreen(
-                    groupId: widget.groupId,
-                    shippingFee: shippingFee,
-                    makeSetStateOnCartChange: true,
-                    deviceTokrn: deviceToken ?? "",
-                  ),
-                ),
-              ),
+              onTap: _openCart,
             ),
           ),
           const SizedBox(width: 12),
@@ -730,16 +710,15 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => StoreProductDetailScreen(
-              item: item,
-              groupId: widget.groupId,
-              isPreview: widget.isPreview,
-              shippingFee: shippingFee,
-              deviceToken: deviceToken ?? '',
-            ),
-          ),
+        context.push(
+          Uri(
+            path:
+                '/shop/${Uri.encodeComponent(widget.groupId)}/product/${Uri.encodeComponent(item.sku)}',
+            queryParameters: {
+              'deviceToken': deviceToken ?? '',
+              'isPreview': widget.isPreview.toString(),
+            },
+          ).toString(),
         );
       },
       child: MouseRegion(

@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:maintenance/Store/store_cart_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'store_checkout_screen.dart';
@@ -278,19 +279,16 @@ class _StoreCartScreenState extends State<StoreCartScreen> {
                           width: double.infinity,
                           height: 50,
                           child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => StoreCheckoutScreen(
-                                    cartService: cart,
-                                    groupId: widget.groupId,
-                                    shippingFee: widget.shippingFee,
-                                    deviceTokrn: widget.deviceTokrn,
-                                  ),
-                                ),
-                              );
-                            },
+                            onPressed: () => context.push(
+                              Uri(
+                                path:
+                                    '/shop/${Uri.encodeComponent(widget.groupId)}/checkout',
+                                queryParameters: {
+                                  'shippingFee': widget.shippingFee.toString(),
+                                  'deviceToken': widget.deviceTokrn,
+                                },
+                              ).toString(),
+                            ),
                             child: const Text('إتمام الشراء'),
                           ),
                         ),

@@ -34,6 +34,15 @@ import 'package:maintenance/warehouseScreen.dart';
 import 'package:maintenance/workSpace.dart';
 import 'package:maintenance/services/billing_service.dart';
 import 'package:maintenance/Store/store_home_screen.dart';
+import 'package:maintenance/Store/store_dashboard_screen.dart';
+import 'package:maintenance/Store/store_cart_screen.dart';
+import 'package:maintenance/Store/store_setup_screen.dart';
+import 'package:maintenance/Store/select_products_screen.dart';
+import 'package:maintenance/Store/store_orders_screen.dart';
+import 'package:maintenance/Store/store_preview_screen.dart';
+import 'package:maintenance/Store/customer_orders_screen.dart';
+import 'package:maintenance/Store/store_checkout_screen.dart';
+import 'package:maintenance/Store/store_cart_service.dart';
 import 'package:provider/provider.dart';
 
 // ✅ Conditional import للـ Platform Setup
@@ -95,8 +104,24 @@ class MyApp extends StatelessWidget {
 }
 
 // GoRouter Configuration
+bool _showSplashOnStartup = true;
+
 final GoRouter _router = GoRouter(
   initialLocation: '/',
+  redirect: (context, state) {
+    // A web refresh restores the last browser URL. Route that first request
+    // through SplashScreen, then allow SplashScreen to resume it.
+    if (_showSplashOnStartup) {
+      _showSplashOnStartup = false;
+      if (state.uri.path != '/') {
+        return Uri(
+          path: '/',
+          queryParameters: {'continueTo': state.uri.toString()},
+        ).toString();
+      }
+    }
+    return null;
+  },
   routes: [
     // SplashScreen - دايماً يفتح أولاً
     GoRoute(
@@ -120,6 +145,73 @@ final GoRouter _router = GoRouter(
 
         return StoreHomeScreen(groupId: groupId);
       },
+    ),
+    GoRoute(
+      path: '/store-dashboard/:groupId',
+      name: 'storeDashboard',
+      builder: (context, state) => StoreDashboardScreen(
+        groupId: state.pathParameters['groupId'] ?? '',
+      ),
+    ),
+    GoRoute(
+      path: '/store-dashboard/:groupId/setup',
+      name: 'storeSetup',
+      builder: (context, state) => StoreSetupScreen(
+        groupId: state.pathParameters['groupId'] ?? '',
+        isFromSettings: state.uri.queryParameters['isFromSettings'] == 'true',
+      ),
+    ),
+    GoRoute(
+      path: '/store-dashboard/:groupId/products',
+      name: 'storeProducts',
+      builder: (context, state) =>
+          SelectProductsScreen(groupId: state.pathParameters['groupId'] ?? ''),
+    ),
+    GoRoute(
+      path: '/store-dashboard/:groupId/orders',
+      name: 'storeOrders',
+      builder: (context, state) =>
+          StoreOrdersScreen(storeId: state.pathParameters['groupId'] ?? ''),
+    ),
+    GoRoute(
+      path: '/store-dashboard/:groupId/preview',
+      name: 'storePreview',
+      builder: (context, state) => StorePreviewScreen(
+        groupId: state.pathParameters['groupId'] ?? '',
+        storeName: state.uri.queryParameters['storeName'] ?? '',
+      ),
+    ),
+    GoRoute(
+      path: '/shop/:groupId/cart',
+      name: 'storeCart',
+      builder: (context, state) => StoreCartScreen(
+        groupId: state.pathParameters['groupId'] ?? '',
+        shippingFee:
+            double.tryParse(state.uri.queryParameters['shippingFee'] ?? '') ??
+            0,
+        makeSetStateOnCartChange: false,
+        deviceTokrn: state.uri.queryParameters['deviceToken'] ?? '',
+      ),
+    ),
+    GoRoute(
+      path: '/shop/:groupId/orders',
+      name: 'customerOrders',
+      builder: (context, state) => MyOrdersScreen(
+        customerId: state.uri.queryParameters['customerId'] ?? '',
+        groupId: state.pathParameters['groupId'] ?? '',
+      ),
+    ),
+    GoRoute(
+      path: '/shop/:groupId/checkout',
+      name: 'storeCheckout',
+      builder: (context, state) => StoreCheckoutScreen(
+        cartService: StoreCartService(),
+        groupId: state.pathParameters['groupId'] ?? '',
+        shippingFee:
+            double.tryParse(state.uri.queryParameters['shippingFee'] ?? '') ??
+            0,
+        deviceTokrn: state.uri.queryParameters['deviceToken'] ?? '',
+      ),
     ),
     GoRoute(
       path: '/shop/:groupId/product/:sku',
@@ -183,7 +275,8 @@ final GoRouter _router = GoRouter(
               item: snapshot.data!,
               shippingFee:
                   0.0, // <-- يمكنك تعديل قيمة رسوم الشحن هنا إذا لزم الأمر
-              deviceToken: '',
+              deviceToken: state.uri.queryParameters['deviceToken'] ?? '',
+              isPreview: state.uri.queryParameters['isPreview'] == 'true',
             );
           },
         );

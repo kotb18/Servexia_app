@@ -615,11 +615,11 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                         const SizedBox(height: 12),
                         _buildField(
                           controller: priceController,
-                          label: 'سعر الصنف (اختياري)',
+                          label: 'سعر الصنف',
                           keyboard: TextInputType.number,
                           icon: Icons.attach_money,
                           validator: (v) {
-                            if (v == null || v.isEmpty) return null;
+                            if (v == null || v.isEmpty) return 'مطلوب';
                             final parsed = double.tryParse(v);
                             if (parsed == null) return 'يجب أن يكون رقم';
                             return null;

@@ -148,12 +148,8 @@ class _HomepageState extends State<Homepage>
     super.dispose();
   }
 
-  void createGroup() =>
-      Navigator.push(context, MaterialPageRoute(builder: (_) => Creategroup()));
-  void joinGroup() => Navigator.push(
-    context,
-    MaterialPageRoute(builder: (_) => JoinGroupScreen()),
-  );
+  void createGroup() => context.push('/create-group');
+  void joinGroup() => context.push('/join-group');
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -458,13 +454,9 @@ class _HomepageState extends State<Homepage>
               await prefs.remove(_localKey('$groupId $uid'));
             } */
 
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => Login(fromCheckout: false),
-                          ),
-                          (route) => false,
-                        );
+                        if (context.mounted) {
+                          context.go('/signIn');
+                        }
                       },
                       child: const Text(
                         'تسجيل الخروج',
@@ -734,18 +726,8 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
       return;
     }
 
-    await Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        settings: const RouteSettings(name: WorkspaceHomeScreen.screenroute),
-        builder: (_) => WorkspaceHomeScreen(workspaceId: group['docId']),
-      ),
-      (route) => route.isFirst,
-    );
-    setState(() {
-      isLoading = false;
-    });
-    // ignore: use_build_context_synchronously
-    showRateDialog(context);
+    if (!context.mounted) return;
+    context.go('/workspace/${Uri.encodeComponent(group['docId'].toString())}');
   }
 }
 

@@ -40,6 +40,14 @@ class _TeamScreenState extends State<TeamScreen> {
 
   bool get isAdmin => widget.isAdmin;
 
+  /// Older member records may store an empty list instead of an image URL.
+  String? _imageUrl(dynamic value) {
+    if (value is String && value.trim().isNotEmpty) {
+      return value;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -202,6 +210,10 @@ class _TeamScreenState extends State<TeamScreen> {
 
         return Column(
           children: confirmedMembers.map((member) {
+            final faceImageUrl = _imageUrl(member['faceImageUrl']);
+            final photoUrl = _imageUrl(member['photoURL']);
+            final avatarUrl = faceImageUrl ?? photoUrl;
+
             return InkWell(
               onTap: !widget.isAdmin
                   ? null
@@ -214,7 +226,7 @@ class _TeamScreenState extends State<TeamScreen> {
                             employeeData: member,
                             isConfirmed: member['confirm'],
                             groupId: widget.groupId,
-                            isAdmin: isAdmin,
+                            isAdmin: widget.isAdmin,
                           ),
                         ),
                       );
@@ -236,17 +248,10 @@ class _TeamScreenState extends State<TeamScreen> {
                           CircleAvatar(
                             radius: 26,
                             backgroundColor: Colors.grey.shade300,
-                            backgroundImage:
-                                member['faceImageUrl'] != null &&
-                                    member['faceImageUrl'].toString().isNotEmpty
-                                ? NetworkImage(member['faceImageUrl'])
-                                : member['photoURL'] != null &&
-                                      member['photoURL'].toString().isNotEmpty
-                                ? NetworkImage(member['photoURL'])
+                            backgroundImage: avatarUrl != null
+                                ? NetworkImage(avatarUrl)
                                 : null,
-                            child:
-                                member['photoURL'] == null ||
-                                    member['photoURL'].toString().isEmpty
+                            child: avatarUrl == null
                                 ? const Icon(Icons.person, color: Colors.white)
                                 : null,
                           ),
@@ -256,7 +261,7 @@ class _TeamScreenState extends State<TeamScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  member['name'] ?? '',
+                                  member['name']?.toString() ?? '',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
@@ -266,7 +271,7 @@ class _TeamScreenState extends State<TeamScreen> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  member['job'] ?? 'عضو',
+                                  member['job']?.toString() ?? 'عضو',
                                   style: TextStyle(
                                     fontSize: 13,
                                     color: Colors.grey.shade600,
@@ -275,7 +280,7 @@ class _TeamScreenState extends State<TeamScreen> {
                               ],
                             ),
                           ),
-                          if (isAdmin)
+                          if (member['id'] == widget.adminId)
                             Icon(
                               Icons.star,
                               color: const Color.fromARGB(255, 164, 172, 12),

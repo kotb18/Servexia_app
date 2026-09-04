@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:maintenance/imageControl/platform_image.dart';
@@ -1275,19 +1276,15 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
           action: SnackBarAction(
             label: 'عرض السلة',
             textColor: Colors.white,
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => StoreCartScreen(
-                    groupId: widget.groupId,
-                    makeSetStateOnCartChange: false,
-                    shippingFee: widget.shippingFee,
-                    deviceTokrn: widget.deviceToken,
-                  ),
-                ),
-              );
-            },
+            onPressed: () => context.push(
+              Uri(
+                path: '/shop/${Uri.encodeComponent(widget.groupId)}/cart',
+                queryParameters: {
+                  'shippingFee': widget.shippingFee.toString(),
+                  'deviceToken': widget.deviceToken,
+                },
+              ).toString(),
+            ),
           ),
         ),
       );

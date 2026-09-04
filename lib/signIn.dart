@@ -73,11 +73,11 @@ class _LoginState extends State<Login> {
       await getAdmins();
 
       if (versionNumber != 1) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => Updateversion(storeLink: linkStore!),
-          ),
+        context.go(
+          Uri(
+            path: '/update-version',
+            queryParameters: {'storeLink': linkStore!},
+          ).toString(),
         );
         return;
       }
@@ -91,11 +91,7 @@ class _LoginState extends State<Login> {
           true,
         ); // ارجع للصفحة السابقة (checkout) بعد تسجيل الدخول
       } else {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => Homepage(isAdmin: isAdmin)),
-          (route) => false,
-        );
+        context.go('/home?isAdmin=$isAdmin');
       }
     } catch (e) {
       print("Google Auth Error: $e");

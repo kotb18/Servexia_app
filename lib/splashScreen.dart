@@ -31,6 +31,17 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _animation;
 
   Future<void> checkAndNavigate() async {
+    final continueTo = GoRouterState.of(
+      context,
+    ).uri.queryParameters['continueTo'];
+
+    if (continueTo != null && continueTo.startsWith('/shop/')) {
+      await Future.delayed(const Duration(seconds: 3));
+      if (!mounted) return;
+      context.go(continueTo);
+      return;
+    }
+
     // 1. استخراج الـ groupId من URL أولاً
     final groupId = _extractGroupIdFromUrl();
 
@@ -49,10 +60,7 @@ class _SplashScreenState extends State<SplashScreen>
     if (user == null) {
       print('kotb');
       if (!mounted) return;
-      await Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => Login(fromCheckout: false)),
-      );
+      context.go('/signIn');
       return;
     }
 
@@ -61,20 +69,24 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     if (versionNumber != 1) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => Updateversion(storeLink: linkStore!)),
+      context.go(
+        Uri(
+          path: '/update-version',
+          queryParameters: {'storeLink': linkStore!},
+        ).toString(),
       );
       return;
     }
 
+    /*   if (continueTo != null && continueTo.startsWith('/')) {
+      context.go(continueTo);
+      return;
+    } */
+
     await Future.delayed(const Duration(seconds: 3));
     if (!mounted) return;
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => Homepage(isAdmin: isAdmin)),
-    );
+    context.go('/home?isAdmin=$isAdmin');
   }
 
   // استخراج groupId من URL

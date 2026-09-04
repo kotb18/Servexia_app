@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:maintenance/Store/store_model.dart';
 import 'package:maintenance/Store/store_preview_screen.dart';
 import 'package:maintenance/Store/store_service.dart';
@@ -120,12 +121,8 @@ class _StoreDashboardScreenState extends State<StoreDashboardScreen> {
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    StoreSetupScreen(groupId: groupId, isFromSettings: false),
-              ),
+            onPressed: () => context.push(
+              '/store-dashboard/${Uri.encodeComponent(groupId)}/setup?isFromSettings=false',
             ),
             icon: const Icon(Icons.add),
             label: const Text('إنشاء متجر جديد'),
@@ -232,22 +229,16 @@ class _StoreDashboardScreenState extends State<StoreDashboardScreen> {
             icon: Icons.inventory_2,
             title: 'اختيار المنتجات من المخزون',
             subtitle: 'اختر الأصناف التي تريد عرضها في المتجر',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SelectProductsScreen(groupId: store.id),
-              ),
+            onTap: () => context.push(
+              '/store-dashboard/${Uri.encodeComponent(store.id)}/products',
             ),
           ),
           _buildMenuItem(
             icon: Icons.receipt_long,
             title: 'الطلبات',
             subtitle: 'إدارة طلبات العملاء',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => StoreOrdersScreen(storeId: store.id),
-              ),
+            onTap: () => context.push(
+              '/store-dashboard/${Uri.encodeComponent(store.id)}/orders',
             ),
           ),
           _buildMenuItem(
@@ -256,12 +247,8 @@ class _StoreDashboardScreenState extends State<StoreDashboardScreen> {
             subtitle: 'تخصيص المظهر والمعلومات',
             onTap: () {
               // TODO: شاشة الإعدادات
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      StoreSetupScreen(groupId: store.id, isFromSettings: true),
-                ),
+              context.push(
+                '/store-dashboard/${Uri.encodeComponent(store.id)}/setup?isFromSettings=true',
               );
             },
           ),
@@ -269,14 +256,11 @@ class _StoreDashboardScreenState extends State<StoreDashboardScreen> {
             icon: Icons.visibility,
             title: 'معاينة المتجر',
             subtitle: 'شوف متجرك زي ما العميل بيشوفه',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => StorePreviewScreen(
-                  groupId: store.id,
-                  storeName: store.name,
-                ),
-              ),
+            onTap: () => context.push(
+              Uri(
+                path: '/store-dashboard/${Uri.encodeComponent(store.id)}/preview',
+                queryParameters: {'storeName': store.name},
+              ).toString(),
             ),
           ),
         ],

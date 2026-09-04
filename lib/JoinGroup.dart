@@ -37,7 +37,7 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
   String? scannedGroupId;
   String? _completePhoneNumber;
   File? _image;
-
+  String? _imageUrl;
   List<double> faceEmbedding = [];
 
   final String uid = FirebaseAuth.instance.currentUser!.uid;
@@ -304,23 +304,25 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
         .doc(groupId)
         .collection('members')
         .doc(uid);
-    final storageRef = FirebaseStorage.instance
-        .ref()
-        .child('users')
-        .child(groupId)
-        .child('faces')
-        .child(uid);
+    if (_image != null && faceEmbedding.isNotEmpty) {
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('users')
+          .child(groupId)
+          .child('faces')
+          .child(uid);
 
-    await storageRef.putFile(
-      _image!,
-      SettableMetadata(contentType: 'image/jpeg'),
-    );
+      await storageRef.putFile(
+        _image!,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+      _imageUrl = await storageRef.getDownloadURL();
+      await prefs.setString(
+        _localKey('faceImage$groupId $uid'),
+        jsonEncode(_imageUrl ?? []),
+      );
+    }
 
-    final imageUrl = await storageRef.getDownloadURL();
-    await prefs.setString(
-      _localKey('faceImage$groupId $uid'),
-      jsonEncode(imageUrl),
-    );
     await memberRef.set({
       'id': uid,
       'name': nameController.text.trim(),
@@ -329,7 +331,7 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
       'joinedAt': Timestamp.now(),
       'confirm': false,
       'photoURL': FirebaseAuth.instance.currentUser!.photoURL ?? '',
-      'faceImageUrl': imageUrl,
+      'faceImageUrl': _imageUrl,
     });
     FirebaseFirestore.instance
         .collection('faceEmbedding')

@@ -119,17 +119,15 @@ class InvoiceService {
       );
     }
 
-    // ✅ البحث النصي (يتطلب حقل clientNameLower محفوظ في الفاتورة)
-
-    // فلترة الاختيار (مرتجع/صيانة/عرض سعر تُستبعد في وضع الاختيار)
-    if (excludeReturns) {
-      query = query.where('type', isNotEqualTo: 'مرتجع');
-    }
-    if (excludeMaintenance) {
-      query = query.where('type', isNotEqualTo: 'صيانة');
-    }
-    if (excludeQuotes) {
-      query = query.where('type', isNotEqualTo: 'عرض سعر');
+    // Firestore permits only one != filter in a query. Combine all types that
+    // must be hidden into one not-in filter instead of chaining != filters.
+    final excludedTypes = <String>[
+      if (excludeReturns) 'مرتجع',
+      if (excludeMaintenance) 'صيانة',
+      if (excludeQuotes) 'عرض سعر',
+    ];
+    if (excludedTypes.isNotEmpty) {
+      query = query.where('type', whereNotIn: excludedTypes);
     }
 
     return query;
