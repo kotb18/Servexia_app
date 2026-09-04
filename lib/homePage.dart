@@ -727,7 +727,9 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
     }
 
     if (!context.mounted) return;
-    context.go('/workspace/${Uri.encodeComponent(group['docId'].toString())}');
+    // Opening a workspace is a forward navigation. Keep Home in the browser
+    // history so the web Back button returns here instead of leaving the app.
+    context.push('/workspace/${Uri.encodeComponent(group['docId'].toString())}');
   }
 }
 

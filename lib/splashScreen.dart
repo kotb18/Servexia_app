@@ -31,14 +31,11 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _animation;
 
   Future<void> checkAndNavigate() async {
-    final continueTo = GoRouterState.of(
-      context,
-    ).uri.queryParameters['continueTo'];
-
-    if (continueTo != null && continueTo.startsWith('/shop/')) {
+    final shopLink = GoRouterState.of(context).uri.queryParameters['shopLink'];
+    if (shopLink != null && shopLink.startsWith('/shop/')) {
       await Future.delayed(const Duration(seconds: 3));
       if (!mounted) return;
-      context.go(continueTo);
+      context.go(shopLink);
       return;
     }
 
@@ -77,11 +74,6 @@ class _SplashScreenState extends State<SplashScreen>
       );
       return;
     }
-
-    /*   if (continueTo != null && continueTo.startsWith('/')) {
-      context.go(continueTo);
-      return;
-    } */
 
     await Future.delayed(const Duration(seconds: 3));
     if (!mounted) return;

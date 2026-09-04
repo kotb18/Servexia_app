@@ -51,6 +51,8 @@ import 'mobile_setup.dart' if (dart.library.html) 'web_setup.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  GoRouter.optionURLReflectsImperativeAPIs = true;
+
   // ✅ Platform-specific setup
   await PlatformSetup.init();
 
@@ -109,15 +111,16 @@ bool _showSplashOnStartup = true;
 final GoRouter _router = GoRouter(
   initialLocation: '/',
   redirect: (context, state) {
-    // A web refresh restores the last browser URL. Route that first request
-    // through SplashScreen, then allow SplashScreen to resume it.
+    // Keep the original startup flow: the app always starts at SplashScreen.
+    // The only preserved deep link is the public store URL, which SplashScreen
+    // supported before the router migration.
     if (_showSplashOnStartup) {
       _showSplashOnStartup = false;
       if (state.uri.path != '/') {
-        return Uri(
-          path: '/',
-          queryParameters: {'continueTo': state.uri.toString()},
-        ).toString();
+        final queryParameters = state.uri.path.startsWith('/shop/')
+            ? {'shopLink': state.uri.toString()}
+            : <String, String>{};
+        return Uri(path: '/', queryParameters: queryParameters).toString();
       }
     }
     return null;
@@ -128,6 +131,14 @@ final GoRouter _router = GoRouter(
       path: '/',
       name: 'splash',
       builder: (context, state) => const SplashScreen(),
+    ),
+    GoRoute(
+      path: '/legacy',
+      name: 'legacy',
+      builder: (context, state) {
+        final page = state.extra;
+        return page is Widget ? page : const SplashScreen();
+      },
     ),
 
     // صفحة المتجر من لينك خارجي
@@ -149,9 +160,8 @@ final GoRouter _router = GoRouter(
     GoRoute(
       path: '/store-dashboard/:groupId',
       name: 'storeDashboard',
-      builder: (context, state) => StoreDashboardScreen(
-        groupId: state.pathParameters['groupId'] ?? '',
-      ),
+      builder: (context, state) =>
+          StoreDashboardScreen(groupId: state.pathParameters['groupId'] ?? ''),
     ),
     GoRoute(
       path: '/store-dashboard/:groupId/setup',
@@ -313,7 +323,7 @@ final GoRouter _router = GoRouter(
     ),
     GoRoute(
       path: '/workspace/:workspaceId',
-      name: 'workspace',
+      name: WorkspaceHomeScreen.screenroute,
       builder: (context, state) {
         final workspaceId = state.pathParameters['workspaceId'] ?? '';
         return WorkspaceHomeScreen(workspaceId: workspaceId);

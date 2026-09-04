@@ -205,19 +205,30 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
     final data = workspaceData!;
     final bool isAdmin = data['admins'][0] == uid ? true : false;
 
-    return Scaffold(
-      backgroundColor: Colors.grey.shade100,
-      body: SafeArea(
-        child: Column(
-          children: [
-            /// 🔷 HEADER
-            _buildHeader(data),
+    return PopScope(
+      canPop: false, // ممنوع يرجع بالرجوع الافتراضي
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        // نفس لوجيك زر الرجوع اللي في الهيدر
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => Homepage(isAdmin: isAdmin)),
+          (route) => false,
+        );
+      },
+      child: Scaffold(
+        backgroundColor: Colors.grey.shade100,
+        body: SafeArea(
+          child: Column(
+            children: [
+              /// 🔷 HEADER
+              _buildHeader(data),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            /// 📊 DASHBOARD
-            Expanded(child: _buildDashboard(isAdmin)),
-          ],
+              /// 📊 DASHBOARD
+              Expanded(child: _buildDashboard(isAdmin)),
+            ],
+          ),
         ),
       ),
     );
@@ -391,7 +402,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                       title: 'الفواتير والمشتريات',
                       color: const Color.fromARGB(255, 66, 121, 3),
                       onTap: () => _goTo(
-                        '/invoice?groupId=${Uri.encodeQueryComponent(widget.workspaceId)}&isFromWorkSpace=true&type=${Uri.encodeQueryComponent('بيع')}',
+                        '/invoice?groupId=${widget.workspaceId}&isFromWorkSpace=true&type=بيع',
                       ),
                     ),
                   if (permissions['العملاء والموردين'] == true)
