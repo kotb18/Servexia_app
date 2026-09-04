@@ -180,7 +180,7 @@ class StoreCartService {
 
     try {
       // تحويل JSON إلى List
-      final List<dynamic> cartData = jsonDecode(cartJson!);
+      final List<dynamic> cartData = jsonDecode(cartJson);
 
       // 🧹 نبني السلة من جديد (ده صح هنا لأن المستخدم logged-in)
       _items.clear();

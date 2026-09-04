@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:maintenance/Store/store_cart_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'store_checkout_screen.dart';
 import 'package:maintenance/imageControl/platform_image.dart';
 
 class StoreCartScreen extends StatefulWidget {
@@ -72,6 +71,7 @@ class _StoreCartScreenState extends State<StoreCartScreen> {
                     itemCount: cart.items.length,
                     itemBuilder: (context, index) {
                       final item = cart.items[index];
+                      print(item.product.imagesList.first);
                       return Stack(
                         children: [
                           Card(

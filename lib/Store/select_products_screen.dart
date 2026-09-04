@@ -1,13 +1,14 @@
-import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_pagination/firebase_pagination.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:maintenance/Store/store_service.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:maintenance/Store/inventory_item_model.dart';
 import 'package:maintenance/Store/inventory_store_service.dart';
+import 'package:maintenance/imageControl/mobile_image.dart';
 
 // ============================================================================
 // 📦 بيانات الألوان والمقاسات المتاحة
@@ -148,8 +149,6 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
     for (final item in items) {
       if (item.isInStore) {
         // ✅ لو المنتج موجود في المتجر، نملأ البيانات المحفوظة
-        // ⚠️ عدل هنا حسب اسم الحقل في الـ Model بتاعك
-        // لو اسم الحقل مختلف، عدل السطرين دول
         if (item.colors != null && item.colors!.isNotEmpty) {
           _selectedColors[item.sku] = Set<String>.from(item.colors!);
         }
@@ -217,21 +216,24 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
     }
   }
 
+  // ═══════════════════════════════════════════════════
+  // 🗜️ ضغط الصورة ورفعها لـ Firebase Storage
+  // ✅ يعمل على الموبايل + الويب (بدون path_provider)
+  // ═══════════════════════════════════════════════════
   Future<String?> _compressAndUploadImage(XFile file, String sku) async {
-    final dir = await getTemporaryDirectory();
-    final targetPath =
-        '${dir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+    // قراءة الصورة كـ bytes (يعمل على موبايل + ويب)
+    final imageBytes = await file.readAsBytes();
 
-    final compressed = await FlutterImageCompress.compressAndGetFile(
-      file.path,
-      targetPath,
+    // ضغط الصورة (يعمل على كل المنصات)
+    final compressedBytes = await FlutterImageCompress.compressWithList(
+      imageBytes,
       quality: 70,
       minWidth: 800,
       minHeight: 800,
       format: CompressFormat.jpeg,
     );
 
-    if (compressed == null) return null;
+    if (compressedBytes.isEmpty) return null;
 
     final ref = _storage
         .ref()
@@ -240,7 +242,12 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
         .child(sku)
         .child('${DateTime.now().millisecondsSinceEpoch}.jpg');
 
-    await ref.putFile(File(compressed.path));
+    // ✅ putData بدل putFile — شغالة على المنصتين
+    await ref.putData(
+      Uint8List.fromList(compressedBytes),
+      SettableMetadata(contentType: 'image/jpeg'),
+    );
+
     return await ref.getDownloadURL();
   }
 
@@ -341,7 +348,6 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
         );
       }
     } finally {
-      // ❌ لا تمسح البيانات هنا! نخليها لحد ما نخرج من الصفحة
       setState(() => _isLoading = false);
     }
   }
@@ -452,10 +458,10 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
     getStoreData();
   }
+
   // ========== UI ==========
 
   @override
@@ -579,8 +585,6 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
                 final documentSnapshot = documentSnapshots[index];
                 final item = InventoryItemModel.fromFirestore(documentSnapshot);
 
-                // يتم استدعاؤها مرة لكل مستند، وتستخدم putIfAbsent لذلك لن
-                // تستبدل القيم التي عدّلها المستخدم أثناء التصفح.
                 if (!_initialDataLoaded || item.isInStore) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (!mounted) return;
@@ -648,9 +652,7 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
     required bool isAlreadyInStore,
   }) {
     return _ItemCardWidget(
-      key: ValueKey(
-        '${item.sku}_${_initialDataLoaded}',
-      ), // 🔑 Key يتغير لما البيانات تتحمل
+      key: ValueKey('${item.sku}_${_initialDataLoaded}'),
       item: item,
       isAlreadyInStore: isAlreadyInStore,
       priceControllers: _priceControllers,
@@ -1789,16 +1791,21 @@ class _ItemCardWidgetState extends State<_ItemCardWidget> {
               itemBuilder: (context, index) {
                 return Stack(
                   children: [
-                    Container(
+                    SizedBox(
                       width: 100,
                       height: 100,
-                      margin: const EdgeInsets.only(right: 10),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        image: DecorationImage(
-                          image: NetworkImage(currentImages[index]),
-                          fit: BoxFit.cover,
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(12),
                         ),
+                        child: currentImages.isNotEmpty
+                            ? WebImage(
+                                src: currentImages[index],
+                                width: double.infinity,
+                                height: double.infinity,
+                                fit: BoxFit.cover,
+                              )
+                            : _buildPlaceholder(),
                       ),
                     ),
                     Positioned(

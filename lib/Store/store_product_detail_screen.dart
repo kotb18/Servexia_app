@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:maintenance/Store/store_home_screen.dart';
 import 'package:maintenance/imageControl/platform_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:maintenance/Store/store_cart_service.dart';
 import 'package:maintenance/Store/inventory_item_model.dart';
 import 'package:maintenance/Store/store_model.dart';
 import 'package:maintenance/Store/store_service.dart';
-import 'store_cart_screen.dart';
 import 'package:maintenance/signIn.dart';
 
 /// ═══════════════════════════════════════════════════════════════════════════
@@ -27,7 +27,7 @@ class StoreProductDetailScreen extends StatefulWidget {
     super.key,
     required this.item,
     required this.groupId,
-    this.isPreview = false,
+    required this.isPreview,
     required this.shippingFee,
     required this.deviceToken,
   });
@@ -275,14 +275,30 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
     final hasColors = item.colors != null && item.colors!.isNotEmpty;
     final hasSizes = item.sizes != null && item.sizes!.isNotEmpty;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FB),
-      body: isMobile
-          ? _buildMobileLayout(item, hasColors, hasSizes)
-          : _buildWebLayout(item, hasColors, hasSizes),
-      bottomNavigationBar: isMobile
-          ? _buildMobileBottomBar(item, hasColors, hasSizes)
-          : null,
+    return PopScope(
+      canPop: false, // ممنوع يرجع بالرجوع الافتراضي
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        // نفس لوجيك زر الرجوع اللي في الهيدر
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => StoreHomeScreen(
+              groupId: widget.groupId,
+              isPreview: widget.isPreview,
+            ),
+          ),
+          (route) => false,
+        );
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8F9FB),
+        body: isMobile
+            ? _buildMobileLayout(item, hasColors, hasSizes)
+            : _buildWebLayout(item, hasColors, hasSizes),
+        bottomNavigationBar: isMobile
+            ? _buildMobileBottomBar(item, hasColors, hasSizes)
+            : null,
+      ),
     );
   }
 

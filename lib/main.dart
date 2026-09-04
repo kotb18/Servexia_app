@@ -154,7 +154,7 @@ final GoRouter _router = GoRouter(
         debugPrint('📍 Location: ${state.uri}');
         debugPrint('🆔 groupId: "$groupId"');
 
-        return StoreHomeScreen(groupId: groupId);
+        return StoreHomeScreen(groupId: groupId, isPreview: false);
       },
     ),
     GoRoute(

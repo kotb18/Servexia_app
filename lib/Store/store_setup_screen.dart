@@ -1,12 +1,18 @@
+import 'dart:typed_data';
+
 import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl_phone_field/countries.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:intl_phone_field/phone_number.dart';
 import 'package:maintenance/Store/store_model.dart';
 import 'package:maintenance/Store/store_service.dart';
+import 'package:maintenance/imageControl/mobile_image.dart';
 
 class StoreSetupScreen extends StatefulWidget {
   final String groupId;
@@ -25,6 +31,13 @@ class StoreSetupScreen extends StatefulWidget {
 class _StoreSetupScreenState extends State<StoreSetupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _storeService = StoreService();
+
+  // ═══ الصور ═══
+  final ImagePicker _picker = ImagePicker();
+  final FirebaseStorage _storage = FirebaseStorage.instance;
+  String? _logoUrl; // رابط شعار المتجر
+  bool _uploadingLogo = false;
+
   bool? _isClothes;
   String _fullPhone = '';
   String _phoneCode = '';
@@ -53,6 +66,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
     {'hex': '#607D8B', 'name': 'رمادي'},
     {'hex': '#FFEB3B', 'name': 'أصفر'},
   ];
+
   getDeviceToken() async {
     _deviceToken = await FirebaseMessaging.instance.getToken();
   }
@@ -80,10 +94,9 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
         _shippingFeeController.text = store.shippingFee.toString();
         _phoneCode = store.phoneCode ?? '';
         _whatsCode = store.whatsCode ?? '';
+        _logoUrl = store.logoUrl; // ✅ تحميل الشعار لو موجود
       });
     }
-
-    print(_phoneCode);
   }
 
   @override
@@ -95,6 +108,157 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
     _emailController.dispose();
     _shippingFeeController.dispose();
     super.dispose();
+  }
+
+  // ═══════════════════════════════════════════════════
+  // 📸 رفع شعار المتجر (صورة واحدة فقط)
+  // ═══════════════════════════════════════════════════
+  Future<void> _pickStoreLogo() async {
+    final pickedFile = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 85,
+    );
+
+    if (pickedFile == null) return;
+
+    setState(() => _uploadingLogo = true);
+
+    try {
+      // حذف الشعار القديم من Storage قبل رفع الجديد
+      final oldUrl = _logoUrl;
+      if (oldUrl != null && oldUrl.isNotEmpty) {
+        await _deleteImageFromStorage(oldUrl);
+      }
+
+      final url = await _compressAndUploadImage(pickedFile);
+
+      if (url != null) {
+        setState(() => _logoUrl = url);
+        print('✅ تم رفع الشعار بنجاح: $_logoUrl');
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('فشل ضغط الصورة، حاول مرة أخرى'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في رفع الشعار: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _uploadingLogo = false);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════
+  // 🗑️ حذف الشعار (بتأكيد)
+  // ═══════════════════════════════════════════════════
+  Future<void> _deleteStoreLogo() async {
+    final currentUrl = _logoUrl;
+    if (currentUrl == null || currentUrl.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_outline, color: Colors.red),
+            SizedBox(width: 10),
+            Text('حذف الشعار'),
+          ],
+        ),
+        content: const Text('هل أنت متأكد من حذف شعار المتجر؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _uploadingLogo = true);
+
+    try {
+      await _deleteImageFromStorage(currentUrl);
+      setState(() => _logoUrl = null);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('خطأ في حذف الشعار: $e')));
+      }
+    } finally {
+      setState(() => _uploadingLogo = false);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════
+  // 🗜️ ضغط الصورة ورفعها لـ Firebase Storage
+  // ✅ يعمل على الموبايل + الويب (بدون path_provider)
+  // ═══════════════════════════════════════════════════
+  Future<String?> _compressAndUploadImage(XFile file) async {
+    // قراءة الصورة كـ bytes
+    final imageBytes = await file.readAsBytes();
+
+    // ضغط الصورة (يعمل على كل المنصات)
+    final compressedBytes = await FlutterImageCompress.compressWithList(
+      imageBytes,
+      quality: 75,
+      minWidth: 600,
+      minHeight: 600,
+      format: CompressFormat.jpeg,
+    );
+
+    if (compressedBytes.isEmpty) return null;
+
+    // مسار ثابت للشعار — كل رفع بيستبدل القديم
+    final ref = _storage
+        .ref()
+        .child('stores')
+        .child(widget.groupId)
+        .child('store_logo.jpg');
+
+    await ref.putData(
+      Uint8List.fromList(compressedBytes),
+      SettableMetadata(contentType: 'image/jpeg'),
+    );
+
+    return await ref.getDownloadURL();
+  }
+
+  // ═══════════════════════════════════════════════════
+  // 🧹 حذف صورة من Storage برابطها
+  // ═══════════════════════════════════════════════════
+  Future<void> _deleteImageFromStorage(String url) async {
+    try {
+      await _storage.refFromURL(url).delete();
+    } catch (e) {
+      debugPrint('فشل حذف الصورة من Storage: $e');
+      // مش بنرمي الخطأ عشان ميوقفش العملية الأساسية
+    }
   }
 
   @override
@@ -123,6 +287,8 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
               icon: Icons.store_outlined,
               title: 'معلومات المتجر الأساسية',
               children: [
+                _buildLogoPicker(), // 👈 شعار المتجر
+                const SizedBox(height: 20),
                 _buildTextField(
                   controller: _nameController,
                   label: 'اسم المتجر',
@@ -154,13 +320,12 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
                   child: _buildPhoneField(
                     controller: _phoneController,
                     label: 'رقم الهاتف',
-                    phoneCode: _phoneCode, // مثال: +966
+                    phoneCode: _phoneCode,
                     icon: Icons.phone,
                     required: true,
                     onChanged: (phone) {
                       setState(() {
-                        _phoneCode = phone.countryCode; // +966
-                        // phoneIsoCode = phone.countryISOCode; // SA
+                        _phoneCode = phone.countryCode;
                         _fullPhone = phone.completeNumber;
                       });
                     },
@@ -170,20 +335,18 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
                   textDirection: TextDirection.ltr,
                   child: _buildPhoneField(
                     controller: _whatsappController,
-                    label: 'رقم الهاتف',
-                    phoneCode: _whatsCode, // مثال: +966
+                    label: 'رقم الواتساب',
+                    phoneCode: _whatsCode,
                     icon: Icons.phone,
                     required: true,
                     onChanged: (phone) {
                       setState(() {
-                        _whatsCode = phone.countryCode; // +966
-                        // phoneIsoCode = phone.countryISOCode; // SA
+                        _whatsCode = phone.countryCode;
                         _fullWhatsapp = phone.completeNumber;
                       });
                     },
                   ),
                 ),
-
                 _buildTextField(
                   controller: _emailController,
                   label: 'البريد الإلكتروني',
@@ -252,10 +415,147 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
     );
   }
 
+  // ═══════════════════════════════════════════════════
+  // 🖼️ منتقي شعار المتجر (تصميم دائري أنيق)
+  // ═══════════════════════════════════════════════════
+  Widget _buildLogoPicker() {
+    final primaryColor = _hexToColor(_primaryColor);
+    final hasLogo = _logoUrl != null && _logoUrl!.isNotEmpty;
+
+    return Center(
+      child: Column(
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // الدائرة الرئيسية
+              Container(
+                width: 110,
+                height: 110,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey.shade100,
+                  border: Border.all(
+                    color: hasLogo ? primaryColor : Colors.grey.shade300,
+                    width: hasLogo ? 3 : 1.5,
+                  ),
+                  boxShadow: hasLogo
+                      ? [
+                          BoxShadow(
+                            color: primaryColor.withOpacity(0.25),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: _uploadingLogo
+                    ? Center(
+                        child: SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            valueColor: AlwaysStoppedAnimation(primaryColor),
+                          ),
+                        ),
+                      )
+                    : hasLogo
+                    ? ClipOval(
+                        child: WebImage(
+                          src: _logoUrl!,
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : Icon(
+                        Icons.add_photo_alternate_outlined,
+                        size: 40,
+                        color: Colors.grey.shade400,
+                      ),
+              ),
+
+              // زرار تغيير/إضافة الشعار
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: GestureDetector(
+                  onTap: _uploadingLogo ? null : _pickStoreLogo,
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: primaryColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withOpacity(0.4),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.photo_camera,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ),
+
+              // زرار حذف الشعار
+              if (hasLogo && !_uploadingLogo)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  child: GestureDetector(
+                    onTap: _deleteStoreLogo,
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 14,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            hasLogo ? 'شعار المتجر' : 'اضغط لإضافة شعار المتجر',
+            style: TextStyle(
+              fontSize: 13,
+              color: hasLogo ? Colors.black87 : Colors.black54,
+              fontWeight: hasLogo ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+          if (hasLogo)
+            Text(
+              'صورة واحدة فقط - الرفع الجديد يستبدل القديم',
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+            ),
+        ],
+      ),
+    );
+  }
+
   // ───────────────────────────────────────────────
   // 🎨 معاينة المتجر
   // ───────────────────────────────────────────────
   Widget _buildPreviewCard() {
+    final hasLogo = _logoUrl != null && _logoUrl!.isNotEmpty;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -270,7 +570,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: _hexToColor(_primaryColor).withOpacity(0.3),
+            color: _hexToColor(_primaryColor).withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -281,15 +581,25 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
         children: [
           Row(
             children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
+              // ✅ الشعار بيظهر في المعاينة
+              SizedBox(
+                width: 100,
+                height: 100,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(12),
+                  ),
+                  child: hasLogo
+                      ? WebImage(
+                          src: _logoUrl!,
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.cover,
+                        )
+                      : const Icon(Icons.store, color: Colors.white, size: 32),
                 ),
-                child: const Icon(Icons.store, color: Colors.white, size: 32),
               ),
+
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -383,7 +693,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
   }
 
   // ───────────────────────────────────────────────
-  // 📝 حقل نصي محسّن
+  // 📝 حقل الهاتف الدولي
   // ───────────────────────────────────────────────
   Widget _buildPhoneField({
     required TextEditingController controller,
@@ -398,7 +708,6 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
       (item) => item.dialCode == normalizedCode,
       orElse: () => countries.firstWhere((item) => item.code == 'EG'),
     );
-    print('ddddddddddddddddddddddddddd ${selectedCountry.code}');
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: IntlPhoneField(
@@ -671,6 +980,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
       _showError('لا تبدأ رقم الواتس بـ 0 بعد كود الدولة');
       return;
     }
+
     setState(() => _isLoading = true);
 
     try {
@@ -683,13 +993,11 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
             : _descriptionController.text.trim(),
         storeSlug: 'slug',
         phone: _fullPhone.trim().isEmpty
-            ? '$_phoneCode'
-                  '${_phoneController.text}'
+            ? '$_phoneCode${_phoneController.text}'
             : _fullPhone,
         phoneCode: _phoneCode,
         whatsapp: _fullWhatsapp.trim().isEmpty
-            ? '$_whatsCode'
-                  '${_whatsappController.text}'
+            ? '$_whatsCode${_whatsappController.text}'
             : _fullWhatsapp,
         whatsCode: _whatsCode,
         email: _emailController.text.trim().isEmpty
@@ -702,6 +1010,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
         isClothes: _isClothes ?? false,
         shippingFee: double.tryParse(_shippingFeeController.text) ?? 0.0,
         deviceToken: _deviceToken ?? '',
+        logoUrl: _logoUrl, // ✅ حفظ رابط الشعار
       );
 
       await _storeService.createOrUpdateStore(store);

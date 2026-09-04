@@ -2,10 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:maintenance/homePage.dart';
 import 'dart:async';
-import 'package:maintenance/signIn.dart';
-import 'package:maintenance/updateVersion.dart';
 
 bool? isCompleted;
 int? versionNumber;

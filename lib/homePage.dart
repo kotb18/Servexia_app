@@ -5,10 +5,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:maintenance/JoinGroup.dart';
-import 'package:maintenance/createGroup.dart';
-import 'package:maintenance/signIn.dart';
-import 'package:maintenance/workSpace.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -729,7 +725,9 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
     if (!context.mounted) return;
     // Opening a workspace is a forward navigation. Keep Home in the browser
     // history so the web Back button returns here instead of leaving the app.
-    context.push('/workspace/${Uri.encodeComponent(group['docId'].toString())}');
+    context.push(
+      '/workspace/${Uri.encodeComponent(group['docId'].toString())}',
+    );
   }
 }
 

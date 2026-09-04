@@ -2,12 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:maintenance/Store/store_model.dart';
-import 'package:maintenance/Store/store_preview_screen.dart';
 import 'package:maintenance/Store/store_service.dart';
-import 'package:maintenance/Store/store_setup_screen.dart';
-
-import 'select_products_screen.dart';
-import 'store_orders_screen.dart';
 
 class StoreDashboardScreen extends StatefulWidget {
   final String groupId;
@@ -258,7 +253,8 @@ class _StoreDashboardScreenState extends State<StoreDashboardScreen> {
             subtitle: 'شوف متجرك زي ما العميل بيشوفه',
             onTap: () => context.push(
               Uri(
-                path: '/store-dashboard/${Uri.encodeComponent(store.id)}/preview',
+                path:
+                    '/store-dashboard/${Uri.encodeComponent(store.id)}/preview',
                 queryParameters: {'storeName': store.name},
               ).toString(),
             ),

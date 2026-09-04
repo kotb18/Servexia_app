@@ -3,10 +3,8 @@ import 'package:firebase_pagination/firebase_pagination.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
-import 'package:maintenance/Store/customer_orders_screen.dart';
 import 'package:maintenance/Store/inventory_item_model.dart';
 import 'package:maintenance/Store/inventory_store_service.dart';
-import 'package:maintenance/Store/store_cart_screen.dart';
 import 'package:maintenance/Store/store_cart_service.dart';
 import 'package:maintenance/Store/store_model.dart';
 import 'package:maintenance/Store/store_product_detail_screen.dart';
@@ -31,7 +29,7 @@ class StoreHomeScreen extends StatefulWidget {
   const StoreHomeScreen({
     super.key,
     required this.groupId,
-    this.isPreview = false,
+    required this.isPreview,
     this.customerId,
   });
 
