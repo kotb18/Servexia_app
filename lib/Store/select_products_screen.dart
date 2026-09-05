@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:firebase_pagination/firebase_pagination.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,7 +7,7 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:maintenance/Store/store_service.dart';
 import 'package:maintenance/Store/inventory_item_model.dart';
 import 'package:maintenance/Store/inventory_store_service.dart';
-import 'package:maintenance/imageControl/mobile_image.dart';
+import 'package:maintenance/imageControl/platform_image.dart';
 
 // ============================================================================
 // 📦 بيانات الألوان والمقاسات المتاحة
@@ -1859,12 +1858,12 @@ class _ItemCardWidgetState extends State<_ItemCardWidget> {
     if (item.imagesList.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Image.network(
-          item.imagesList.first,
+        child: WebImage(
+          src: item.imagesList.first,
           width: 70,
           height: 70,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _buildPlaceholder(),
+          //  errorBuilder: (_, __, ___) => _buildPlaceholder(),
         ),
       );
     }

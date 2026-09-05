@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-
 import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -12,7 +11,7 @@ import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:intl_phone_field/phone_number.dart';
 import 'package:maintenance/Store/store_model.dart';
 import 'package:maintenance/Store/store_service.dart';
-import 'package:maintenance/imageControl/mobile_image.dart';
+import 'package:maintenance/imageControl/platform_image.dart';
 
 class StoreSetupScreen extends StatefulWidget {
   final String groupId;

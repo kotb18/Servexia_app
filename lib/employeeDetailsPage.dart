@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:maintenance/imageControl/platform_image.dart';
 
 class EmployeeDetailsPage extends StatefulWidget {
   final Map<String, dynamic> employeeData;
@@ -215,18 +216,34 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
                     ],
                   ),
                   child: CircleAvatar(
-                    radius: 45,
-                    backgroundColor: Colors.white,
-                    backgroundImage: employee['photoURL'] != null
-                        ? NetworkImage(employee['photoURL'])
-                        : null,
-                    child: employee['photoURL'] == null
-                        ? const Icon(
-                            Icons.person,
-                            size: 45,
-                            color: Color(0xFF1E3A5F),
+                    radius: 26,
+                    backgroundColor: Colors.grey.shade300,
+                    child:
+                        employee['faceImageUrl'] != null &&
+                            employee['faceImageUrl'].isNotEmpty
+                        ? ClipOval(
+                            child: WebImage(
+                              src: employee['faceImageUrl'],
+                              width: 52, // ضعف الـ radius
+                              height: 52,
+                              fit: BoxFit.cover,
+                            ),
                           )
-                        : null,
+                        : employee['photoURL'] != null &&
+                              employee['photoURL'].isNotEmpty
+                        ? ClipOval(
+                            child: WebImage(
+                              src: employee['photoURL'],
+                              width: 52, // ضعف الـ radius
+                              height: 52,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.person,
+                            size: 30,
+                            color: Colors.grey,
+                          ),
                   ),
                 ),
                 const SizedBox(width: 16),

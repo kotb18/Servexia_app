@@ -10,6 +10,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
+import 'package:maintenance/imageControl/platform_image.dart';
 
 int? maxMembers;
 int? currentTeamNumber;
@@ -248,12 +249,20 @@ class _TeamScreenState extends State<TeamScreen> {
                           CircleAvatar(
                             radius: 26,
                             backgroundColor: Colors.grey.shade300,
-                            backgroundImage: avatarUrl != null
-                                ? NetworkImage(avatarUrl)
-                                : null,
-                            child: avatarUrl == null
-                                ? const Icon(Icons.person, color: Colors.white)
-                                : null,
+                            child: avatarUrl != null && avatarUrl.isNotEmpty
+                                ? ClipOval(
+                                    child: WebImage(
+                                      src: avatarUrl,
+                                      width: 52, // ضعف الـ radius
+                                      height: 52,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.person,
+                                    size: 30,
+                                    color: Colors.grey,
+                                  ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(

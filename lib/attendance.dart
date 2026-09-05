@@ -15,6 +15,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:maintenance/imageControl/platform_image.dart';
 
 String? groupId0;
 List<double> faceEmbeddingLive = [];
@@ -566,21 +567,32 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                           CircleAvatar(
                             radius: 28,
                             backgroundColor: primaryColor.withOpacity(0.1),
-                            backgroundImage:
+                            child:
                                 member['faceImageUrl'] != null &&
                                     member['faceImageUrl'].toString().isNotEmpty
-                                ? NetworkImage(member['faceImageUrl'])
+                                ? ClipOval(
+                                    child: WebImage(
+                                      src: member['faceImageUrl'],
+                                      width: 56, // ضعف الـ radius = 28 × 2
+                                      height: 56,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  )
                                 : member['photoURL'] != null &&
                                       member['photoURL'].toString().isNotEmpty
-                                ? NetworkImage(member['photoURL'])
-                                : null,
-                            child: member['photoURL'] == ''
-                                ? Icon(
+                                ? ClipOval(
+                                    child: WebImage(
+                                      src: member['photoURL'],
+                                      width: 56,
+                                      height: 56,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  )
+                                : Icon(
                                     Icons.person,
                                     color: primaryColor,
                                     size: 30,
-                                  )
-                                : null,
+                                  ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
