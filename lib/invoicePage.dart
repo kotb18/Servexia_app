@@ -1345,7 +1345,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
         .doc(widget.groupId)
         .collection('items')
         .doc();
-
+    final invoiceDocPreRef = firestore.collection('invoices');
     final String reInvoiceId = invoiceDocRef.id;
 
     final dataFinal = buildInvoiceData(reInvoiceId);
@@ -1377,6 +1377,9 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
 
     // حفظ الفاتورة
     batch.set(invoiceDocRef, dataFinal);
+    batch.set(invoiceDocPreRef.doc(widget.groupId), {
+      'lastInvoiceNumber': widget.state.lastInvoiceNumber + 1,
+    }, SetOptions(merge: true));
 
     // تحديث الفاتورة الأصلية لو مرتجع
     if (widget.type == 'مرتجع') {

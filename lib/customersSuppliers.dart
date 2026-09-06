@@ -189,6 +189,10 @@ class _CustomersSuppliersState extends State<CustomersSuppliers> {
                               'notes': notes.text,
                               'createdAt': Timestamp.now(),
                             });
+                        await FirebaseFirestore.instance
+                            .collection('customersSuppliers')
+                            .doc(widget.groupId)
+                            .set({'lastUpdate': FieldValue.serverTimestamp()});
                       },
                       child: const Text('حفظ'),
                     ),

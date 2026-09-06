@@ -621,15 +621,12 @@ class _StoreCheckoutScreenState extends State<StoreCheckoutScreen> {
         createdAt: DateTime.now(),
         orderNumber: '',
       );
-
-      final createdOrder = await _orderService.createOrder(order);
       await FirebaseFirestore.instance
           .collection('store_orders')
-          .doc(createdOrder.id)
-          .set({
-            'customerId': order.customerId,
-            'orderNumber': createdOrder.orderNumber,
-          }, SetOptions(merge: true));
+          .doc(widget.groupId)
+          .set({'customerId': order.customerId});
+      final createdOrder = await _orderService.createOrder(order);
+
       await _removeCartKey();
       await sendNotificationToDevice(
         title: 'طلب جديد في متجرك',

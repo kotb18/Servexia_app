@@ -632,7 +632,13 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
                         TextButton(
                           onPressed: () async {
                             Navigator.of(context).pop();
+                            setState(() {
+                              isLoading = true;
+                            });
                             await deleteGroupBatch(widget.groupId);
+                            setState(() {
+                              isLoading = false;
+                            });
                           },
                           child: const Text(
                             'حذف',
@@ -661,6 +667,10 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
                       ),
                       TextButton(
                         onPressed: () async {
+                          Navigator.of(context).pop(false);
+                          setState(() {
+                            isLoading = true;
+                          });
                           await removeMemberFromGroupAndTeam(
                             groupId: widget.groupId,
                             memberId: widget.uid,
@@ -669,6 +679,9 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
                             widget.groupId,
                           );
                           Navigator.of(context).pop(false);
+                          setState(() {
+                            isLoading = false;
+                          });
                         },
                         child: const Text(
                           'مغادرة',
@@ -688,7 +701,7 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
 
   void _handleTap(BuildContext context, Map<String, dynamic> group) async {
     setState(() {
-      isLoading = false;
+      isLoading = true;
     });
     // Subscription Logic from original code
     final adminId = group['adminId'];
@@ -728,6 +741,9 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
     context.push(
       '/workspace/${Uri.encodeComponent(group['docId'].toString())}',
     );
+    setState(() {
+      isLoading = false;
+    });
   }
 }
 
@@ -906,6 +922,47 @@ Future<void> deleteGroupBatch(String groupId) async {
   }
 
   batch.delete(attendanceRef);
+  // =====  invoices =====
+  final invoicesRef = firestore.collection('invoices').doc(groupId);
+  final invoiceItemsSnapshot = await invoicesRef.collection('items').get();
+
+  for (final item in invoiceItemsSnapshot.docs) {
+    batch.delete(item.reference);
+  }
+  batch.delete(invoicesRef);
+  //======customers ======
+  final customersRef = firestore.collection('customersSuppliers').doc(groupId);
+  final customersItemsSnapshot = await customersRef.collection('persons').get();
+
+  for (final item in customersItemsSnapshot.docs) {
+    batch.delete(item.reference);
+  }
+  batch.delete(customersRef);
+  //========employees ======
+  final employeesRef = firestore
+      .collection('employees_permissions')
+      .doc(groupId);
+  final employeesItemsSnapshot = await employeesRef.collection('items').get();
+  for (final item in employeesItemsSnapshot.docs) {
+    batch.delete(item.reference);
+  }
+  batch.delete(employeesRef);
+  //==========store_orders========
+  final storeOrdersRef = firestore.collection('store_orders').doc(groupId);
+  final storeOrdersItemsSnapshot = await storeOrdersRef
+      .collection('items')
+      .get();
+  for (final item in storeOrdersItemsSnapshot.docs) {
+    batch.delete(item.reference);
+  }
+  batch.delete(storeOrdersRef);
+  //=========stores========
+  final storesRef = firestore.collection('stores').doc(groupId);
+  final storesItemsSnapshot = await storesRef.collection('items').get();
+  for (final item in storesItemsSnapshot.docs) {
+    batch.delete(item.reference);
+  }
+  batch.delete(storesRef);
 
   // ===== COMMIT =====
   await batch.commit();

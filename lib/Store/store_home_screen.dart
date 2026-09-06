@@ -19,6 +19,7 @@ import 'package:url_launcher/url_launcher.dart';
 /// ═══════════════════════════════════════════════════════════════════════════
 /// - يقرأ إعدادات المتجر من Firestore (لون، اسم، وصف، تواصل، شحن)
 /// - يطبّق اللون الأساسي ديناميكياً على كل الواجهة
+/// - 💎 وجو احترافي في الـ AppBar + البانر مع Fallback ذكي
 /// ═══════════════════════════════════════════════════════════════════════════
 
 class StoreHomeScreen extends StatefulWidget {
@@ -115,6 +116,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   double get shippingFee => _store?.shippingFee ?? 0.0;
   bool get isClothes => _store?.isClothes ?? false;
   String? get deviceToken => _store?.deviceToken;
+  String? get logoUrl => _store?.logoUrl;
 
   String _generateStoreLink() {
     const baseUrl = 'https://maintenance-b7282.web.app';
@@ -256,6 +258,62 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   }
 
   /// ═══════════════════════════════════════════════════════════════════════
+  /// 💎 LOGO WIDGET (مستخدم في AppBar + البانر)
+  /// ═══════════════════════════════════════════════════════════════════════
+  Widget _buildStoreLogo({required double size, double borderRadius = 12}) {
+    final hasLogo = logoUrl != null && logoUrl!.isNotEmpty;
+
+    return Hero(
+      tag: hasLogo ? logoUrl! : 'store_logo_${widget.groupId}',
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: hasLogo ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(borderRadius),
+          border: hasLogo
+              ? Border.all(color: primaryColor.withOpacity(0.15))
+              : null,
+          gradient: hasLogo
+              ? null
+              : LinearGradient(
+                  colors: [primaryColor, primaryColorDark],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+          boxShadow: [
+            BoxShadow(
+              color: primaryColor.withOpacity(hasLogo ? 0.15 : 0.3),
+              blurRadius: size * 0.2,
+              offset: Offset(0, size * 0.07),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(borderRadius),
+          child: hasLogo
+              ? WebImage(
+                  src: logoUrl!,
+                  width: size,
+                  height: size,
+                  fit: BoxFit.contain,
+                )
+              : Center(
+                  child: Text(
+                    storeName.isNotEmpty ? storeName[0] : 'M',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: size * 0.48,
+                    ),
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  /// ═══════════════════════════════════════════════════════════════════════
   /// 🎯 SLIVER APP BAR
   /// ═══════════════════════════════════════════════════════════════════════
   Widget _buildSliverAppBar(bool isMobile) {
@@ -268,38 +326,8 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
       expandedHeight: isMobile ? 0 : 80,
       title: Row(
         children: [
-          Hero(
-            tag: 'store_logo_${widget.groupId}',
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [primaryColor, primaryColorDark],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: primaryColor.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Text(
-                  storeName.isNotEmpty ? storeName[0] : 'M',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                  ),
-                ),
-              ),
-            ),
-          ),
+          // 💎 الوجو في الـ AppBar
+          _buildStoreLogo(size: 42, borderRadius: 12),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -382,6 +410,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         borderRadius: BorderRadius.circular(20),
         child: Stack(
           children: [
+            // زخارف خلفية
             Positioned(
               left: -30,
               top: -30,
@@ -412,7 +441,10 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
+                      // 💎 الوجو الكبير في البانر
+
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -446,6 +478,10 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                             ),
                           ],
                         ),
+                      ),
+                      _buildStoreLogo(
+                        size: isMobile ? 64 : 80,
+                        borderRadius: isMobile ? 18 : 22,
                       ),
                     ],
                   ),
@@ -544,10 +580,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   /// ═══════════════════════════════════════════════════════════════════════
   Widget _buildSearchSection(bool isMobile) {
     return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : 16,
-        vertical: 8,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Focus(
         onFocusChange: (hasFocus) =>
             setState(() => _isSearchFocused = hasFocus),
@@ -647,8 +680,6 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
             : 2;
 
         return SliverToBoxAdapter(
-          // ❌ أزل SizedBox(height: ...) تماماً
-          // GridView مع shrinkWrap يحسب ارتفاعه ذاتياً
           child: FirestorePagination(
             // 🔑 مفتاح لإعادة البناء عند تغير البحث
             key: ValueKey(_searchQuery),
@@ -658,12 +689,11 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
               searchQuery: _searchQuery.isEmpty ? null : _searchQuery,
             ),
 
-            limit: 20, // ✅ دفعة منطقية (صفين إلى ثلاثة)
+            limit: 20,
             viewType: ViewType.grid,
             isLive: true,
             padding: const EdgeInsets.all(16),
 
-            // ✅ اترك shrinkWrap ليحسب الارتفاع ذاتياً
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
 
@@ -741,13 +771,11 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
               // ═══════════════════════════════════════
               // IMAGE
               // ═══════════════════════════════════════
-
               Expanded(
                 flex: 3,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // الصورة
                     ClipRRect(
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(16),
@@ -857,7 +885,6 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                       // ═══════════════════════════════════════
                       // NAME
                       // ═══════════════════════════════════════
-
                       Text(
                         item.name,
                         maxLines: 2,
@@ -875,7 +902,6 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                       // ═══════════════════════════════════════
                       if (hasDesc) ...[
                         const SizedBox(height: 4),
-
                         Expanded(
                           child: Text(
                             item.storeDescription!,
@@ -910,7 +936,6 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                                     color: primaryColor,
                                   ),
                                 ),
-
                                 if (item.hasDiscount)
                                   Text(
                                     item.price.toStringAsFixed(2),
@@ -925,11 +950,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                           ),
 
                           // ADD TO CART
-                          if (item.isInStock)
-                            IgnorePointer(
-                              ignoring: false,
-                              child: _buildAddToCartButton(item),
-                            ),
+                          if (item.isInStock) _buildAddToCartButton(item),
                         ],
                       ),
                     ],
@@ -1156,32 +1177,6 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
           size: 48,
           color: Colors.grey.shade300,
         ),
-      ),
-    );
-  }
-
-  Widget _buildErrorState(String error) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
-          const SizedBox(height: 16),
-          const Text(
-            'حدث خطأ في تحميل المنتجات',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F2937),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            error,
-            style: TextStyle(color: Colors.grey.shade600),
-            textAlign: TextAlign.center,
-          ),
-        ],
       ),
     );
   }

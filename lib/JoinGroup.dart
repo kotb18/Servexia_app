@@ -342,6 +342,10 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
           'faceEmbedding': faceEmbedding,
           'updatedAt': FieldValue.serverTimestamp(),
         });
+    final facePreRef = FirebaseFirestore.instance
+        .collection('faceEmbedding')
+        .doc(groupId);
+    facePreRef.set({'lastFaceEmbeddingUpdate': FieldValue.serverTimestamp()});
     if (!kIsWeb) {
       await FirebaseMessaging.instance.subscribeToTopic(groupId);
     }

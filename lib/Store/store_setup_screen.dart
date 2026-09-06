@@ -65,6 +65,10 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
     {'hex': '#607D8B', 'name': 'رمادي'},
     {'hex': '#FFEB3B', 'name': 'أصفر'},
   ];
+  String _generateStoreLink() {
+    const baseUrl = 'https://maintenance-b7282.web.app';
+    return '$baseUrl/shop/${widget.groupId}';
+  }
 
   getDeviceToken() async {
     _deviceToken = await FirebaseMessaging.instance.getToken();
@@ -990,7 +994,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
         description: _descriptionController.text.trim().isEmpty
             ? null
             : _descriptionController.text.trim(),
-        storeSlug: 'slug',
+        storeSlug: _generateStoreLink(),
         phone: _fullPhone.trim().isEmpty
             ? '$_phoneCode${_phoneController.text}'
             : _fullPhone,

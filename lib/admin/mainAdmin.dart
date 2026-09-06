@@ -4,64 +4,74 @@ import 'package:iconsax/iconsax.dart';
 import 'package:maintenance/admin/feedBack.dart';
 import 'package:maintenance/admin/groups.dart';
 
-class MainAdmin extends StatelessWidget {
+class MainAdmin extends StatefulWidget {
   const MainAdmin({super.key});
   static const String screenroute = 'mainAdmin';
 
   @override
+  State<MainAdmin> createState() => _MainAdminState();
+}
+
+class _MainAdminState extends State<MainAdmin> {
+  bool _isLoading = false;
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('لوحة تحكم الأدمن'), centerTitle: true),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: GridView.count(
-          crossAxisCount: 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          children: [
-            _adminButton(
-              icon: Iconsax.message_question,
-              title: 'الاقتراحات\nوالشكاوى',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const FeedbacksPage()),
-                );
-              },
-            ),
-            _adminButton(
-              icon: Icons.group,
-              title: 'متابعة المجموعات',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const GroupsMintor()),
-                );
-              },
-            ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16),
+              child: GridView.count(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                children: [
+                  _adminButton(
+                    icon: Iconsax.message_question,
+                    title: 'الاقتراحات\nوالشكاوى',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const FeedbacksPage(),
+                        ),
+                      );
+                    },
+                  ),
+                  _adminButton(
+                    icon: Icons.group,
+                    title: 'متابعة المجموعات',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const GroupsMintor()),
+                      );
+                    },
+                  ),
 
-            _adminButton(
-              icon: Iconsax.user,
-              title: 'مسح السجلات المنتهية',
-              onTap: () {
-                deleteExpiredAttendance(context);
-              },
-            ),
+                  _adminButton(
+                    icon: Iconsax.user,
+                    title: 'مسح السجلات المنتهية',
+                    onTap: () {
+                      deleteExpiredAttendance(context);
+                    },
+                  ),
 
-            _adminButton(
-              icon: Iconsax.setting,
-              title: 'الإعدادات',
-              onTap: () {},
-            ),
+                  _adminButton(
+                    icon: Iconsax.setting,
+                    title: 'الإعدادات',
+                    onTap: () {},
+                  ),
 
-            _adminButton(
-              icon: Iconsax.logout,
-              title: 'تسجيل الخروج',
-              onTap: () {},
+                  _adminButton(
+                    icon: Iconsax.logout,
+                    title: 'تسجيل الخروج',
+                    onTap: () {},
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -100,148 +110,222 @@ class MainAdmin extends StatelessWidget {
       ),
     );
   }
-}
 
-Future<void> deleteExpiredAttendance(BuildContext context) async {
-  final firestore = FirebaseFirestore.instance;
-  final batch = firestore.batch();
+  Future<void> deleteExpiredAttendance(BuildContext context) async {
+    setState(() {
+      _isLoading = true;
+    });
+    final firestore = FirebaseFirestore.instance;
+    final batch = firestore.batch();
 
-  final attendanceSnapshot = await firestore.collection('attendance').get();
+    final attendanceSnapshot = await firestore.collection('attendance').get();
 
-  int deletedCount = 0;
+    int deletedCount = 0;
 
-  for (final groupDoc in attendanceSnapshot.docs) {
-    final expiredRecords = await groupDoc.reference
-        .collection('records')
-        .where('expiredAt', isLessThan: Timestamp.now())
-        .get();
-    print('11111111111');
-    for (final record in expiredRecords.docs) {
-      batch.delete(record.reference);
-      deletedCount++;
+    for (final groupDoc in attendanceSnapshot.docs) {
+      final expiredRecords = await groupDoc.reference
+          .collection('records')
+          .where('expiredAt', isLessThan: Timestamp.now())
+          .get();
+      print('11111111111');
+      for (final record in expiredRecords.docs) {
+        batch.delete(record.reference);
+        deletedCount++;
+      }
     }
+
+    if (deletedCount > 0) {
+      await batch.commit();
+    }
+    await deleteGroupBatch();
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        content: Text('تم مسح $deletedCount سجل حضور منتهي بنجاح'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('حسناً'),
+          ),
+        ],
+      ),
+    );
+    setState(() {
+      _isLoading = false;
+    });
   }
 
-  if (deletedCount > 0) {
-    await batch.commit();
+  Future<void> deleteGroupBatch() async {
+    final firestore = FirebaseFirestore.instance;
+    final batch = firestore.batch();
+    await firestore
+        .collection('groups')
+        .where('willDeleteAt', isLessThan: Timestamp.fromDate(DateTime.now()))
+        .get()
+        .then((snapshot) async {
+          for (final doc in snapshot.docs) {
+            batch.delete(doc.reference);
+            final groupRef = firestore.collection('groups').doc(doc.id);
+            batch.delete(groupRef);
+
+            // ===== teams =====
+            final teamRef = firestore.collection('teams').doc(doc.id);
+            final teamsSnapshot = await teamRef.collection('members').get();
+
+            for (final item in teamsSnapshot.docs) {
+              batch.delete(item.reference);
+            }
+
+            batch.delete(teamRef);
+            //====== users ======
+            final usersRef = firestore.collection('faceEmbedding').doc(doc.id);
+            final usersSnapshot = await usersRef.collection('users').get();
+
+            for (final item in usersSnapshot.docs) {
+              batch.delete(item.reference);
+            }
+
+            batch.delete(teamRef);
+
+            // ===== tasks =====
+            final tasksRef = firestore.collection('tasks').doc(doc.id);
+            final taskItemsSnapshot = await tasksRef.collection('items').get();
+
+            for (final item in taskItemsSnapshot.docs) {
+              final worksSnapshot = await item.reference
+                  .collection('works')
+                  .get();
+
+              for (final work in worksSnapshot.docs) {
+                batch.delete(work.reference);
+              }
+
+              batch.delete(item.reference);
+            }
+            batch.delete(tasksRef);
+
+            // ===== assets =====
+            final assetsRef = firestore.collection('assets').doc(doc.id);
+            final assetItemsSnapshot = await assetsRef
+                .collection('items')
+                .get();
+
+            for (final item in assetItemsSnapshot.docs) {
+              final worksSnapshot = await item.reference
+                  .collection('works')
+                  .get();
+
+              for (final work in worksSnapshot.docs) {
+                batch.delete(work.reference);
+              }
+
+              batch.delete(item.reference);
+            }
+            batch.delete(assetsRef);
+            /////////////warehouse///////////////
+            final warehouseRef = firestore.collection('inventory').doc(doc.id);
+            final warehouseItemsSnapshot = await warehouseRef
+                .collection('items')
+                .get();
+
+            for (final item in warehouseItemsSnapshot.docs) {
+              final worksSnapshot = await item.reference
+                  .collection('movements')
+                  .get();
+
+              for (final work in worksSnapshot.docs) {
+                batch.delete(work.reference);
+              }
+
+              batch.delete(item.reference);
+            }
+            batch.delete(warehouseRef);
+
+            // ===== attendance =====
+            final attendanceRef = firestore
+                .collection('attendance')
+                .doc(doc.id);
+
+            final recordsSnapshot = await attendanceRef
+                .collection('records')
+                .get();
+
+            for (final record in recordsSnapshot.docs) {
+              batch.delete(record.reference);
+            }
+
+            batch.delete(attendanceRef);
+            //========= faceEmbedding ======
+            final faceEmbeddingRef = firestore
+                .collection('faceEmbedding')
+                .doc(doc.id);
+            final faceEmbeddingItemsSnapshot = await faceEmbeddingRef
+                .collection('users')
+                .get();
+            for (final item in faceEmbeddingItemsSnapshot.docs) {
+              batch.delete(item.reference);
+            }
+            batch.delete(faceEmbeddingRef);
+            // =====  invoices =====
+            final invoicesRef = firestore.collection('invoices').doc(doc.id);
+            final invoiceItemsSnapshot = await invoicesRef
+                .collection('items')
+                .get();
+
+            for (final item in invoiceItemsSnapshot.docs) {
+              batch.delete(item.reference);
+            }
+            batch.delete(invoicesRef);
+            //======customers ======
+            final customersRef = firestore
+                .collection('customersSuppliers')
+                .doc(doc.id);
+            final customersItemsSnapshot = await customersRef
+                .collection('persons')
+                .get();
+
+            for (final item in customersItemsSnapshot.docs) {
+              batch.delete(item.reference);
+            }
+            batch.delete(customersRef);
+            //========employees ======
+            final employeesRef = firestore
+                .collection('employees_permissions')
+                .doc(doc.id);
+            final employeesItemsSnapshot = await employeesRef
+                .collection('items')
+                .get();
+            for (final item in employeesItemsSnapshot.docs) {
+              batch.delete(item.reference);
+            }
+            batch.delete(employeesRef);
+            //==========store_orders========
+            final storeOrdersRef = firestore
+                .collection('store_orders')
+                .doc(doc.id);
+            final storeOrdersItemsSnapshot = await storeOrdersRef
+                .collection('items')
+                .get();
+            for (final item in storeOrdersItemsSnapshot.docs) {
+              batch.delete(item.reference);
+            }
+            batch.delete(storeOrdersRef);
+            //=========stores========
+            final storesRef = firestore.collection('stores').doc(doc.id);
+            final storesItemsSnapshot = await storesRef
+                .collection('items')
+                .get();
+            for (final item in storesItemsSnapshot.docs) {
+              batch.delete(item.reference);
+            }
+            batch.delete(storesRef);
+
+            // ===== COMMIT =====
+            await batch.commit();
+          }
+        });
+
+    // ===== groups =====
   }
-  await deleteGroupBatch();
-
-  await showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      content: Text('تم مسح $deletedCount سجل حضور منتهي بنجاح'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('حسناً'),
-        ),
-      ],
-    ),
-  );
-}
-
-Future<void> deleteGroupBatch() async {
-  final firestore = FirebaseFirestore.instance;
-  final batch = firestore.batch();
-  await firestore
-      .collection('groups')
-      .where('willDeleteAt', isLessThan: Timestamp.fromDate(DateTime.now()))
-      .get()
-      .then((snapshot) async {
-        for (final doc in snapshot.docs) {
-          batch.delete(doc.reference);
-          final groupRef = firestore.collection('groups').doc(doc.id);
-          batch.delete(groupRef);
-
-          // ===== teams =====
-          final teamRef = firestore.collection('teams').doc(doc.id);
-          final teamsSnapshot = await teamRef.collection('members').get();
-
-          for (final item in teamsSnapshot.docs) {
-            batch.delete(item.reference);
-          }
-
-          batch.delete(teamRef);
-          //====== users ======
-          final usersRef = firestore.collection('faceEmbedding').doc(doc.id);
-          final usersSnapshot = await usersRef.collection('users').get();
-
-          for (final item in usersSnapshot.docs) {
-            batch.delete(item.reference);
-          }
-
-          batch.delete(teamRef);
-
-          // ===== tasks =====
-          final tasksRef = firestore.collection('tasks').doc(doc.id);
-          final taskItemsSnapshot = await tasksRef.collection('items').get();
-
-          for (final item in taskItemsSnapshot.docs) {
-            final worksSnapshot = await item.reference
-                .collection('works')
-                .get();
-
-            for (final work in worksSnapshot.docs) {
-              batch.delete(work.reference);
-            }
-
-            batch.delete(item.reference);
-          }
-          batch.delete(tasksRef);
-
-          // ===== assets =====
-          final assetsRef = firestore.collection('assets').doc(doc.id);
-          final assetItemsSnapshot = await assetsRef.collection('items').get();
-
-          for (final item in assetItemsSnapshot.docs) {
-            final worksSnapshot = await item.reference
-                .collection('works')
-                .get();
-
-            for (final work in worksSnapshot.docs) {
-              batch.delete(work.reference);
-            }
-
-            batch.delete(item.reference);
-          }
-          batch.delete(assetsRef);
-          /////////////warehouse///////////////
-          final warehouseRef = firestore.collection('inventory').doc(doc.id);
-          final warehouseItemsSnapshot = await warehouseRef
-              .collection('items')
-              .get();
-
-          for (final item in warehouseItemsSnapshot.docs) {
-            final worksSnapshot = await item.reference
-                .collection('movements')
-                .get();
-
-            for (final work in worksSnapshot.docs) {
-              batch.delete(work.reference);
-            }
-
-            batch.delete(item.reference);
-          }
-          batch.delete(warehouseRef);
-
-          // ===== attendance =====
-          final attendanceRef = firestore.collection('attendance').doc(doc.id);
-
-          final recordsSnapshot = await attendanceRef
-              .collection('records')
-              .get();
-
-          for (final record in recordsSnapshot.docs) {
-            batch.delete(record.reference);
-          }
-
-          batch.delete(attendanceRef);
-
-          // ===== COMMIT =====
-          await batch.commit();
-        }
-      });
-
-  // ===== groups =====
 }

@@ -310,6 +310,12 @@ class _CreategroupState extends State<Creategroup> {
         'faceEmbedding': faceEmbeddingAdmin ?? [],
         'updatedAt': FieldValue.serverTimestamp(),
       });
+      final facePreRef = FirebaseFirestore.instance
+          .collection('faceEmbedding')
+          .doc(groupId);
+      batch.set(facePreRef, {
+        'lastFaceEmbeddingUpdate': FieldValue.serverTimestamp(),
+      });
     }
 
     // إنشاء Batch
@@ -396,16 +402,14 @@ class _CreategroupState extends State<Creategroup> {
       'updatedAt': FieldValue.serverTimestamp(),
     });
 
-    /*  if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم حفظ الصلاحيات بنجاح ✅'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
- */
+    final inventoryRef = await FirebaseFirestore.instance
+        .collection('inventory')
+        .doc(groupId);
+    batch.set(inventoryRef, {'groupId': groupId});
+    final tasksRef = await FirebaseFirestore.instance
+        .collection('tasks')
+        .doc(groupId);
+    batch.set(tasksRef, {'groupId': groupId});
     // تنفيذ كل العمليات مرة واحدة
     await batch.commit();
 

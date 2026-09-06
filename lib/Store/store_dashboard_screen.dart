@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:maintenance/Store/store_model.dart';
 import 'package:maintenance/Store/store_service.dart';
+import 'package:maintenance/imageControl/platform_image.dart';
+import 'package:share_plus/share_plus.dart';
 
 class StoreDashboardScreen extends StatefulWidget {
   final String groupId;
@@ -146,7 +148,12 @@ class _StoreDashboardScreenState extends State<StoreDashboardScreen> {
                         radius: 30,
                         backgroundColor: _hexToColor(store.primaryColor),
                         child: store.logoUrl != null
-                            ? null
+                            ? WebImage(
+                                src: store.logoUrl!,
+                                width: 60,
+                                height: 60,
+                                fit: BoxFit.cover,
+                              )
                             : Text(
                                 store.name[0],
                                 style: const TextStyle(
@@ -168,20 +175,26 @@ class _StoreDashboardScreenState extends State<StoreDashboardScreen> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            /*     const SizedBox(height: 4),
                             SelectableText(
-                              store.storeUrl,
+                              store.storeSlug.isNotEmpty
+                                  ? 'رابط المتجر: ${store.storeSlug}'
+                                  : 'لم يتم تعيين رابط المتجر بعد',
                               style: const TextStyle(
                                 color: Colors.blue,
                                 fontSize: 14,
                               ),
-                            ),
+                            ), */
                           ],
                         ),
                       ),
                       IconButton(
                         icon: const Icon(Icons.share),
-                        onPressed: () {
+                        onPressed: () async {
+                          await Share.share(
+                            'تفضل بزيارة متجر "${store.name}" 🛒\n${store.storeSlug}',
+                            subject: store.name,
+                          );
                           // TODO: مشاركة الرابط
                         },
                       ),

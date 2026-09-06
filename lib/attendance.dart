@@ -959,7 +959,12 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                           .doc(widget.groupId)
                           .collection('users')
                           .doc(uid);
-
+                      final facePreRef = FirebaseFirestore.instance
+                          .collection('faceEmbedding')
+                          .doc(widget.groupId);
+                      batch.set(facePreRef, {
+                        'lastFaceEmbeddingUpdate': FieldValue.serverTimestamp(),
+                      });
                       batch.set(faceRef, {
                         'faceEmbedding': faceEmbeddingLive,
                         'updatedAt': FieldValue.serverTimestamp(),
