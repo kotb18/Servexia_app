@@ -1,10 +1,72 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:maintenance/Store/store_order_model.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class StoreOrderSuccessScreen extends StatelessWidget {
   final StoreOrderModel order;
 
   const StoreOrderSuccessScreen({super.key, required this.order});
+
+  /// ═══════════════════════════════════════════════════════════════════
+  /// 📱 نص المشاركة المُنسّق
+  /// ═══════════════════════════════════════════════════════════════════
+  String get _shareText {
+    final buffer = StringBuffer();
+    buffer.writeln('🛒 طلب جديد من المتجر');
+    buffer.writeln('━━━━━━━━━━━━━━');
+    buffer.writeln('📋 رقم الطلب: #${order.orderNumber}');
+    buffer.writeln('👤 الاسم: ${order.customerInfo.name}');
+    buffer.writeln('📱 الهاتف: ${order.customerInfo.phone}');
+    buffer.writeln('📍 العنوان: ${order.shippingAddress.formattedAddress}');
+    buffer.writeln(
+      '💳 طريقة الدفع: ${_getPaymentMethodText(order.paymentMethod)}',
+    );
+    buffer.writeln('━━━━━━━━━━━━━━');
+
+    // 🛍️ المنتجات — ⚠️ عدّل أسماء الحقول دي حسب الـ StoreOrderModel بتاعك
+    // if (order.items != null) {
+    //   buffer.writeln('🛍️ المنتجات:');
+    //   for (final item in order.items) {
+    //     buffer.writeln('• ${item.name} ×${item.quantity} — ${item.price.toStringAsFixed(2)}');
+    //   }
+    //   buffer.writeln('━━━━━━━━━━━━━━');
+    // }
+
+    buffer.writeln('💰 الإجمالي: ${order.total.toStringAsFixed(2)}');
+    return buffer.toString();
+  }
+
+  /// ═══════════════════════════════════════════════════════════════════
+  /// 💬 مشاركة عبر واتساب
+  /// ═══════════════════════════════════════════════════════════════════
+  Future<void> _shareOnWhatsApp(BuildContext context) async {
+    final uri = Uri.parse(
+      'https://wa.me/?text=${Uri.encodeComponent(_shareText)}',
+    );
+
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      // واتساب مش متسطب — نستخدم المشاركة العادية
+      _shareGeneric();
+    }
+  }
+
+  /// ═══════════════════════════════════════════════════════════════════
+  /// 📤 مشاركة عامة (أي تطبيق)
+  /// ═══════════════════════════════════════════════════════════════════
+  void _shareGeneric() {
+    Share.share(_shareText, subject: 'طلب #${order.orderNumber}');
+  }
+
+  /// ═══════════════════════════════════════════════════════════════════
+  /// 🏠 العودة للمتجر (بتنضف السلة قبل الرجوع)
+  /// ═══════════════════════════════════════════════════════════════════
+  void _backToStore(BuildContext context) {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,38 +78,77 @@ class StoreOrderSuccessScreen extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // أيقونة النجاح
-                Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade50,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.check_circle,
-                    size: 80,
-                    color: Colors.green.shade600,
-                  ),
+                // ═══════════════════════════════════════
+                // ✅ أيقونة النجاح مع أنيميشن
+                // ═══════════════════════════════════════
+                TweenAnimationBuilder(
+                  tween: Tween<double>(begin: 0, end: 1),
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.elasticOut,
+                  builder: (context, value, child) {
+                    return Transform.scale(
+                      scale: value,
+                      child: Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.green.withOpacity(0.2),
+                              blurRadius: 30,
+                              spreadRadius: 5,
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          Icons.check_circle,
+                          size: 80,
+                          color: Colors.green.shade600,
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 32),
 
                 // عنوان
                 const Text(
-                  'تم تأكيد طلبك بنجاح!',
+                  'تم تأكيد طلبك بنجاح! 🎉',
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
 
                 // رقم الطلب
-                Text(
-                  'رقم الطلب: ${order.orderNumber}',
-                  style: TextStyle(fontSize: 18, color: Colors.grey.shade700),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  child: Text(
+                    'رقم الطلب: #${order.orderNumber}',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 32),
 
-                // تفاصيل الطلب
+                // ═══════════════════════════════════════
+                // 📋 تفاصيل الطلب
+                // ═══════════════════════════════════════
                 Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
@@ -75,7 +176,7 @@ class StoreOrderSuccessScreen extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              '${order.total.toStringAsFixed(2)} ج.م',
+                              '${order.total.toStringAsFixed(2)}',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 18,
@@ -90,7 +191,9 @@ class StoreOrderSuccessScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 32),
 
-                // ملاحظة
+                // ═══════════════════════════════════════
+                // ℹ️ ملاحظة
+                // ═══════════════════════════════════════
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -113,17 +216,26 @@ class StoreOrderSuccessScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 32),
 
-                // أزرار
+                // ═══════════════════════════════════════
+                // 💬 زر واتساب
+                // ═══════════════════════════════════════
                 SizedBox(
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      // TODO: مشاركة رقم الطلب على واتساب
-                    },
-                    icon: const Icon(Icons.share),
-                    label: const Text('مشاركة رقم الطلب'),
+                    onPressed: () => _shareOnWhatsApp(context),
+                    icon: const Icon(Icons.chat),
+                    label: const Text(
+                      'مشاركة عبر واتساب',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF25D366),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -131,20 +243,47 @@ class StoreOrderSuccessScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
+
+                // ═══════════════════════════════════════
+                // 📤 زر المشاركة العامة
+                // ═══════════════════════════════════════
                 SizedBox(
                   width: double.infinity,
                   height: 50,
-                  child: OutlinedButton(
-                    onPressed: () {
-                      // الرجوع للرئيسية
-                      Navigator.of(context).popUntil((route) => route.isFirst);
-                    },
+                  child: OutlinedButton.icon(
+                    onPressed: _shareGeneric,
+                    icon: const Icon(Icons.share),
+                    label: const Text(
+                      'مشاركة الطلب',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     style: OutlinedButton.styleFrom(
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text('العودة للمتجر'),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // ═══════════════════════════════════════
+                // 🏪 زر العودة للمتجر
+                // ═══════════════════════════════════════
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: TextButton(
+                    onPressed: () => _backToStore(context),
+                    child: Text(
+                      'العودة للمتجر',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -155,6 +294,9 @@ class StoreOrderSuccessScreen extends StatelessWidget {
     );
   }
 
+  /// ═══════════════════════════════════════════════════════════════════
+  /// 🔧 HELPERS
+  /// ═══════════════════════════════════════════════════════════════════
   Widget _buildDetailRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),

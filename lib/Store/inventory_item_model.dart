@@ -42,7 +42,7 @@ class InventoryItemModel {
     return InventoryItemModel(
       sku: data['sku'] ?? '',
       name: data['name'] ?? '',
-      quantity: data['quantity'] ?? 0.0,
+      quantity: (data['quantity'] ?? 0).toDouble(),
       unit: data['unit'] ?? '',
       location: data['location'],
       notes: data['notes'],

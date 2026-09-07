@@ -3,6 +3,7 @@ import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
@@ -90,6 +91,8 @@ class _HomepageState extends State<Homepage>
 
   bool isMainAdmin = false;
   String? token = '';
+  String? youTubeUrl;
+String? websiteUrl;
   Future<void> getVariables() async {
     final doc = await FirebaseFirestore.instance
         .collection('variables')
@@ -103,6 +106,8 @@ class _HomepageState extends State<Homepage>
     final data = doc.data();
 
     maxGroup = data!['maxGroup'];
+    youTubeUrl = data['youTubeUrl'];
+    websiteUrl = data['websiteUrl'];
   }
 
   @override
@@ -410,14 +415,22 @@ class _HomepageState extends State<Homepage>
 
           _buildDrawerItem(Icons.share, 'مشاركة التطبيق', () {
             Share.share(
-              'جرب تطبيق Servexia لإدارة الصيانة 👷‍♂️🔧\n'
+              'جرب تطبيق Servexia لإدارة المبيعات والصيانة👷‍♂️🔧\n'
               'حمّل التطبيق من هنا:\n'
               'https://play.google.com/store/apps/details?id=com.masry.maintenance',
               sharePositionOrigin: Rect.fromLTWH(0, 0, 100, 100),
             );
           }),
+          _buildDrawerItem(Icons.share, 'مشاركة الموقع', () {
+            Share.share(
+              'جرب موقع Servexia لإدارة المبيعات والصيانة👷‍♂️🔧\n'
+              'حمّل التطبيق من هنا:\n'
+              '${websiteUrl ?? 'https://maintenance-b7282.web.app/'}',
+              sharePositionOrigin: Rect.fromLTWH(0, 0, 100, 100),
+            );
+          }),
           _buildDrawerItem(Icons.help_outline, 'شرح طريقة عمل التطبيق', () {
-            launchUrl(Uri.parse('https://youtu.be/F-NiFb6uWQ0'));
+            launchUrl(Uri.parse(youTubeUrl ?? 'https://youtu.be/F-NiFb6uWQ0'));
           }),
           _buildDrawerItem(Icons.privacy_tip_outlined, "سياسة الخصوصية", () {
             launchUrl(
@@ -636,6 +649,12 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
                               isLoading = true;
                             });
                             await deleteGroupBatch(widget.groupId);
+                            await FirebaseStorage.instance
+                                .ref('users/${widget.groupId}')
+                                .delete();
+                            await FirebaseStorage.instance
+                                .ref('stores/${widget.groupId}')
+                                .delete();
                             setState(() {
                               isLoading = false;
                             });
@@ -675,6 +694,10 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
                             groupId: widget.groupId,
                             memberId: widget.uid,
                           );
+                          await FirebaseStorage.instance
+                              .ref('users/${widget.groupId}/${widget.uid}')
+                              .delete();
+
                           await FirebaseMessaging.instance.unsubscribeFromTopic(
                             widget.groupId,
                           );

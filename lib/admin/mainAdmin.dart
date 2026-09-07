@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:maintenance/admin/feedBack.dart';
@@ -323,6 +324,8 @@ class _MainAdminState extends State<MainAdmin> {
 
             // ===== COMMIT =====
             await batch.commit();
+            await FirebaseStorage.instance.ref('users/${doc.id}').delete();
+            await FirebaseStorage.instance.ref('stores/${doc.id}').delete();
           }
         });
 

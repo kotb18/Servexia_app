@@ -937,7 +937,6 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                           .ref()
                           .child('users')
                           .child(widget.groupId)
-                          .child('faces')
                           .child(uid);
 
                       await storageRef.putFile(

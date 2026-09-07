@@ -296,7 +296,7 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
 
     await prefs.setString(
       _localKey('faceImage$groupId $uid'),
-      jsonEncode(_image),
+      jsonEncode(_imageUrl),
     );
 
     final memberRef = FirebaseFirestore.instance
@@ -309,7 +309,6 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
           .ref()
           .child('users')
           .child(groupId)
-          .child('faces')
           .child(uid);
 
       await storageRef.putFile(

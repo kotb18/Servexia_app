@@ -56,7 +56,7 @@ class InvoiceItem {
   factory InvoiceItem.fromJson(Map<String, dynamic> json) {
     return InvoiceItem(
       name: json['name'] as String? ?? '',
-      quantity: json['quantity'] as double? ?? 0.0,
+      quantity: (json['quantity'] as num?)?.toDouble() ?? 0.0,
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       total: (json['total'] as num?)?.toDouble() ?? 0.0,
       itemId: '${json['itemId'] ?? ''}',

@@ -348,7 +348,6 @@ class _CreategroupState extends State<Creategroup> {
           .ref()
           .child('users')
           .child(groupId)
-          .child('faces')
           .child(uid);
 
       await storageRef.putFile(
