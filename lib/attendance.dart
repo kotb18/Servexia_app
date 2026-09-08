@@ -104,6 +104,13 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
 
   Future<void> _loadMembers() async {
     setState(() => loading = true);
+    try {
+      // الكود اللي ممكن يعمل الخطأ
+    } catch (e, stackTrace) {
+      print('❌ ERROR: $e');
+      print('📍 STACK TRACE:');
+      print(stackTrace);
+    }
 
     try {
       final snapshot = await FirebaseFirestore.instance
@@ -153,7 +160,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
     throw Exception('Invalid date format');
   }
 
-  String selectedItem = storedEmbeddingDynamic![0];
+  String selectedItem = storedEmbeddingDynamic![0].toString();
   DateTime result1 = DateTime.now();
 
   void showDropdownMenu(BuildContext context, TapDownDetails details) async {
@@ -167,7 +174,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
         Offset.zero & overlay.size,
       ),
       items: storedEmbeddingDynamic!.map((item) {
-        return PopupMenuItem(value: item, child: Text(item));
+        return PopupMenuItem(value: item, child: Text(item.toString()));
       }).toList(),
     );
 
@@ -810,11 +817,15 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
     if (user == null) return null;
 
     final prefs = await SharedPreferences.getInstance();
-    final localData = prefs.getString(localKey('$groupId0 ${user.uid}'));
+    final localValue = prefs.get(localKey('$groupId0 ${user.uid}'));
 
     // ✅ 1. لو موجود محليًا
-    if (localData != null) {
-      final List decoded = jsonDecode(localData);
+    if (localValue != null) {
+      final List decoded = localValue is String
+          ? jsonDecode(localValue) as List
+          : localValue is List
+          ? localValue
+          : <dynamic>[];
       setState(() {
         _isFaceEmbeddingFound = true;
         print('yessssssssssssssssssssssssssss');

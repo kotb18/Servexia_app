@@ -294,11 +294,6 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
     setState(() => isLoading = true);
     final prefs = await SharedPreferences.getInstance();
 
-    await prefs.setString(
-      _localKey('faceImage$groupId $uid'),
-      jsonEncode(_imageUrl),
-    );
-
     final memberRef = FirebaseFirestore.instance
         .collection('teams')
         .doc(groupId)
@@ -319,6 +314,10 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
       await prefs.setString(
         _localKey('faceImage$groupId $uid'),
         jsonEncode(_imageUrl ?? []),
+      );
+      await prefs.setString(
+        _localKey('$groupId $uid'),
+        jsonEncode(faceEmbedding),
       );
     }
 

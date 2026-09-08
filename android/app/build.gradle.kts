@@ -25,7 +25,7 @@ android {
     ndkVersion = "28.2.13676358"// دعم 16KB page size
      packaging {
              jniLibs {
-               useLegacyPackaging = true
+               useLegacyPackaging = false
            }
         }
 
@@ -50,7 +50,7 @@ android {
         applicationId = "com.masry.maintenance"
 
         minSdk = flutter.minSdkVersion
-        targetSdk = 35
+        targetSdk = 36
 
         versionCode = flutter.versionCode
         versionName = flutter.versionName
