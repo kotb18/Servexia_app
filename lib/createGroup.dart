@@ -357,7 +357,7 @@ class _CreategroupState extends State<Creategroup> {
       _imageUrl = await storageRef.getDownloadURL();
       await prefs.setString(
         _localKey('faceImage$groupId $uid'),
-        jsonEncode(_imageUrl ?? []),
+        jsonEncode(_imageUrl),
       );
     }
 

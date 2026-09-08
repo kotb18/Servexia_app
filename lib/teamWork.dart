@@ -515,7 +515,7 @@ Future<void> removeMemberFromGroupAndTeam({
       .doc(memberId);
   batch.delete(faceEmbeddingRef);
 
-  await FirebaseMessaging.instance.unsubscribeFromTopic(groupId);
+  //  await FirebaseMessaging.instance.unsubscribeFromTopic(groupId);
   // 🔹 جلب بيانات الجروب
   final groupSnap = await groupRef.get();
   if (groupSnap.exists) {

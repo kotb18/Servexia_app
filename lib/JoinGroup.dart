@@ -313,8 +313,9 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
       _imageUrl = await storageRef.getDownloadURL();
       await prefs.setString(
         _localKey('faceImage$groupId $uid'),
-        jsonEncode(_imageUrl ?? []),
+        jsonEncode(_imageUrl),
       );
+
       await prefs.setString(
         _localKey('$groupId $uid'),
         jsonEncode(faceEmbedding),
