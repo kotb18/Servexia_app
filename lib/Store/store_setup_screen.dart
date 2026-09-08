@@ -969,12 +969,12 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
 
   Future<void> _saveStore() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_isClothes == null) {
+    /*   if (_isClothes == null) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('يرجى تحديد نوع المتجر')));
       return;
-    }
+    } */
     if (_phoneController.text.startsWith('0')) {
       _showError('لا تبدأ الرقم بـ 0 بعد كود الدولة');
       return;
