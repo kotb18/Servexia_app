@@ -66,7 +66,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
     {'hex': '#FFEB3B', 'name': 'أصفر'},
   ];
   String _generateStoreLink() {
-    const baseUrl = 'https://maintenance-b7282.web.app';
+    const baseUrl = 'https://servexia-2498k.web.app';
     return '$baseUrl/shop/${widget.groupId}';
   }
 

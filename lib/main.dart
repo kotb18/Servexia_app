@@ -88,7 +88,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
-      title: 'Maintenance',
+      title: 'Servexia',
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -439,6 +439,7 @@ final GoRouter _router = GoRouter(
           itemsPurchase: state.uri.queryParameters['itemsPurchase'] == 'true'
               ? []
               : [],
+          itemsSale: state.uri.queryParameters['itemsSale'] == 'true' ? [] : [],
         );
       },
     ),

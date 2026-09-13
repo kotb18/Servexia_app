@@ -92,7 +92,7 @@ class _HomepageState extends State<Homepage>
   bool isMainAdmin = false;
   String? token = '';
   String? youTubeUrl;
-String? websiteUrl;
+  String? websiteUrl;
   Future<void> getVariables() async {
     final doc = await FirebaseFirestore.instance
         .collection('variables')
@@ -114,7 +114,7 @@ String? websiteUrl;
   void initState() {
     super.initState();
     billingService.init();
-    groups.clear;
+    groups.clear();
     getVariables();
     if (FirebaseAuth.instance.currentUser!.email ==
         'aahmedkotb2498@gmail.com') {
@@ -156,46 +156,57 @@ String? websiteUrl;
     return Scaffold(
       backgroundColor: AppColors.backgroundStart,
       drawer: _buildModernDrawer(),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppColors.backgroundStart, AppColors.backgroundEnd],
-                ),
+      body: Stack(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.backgroundStart, AppColors.backgroundEnd],
               ),
-              child: SafeArea(
-                child: CustomScrollView(
-                  slivers: [
-                    _buildModernAppBar(),
-                    SliverToBoxAdapter(
-                      child: FadeTransition(
-                        opacity: _fadeAnimation,
-                        child: SlideTransition(
-                          position: _slideAnimation,
-                          child: Column(
-                            children: [
-                              const SizedBox(height: 20),
-                              const HexagonImage(
-                                imagePath: 'images/2.png',
-                                size: 160.0,
-                              ),
-                              const SizedBox(height: 30),
-                              _buildQuickActions(),
-                              const SizedBox(height: 30),
-                              _buildSectionTitle("مجموعاتك النشطة"),
-                            ],
-                          ),
+            ),
+            child: SafeArea(
+              child: CustomScrollView(
+                slivers: [
+                  _buildModernAppBar(),
+                  SliverToBoxAdapter(
+                    child: FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: SlideTransition(
+                        position: _slideAnimation,
+                        child: Column(
+                          children: [
+                            const SizedBox(height: 20),
+                            const HexagonImage(
+                              imagePath: 'images/2.png',
+                              size: 160.0,
+                            ),
+                            const SizedBox(height: 30),
+                            _buildQuickActions(),
+                            const SizedBox(height: 30),
+                            _buildSectionTitle("مجموعاتك النشطة"),
+                          ],
                         ),
                       ),
                     ),
-                    _buildGroupsList(),
-                  ],
+                  ),
+                  _buildGroupsList(),
+                ],
+              ),
+            ),
+          ),
+          if (isLoading)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black45,
+                child: const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
                 ),
               ),
             ),
+        ],
+      ),
     );
   }
 
@@ -384,6 +395,12 @@ String? websiteUrl;
               groupId: groups[index].id,
               uid: uid,
               billingService: billingService,
+              onLoadingChanged: (value) {
+                if (!mounted) return;
+                setState(() {
+                  isLoading = value;
+                });
+              },
             ),
             childCount: groups.length,
           ),
@@ -421,11 +438,11 @@ String? websiteUrl;
               sharePositionOrigin: Rect.fromLTWH(0, 0, 100, 100),
             );
           }),
-          _buildDrawerItem(Icons.share, 'مشاركة الموقع', () {
+          _buildDrawerItem(Icons.ios_share, 'مشاركة الموقع', () {
             Share.share(
               'جرب موقع Servexia لإدارة المبيعات والصيانة👷‍♂️🔧\n'
-              'حمّل التطبيق من هنا:\n'
-              '${websiteUrl ?? 'https://maintenance-b7282.web.app/'}',
+              'زيارة الموقع من هنا:\n'
+              '${websiteUrl ?? 'https://servexia-2498k.web.app/'}',
               sharePositionOrigin: Rect.fromLTWH(0, 0, 100, 100),
             );
           }),
@@ -560,11 +577,13 @@ class _ModernGroupTile extends StatefulWidget {
   final String groupId;
   final String uid;
   final BillingService billingService;
+  final ValueChanged<bool> onLoadingChanged;
 
   const _ModernGroupTile({
     required this.groupId,
     required this.uid,
     required this.billingService,
+    required this.onLoadingChanged,
   });
 
   @override
@@ -582,7 +601,7 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const SizedBox();
         final group = snapshot.data!.data() as Map<String, dynamic>;
-
+        final isGroupAdmin = group['adminId'] == widget.uid;
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           decoration: BoxDecoration(
@@ -611,12 +630,37 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
                 fontSize: 16,
               ),
             ),
-            subtitle: Text(
-              group['area'] ?? '',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
-                fontSize: 12,
-              ),
+            subtitle: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (group['purpose'] != null &&
+                    group['purpose'].toString().isNotEmpty)
+                  Text(
+                    group['purpose'],
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 12,
+                    ),
+                  ),
+                Text(
+                  group['area'] ?? '',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.6),
+                    fontSize: 12,
+                  ),
+                ),
+                Divider(color: Colors.white.withOpacity(0.4)),
+                Text(
+                  isGroupAdmin
+                      ? 'لمسح المجموعة اضغط مطولاً'
+                      : 'لمغادرة المجموعة اضغط مطولاً',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.4),
+                    fontSize: 10,
+                  ),
+                ),
+              ],
             ),
             trailing: const Icon(
               Icons.arrow_forward_ios_rounded,
@@ -624,149 +668,133 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
               size: 18,
             ),
             onTap: () => _handleTap(context, group),
-            onLongPress: () async {
-              if (group['adminId'] == widget.uid) {
-                await showDialog(
-                  context: context,
-                  builder: (context) {
-                    return AlertDialog(
-                      title: const Text(
-                        'تأكيد الحذف',
-                        style: TextStyle(color: Colors.red),
-                      ),
-                      content: const Text(
-                        'هل أنت متأكد من رغبتك في حذف المجموعة؟ سيؤدي ذلك الى مسح جميع البيانات داخل هذه المجموعة.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('إلغاء'),
-                        ),
-                        TextButton(
-                          onPressed: () async {
-                            Navigator.of(context).pop();
-                            setState(() {
-                              isLoading = true;
-                            });
-                            await deleteGroupBatch(widget.groupId);
-                            await FirebaseStorage.instance
-                                .ref('users/${widget.groupId}')
-                                .delete();
-                            await FirebaseStorage.instance
-                                .ref('stores/${widget.groupId}')
-                                .delete();
-                            setState(() {
-                              isLoading = false;
-                            });
-                          },
-                          child: const Text(
-                            'حذف',
-                            style: TextStyle(color: Colors.red),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              } else {
-                await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text(
-                      'تأكيد المغادرة',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                    content: const Text(
-                      'هل أنت متأكد من رغبتك في مغادرة المجموعة؟',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(false),
-                        child: const Text('إلغاء'),
-                      ),
-                      TextButton(
-                        onPressed: () async {
-                          Navigator.of(context).pop(false);
-                          setState(() {
-                            isLoading = true;
-                          });
-                          await removeMemberFromGroupAndTeam(
-                            groupId: widget.groupId,
-                            memberId: widget.uid,
-                          );
-                          await FirebaseStorage.instance
-                              .ref('users/${widget.groupId}/${widget.uid}')
-                              .delete();
-
-                          await FirebaseMessaging.instance.unsubscribeFromTopic(
-                            widget.groupId,
-                          );
-                          Navigator.of(context).pop(false);
-                          setState(() {
-                            isLoading = false;
-                          });
-                        },
-                        child: const Text(
-                          'مغادرة',
-                          style: TextStyle(color: Colors.red),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
-            },
+            onLongPress: () => _handleLongPress(context, group),
           ),
         );
       },
     );
   }
 
-  void _handleTap(BuildContext context, Map<String, dynamic> group) async {
-    setState(() {
-      isLoading = true;
-    });
-    // Subscription Logic from original code
-    final adminId = group['adminId'];
-    final adminDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(adminId)
-        .get();
-    final expiredAt = (adminDoc.data()?['expiredAt'] as Timestamp?)?.toDate();
-    final bool isAdmin = adminId == widget.uid;
+  Future<void> _handleLongPress(
+    BuildContext context,
+    Map<String, dynamic> group,
+  ) async {
+    final isGroupAdmin = group['adminId'] == widget.uid;
 
-    if (expiredAt != null && expiredAt.isBefore(DateTime.now())) {
-      AwesomeDialog(
-        context: context,
-        dialogType: DialogType.warning,
-        title: adminId == widget.uid
-            ? 'انتهت صلاحية اشتراكك'
-            : 'تم تعليق المجموعة',
-        desc: adminId == widget.uid
-            ? 'يرجى التجديد للاستمرار'
-            : 'تواصل مع المشرف لتجديد الاشتراك',
-        btnCancelText: adminId == widget.uid ? 'إلغاء' : null,
-        btnOkText: adminId == widget.uid ? 'تجديد الاشتراك' : 'حسنا',
-        btnOkOnPress: isAdmin
-            ? () {
-                widget.billingService.buySubscription();
-                print('11111122222333333444455555');
-              }
-            : () {},
-        btnCancelOnPress: adminId == widget.uid ? () {} : null,
-      ).show();
-      return;
-    }
-
-    if (!context.mounted) return;
-    // Opening a workspace is a forward navigation. Keep Home in the browser
-    // history so the web Back button returns here instead of leaving the app.
-    context.push(
-      '/workspace/${Uri.encodeComponent(group['docId'].toString())}',
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          isGroupAdmin ? 'تأكيد الحذف' : 'تأكيد المغادرة',
+          style: const TextStyle(color: Colors.red),
+        ),
+        content: Text(
+          isGroupAdmin
+              ? 'هل أنت متأكد من رغبتك في حذف المجموعة؟ سيؤدي ذلك الى مسح جميع البيانات داخل هذه المجموعة.'
+              : 'هل أنت متأكد من رغبتك في مغادرة المجموعة؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(
+              isGroupAdmin ? 'حذف' : 'مغادرة',
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
     );
-    setState(() {
-      isLoading = false;
-    });
+
+    if (confirmed != true) return;
+
+    widget.onLoadingChanged(true);
+    try {
+      if (isGroupAdmin) {
+        await deleteGroupBatch(widget.groupId);
+        await _deleteStorageIfExists('users/${widget.groupId}');
+        await _deleteStorageIfExists('stores/${widget.groupId}');
+      } else {
+        await removeMemberFromGroupAndTeam(
+          groupId: widget.groupId,
+          memberId: widget.uid,
+        );
+        await _deleteStorageIfExists('users/${widget.groupId}/${widget.uid}');
+        await FirebaseMessaging.instance.unsubscribeFromTopic(widget.groupId);
+      }
+    } catch (e) {
+      debugPrint('Group action error: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('حدث خطأ، حاول مرة أخرى')));
+      }
+    } finally {
+      widget.onLoadingChanged(false);
+    }
+  }
+
+  Future<void> _deleteStorageIfExists(String path) async {
+    try {
+      await FirebaseStorage.instance.ref(path).delete();
+    } on FirebaseException catch (e) {
+      if (e.code != 'object-not-found') rethrow;
+    }
+  }
+
+  Future<void> _handleTap(
+    BuildContext context,
+    Map<String, dynamic> group,
+  ) async {
+    widget.onLoadingChanged(true);
+
+    try {
+      final adminId = group['adminId'];
+      final adminDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(adminId)
+          .get();
+      final expiredAt = (adminDoc.data()?['expiredAt'] as Timestamp?)?.toDate();
+      final isAdmin = adminId == widget.uid;
+
+      if (expiredAt != null && expiredAt.isBefore(DateTime.now())) {
+        if (!context.mounted) return;
+
+        await AwesomeDialog(
+          context: context,
+          dialogType: DialogType.warning,
+          title: isAdmin ? 'انتهت صلاحية اشتراكك' : 'تم تعليق المجموعة',
+          desc: isAdmin
+              ? 'يرجى التجديد للاستمرار'
+              : 'تواصل مع المشرف لتجديد الاشتراك',
+          btnCancelText: isAdmin ? 'إلغاء' : null,
+          btnOkText: isAdmin ? 'تجديد الاشتراك' : 'حسنا',
+          btnOkOnPress: isAdmin
+              ? () => widget.billingService.buySubscription()
+              : () {},
+          btnCancelOnPress: isAdmin ? () {} : null,
+        ).show();
+        return;
+      }
+
+      if (!context.mounted) return;
+      widget.onLoadingChanged(false);
+      context.push(
+        '/workspace/${Uri.encodeComponent(group['docId'].toString())}',
+      );
+    } catch (e) {
+      debugPrint('Error opening workspace: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('حدث خطأ أثناء فتح المجموعة')),
+        );
+      }
+    } finally {
+      widget.onLoadingChanged(false);
+    }
   }
 }
 

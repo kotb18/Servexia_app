@@ -129,9 +129,11 @@ class _GroupsMintorState extends State<GroupsMintor> {
               children: [
                 Icon(Icons.person_outline, size: 14, color: Colors.grey[600]),
                 const SizedBox(width: 4),
-                Text(
-                  'المسؤول: $admin',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                Expanded(
+                  child: Text(
+                    'المسؤول: $admin',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                  ),
                 ),
               ],
             ),

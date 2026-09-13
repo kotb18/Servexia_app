@@ -3,6 +3,7 @@ import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:maintenance/addAwarehouseItem.dart';
 import 'package:maintenance/customersSuppliers.dart';
 import 'package:maintenance/invoiceSettings.dart';
@@ -659,8 +660,11 @@ class _InvoicePageState extends State<InvoicePage>
       (t) => t.type == selectedFilter,
     );
 
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+
         state.loading = false;
         nameController.clear();
         addressController.clear();
@@ -672,11 +676,7 @@ class _InvoicePageState extends State<InvoicePage>
         widget.itemsPurchase.clear();
         selectedPaymentMethod = 'كاش';
         returnItems.clear();
-        Navigator.popUntil(
-          context,
-          ModalRoute.withName(WorkspaceHomeScreen.screenroute),
-        );
-        return false;
+        context.go('/workspace/${Uri.encodeComponent(widget.groupId)}');
       },
       child: Scaffold(
         backgroundColor: _getBackgroundColor(selectedFilter),
@@ -2088,6 +2088,14 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
               ),
           ],
         ),
+        if (items.isNotEmpty)
+          Text(
+            'اسحب لليمين لحذف البند',
+            style: const TextStyle(
+              color: Color.fromARGB(255, 129, 36, 52),
+              fontSize: 12,
+            ),
+          ),
         const SizedBox(height: 12),
 
         if (items.isEmpty)
@@ -2265,6 +2273,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                     customerId: widget.customerId,
                     isEditMode: widget.isEditMode,
                     itemsPurchase: widget.itemsPurchase,
+                    itemsSale: widget.itemsSale,
                   ),
                 ),
               );
@@ -2302,6 +2311,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                     customerId: widget.customerId,
                     isEditMode: widget.isEditMode,
                     itemsPurchase: widget.itemsPurchase,
+                    itemsSale: widget.itemsSale,
                   ),
                 ),
               );
@@ -2327,6 +2337,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                         customerId: widget.customerId,
                         isEditMode: widget.isEditMode,
                         itemsPurchase: widget.itemsPurchase,
+                        itemsSale: widget.itemsSale,
                       ),
                     ),
                   );
@@ -2700,10 +2711,10 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
 
                   if (!mounted) return;
 
-                  Navigator.popUntil(
+                  /*  Navigator.popUntil(
                     context,
                     ModalRoute.withName(WorkspaceHomeScreen.screenroute),
-                  );
+                  ); */
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -2750,7 +2761,9 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                   try {
                     setState(() => widget.state.loading = true);
                     if (dialogContext.mounted) {
-                      Navigator.of(dialogContext).pop();
+                      context.go(
+                        '/workspace/${Uri.encodeComponent(widget.groupId)}',
+                      );
                       setState(() => widget.state.loading = false);
                     }
                     await _printMode(true);
@@ -2770,7 +2783,9 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                   try {
                     setState(() => widget.state.loading = true);
                     if (dialogContext.mounted) {
-                      Navigator.of(dialogContext).pop();
+                      context.go(
+                        '/workspace/${Uri.encodeComponent(widget.groupId)}',
+                      );
                       setState(() => widget.state.loading = false);
                     }
                     await _printMode(false);
@@ -3472,13 +3487,11 @@ class InvoiceGenerator {
       clientLabel = 'العميل';
     }
 
-    String footerText;
+    String footerText = 'فاتورة إلكترونية - لا تحتاج توقيعاً';
     if (isQuote) {
       footerText = 'عرض سعر صالح لمدة 15 يوماً';
     } else if (invoiceType == 'مرتجع') {
       footerText = 'فاتورة مرتجعة - يتم إعادة الكميات للمخزون';
-    } else {
-      footerText = 'فاتورة إلكترونية - لا تحتاج توقيعاً';
     }
 
     // Table setup
@@ -4105,12 +4118,12 @@ class InvoiceGenerator {
                           ],
                         ),
                       ),
-                      pw.BarcodeWidget(
+                      /*  pw.BarcodeWidget(
                         barcode: pw.Barcode.qrCode(),
                         data: invoiceNumber,
                         width: 40,
                         height: 40,
-                      ),
+                      ), */
                     ],
                   ),
                 ),
@@ -4353,7 +4366,7 @@ class ThermalPrinterService {
                     textAlign: pw.TextAlign.center,
                   ),
                 ),
-                pw.SizedBox(height: 8),
+                /*    pw.SizedBox(height: 8),
                 pw.Center(
                   child: pw.BarcodeWidget(
                     barcode: pw.Barcode.qrCode(),
@@ -4361,7 +4374,7 @@ class ThermalPrinterService {
                     width: 50,
                     height: 50,
                   ),
-                ),
+                ), */
                 // ═══ FIXED: Feed for cutting ═══
                 pw.SizedBox(height: 40),
               ],

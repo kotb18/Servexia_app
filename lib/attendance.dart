@@ -664,6 +664,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                                     fontSize: 12,
                                     color: Colors.grey[700],
                                     fontFamily: 'Cairo',
+                                    decoration: TextDecoration.underline,
                                   ),
                                   /*  maxLines: 1,
                                   overflow: TextOverflow.ellipsis, */
@@ -695,6 +696,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                                       fontSize: 12,
                                       color: Colors.grey[700],
                                       fontFamily: 'Cairo',
+                                      decoration: TextDecoration.underline,
                                     ),
                                   ),
                                 ),

@@ -26,6 +26,7 @@ class StoreScreen extends StatefulWidget {
   final String customerId;
   final bool isEditMode;
   final List<Map<dynamic, dynamic>> itemsPurchase;
+  final List<Map<dynamic, dynamic>> itemsSale;
   const StoreScreen({
     super.key,
     required this.groupId,
@@ -35,6 +36,7 @@ class StoreScreen extends StatefulWidget {
     required this.customerId,
     required this.isEditMode,
     required this.itemsPurchase,
+    required this.itemsSale,
   });
   static const String screenroute = 'StoreScreen';
 
@@ -188,6 +190,12 @@ class _StoreScreenState extends State<StoreScreen> {
     if (widget.invoiceType == 'شراء') {
       items = widget.itemsPurchase;
     }
+    if (widget.invoiceType == 'بيع') {
+      items = widget.itemsSale;
+    }
+    if (widget.invoiceType == 'عرض سعر') {
+      items = widget.itemsSale;
+    }
     if (widget.deletedItems) {
       items.clear();
       selectedIds.clear();
@@ -331,7 +339,7 @@ class _StoreScreenState extends State<StoreScreen> {
                           ),
                           onPressed: () => Navigator.pop(context),
                         ),
-                        actions: [
+                        /*  actions: [
                           if (widget.isFromInvoice && items.isNotEmpty)
                             Container(
                               margin: const EdgeInsets.only(left: 8),
@@ -340,13 +348,13 @@ class _StoreScreenState extends State<StoreScreen> {
                                 label: Text(
                                   '${items.length} صنف',
                                   style: const TextStyle(
-                                    color: Colors.white,
+                                    color: Colors.black,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ),
                             ),
-                        ],
+                        ], */
                       ),
                     ),
 
@@ -452,6 +460,19 @@ class _StoreScreenState extends State<StoreScreen> {
                         ],
                       ),
                     ),
+                    SizedBox(
+                      height: 30,
+                      child: Center(
+                        child: Text(
+                          'اضغط على الصنف مطولاً لمزيد من الخيارات.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.blueAccent,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 secondChild: const SizedBox.shrink(),
@@ -501,7 +522,6 @@ class _StoreScreenState extends State<StoreScreen> {
                               data['isWeighted'] ?? false;
                           final String unitText =
                               data['unit']?.toString() ?? '';
-
                           return _buildItemCard(
                             data,
                             doc.id,
@@ -618,7 +638,13 @@ class _StoreScreenState extends State<StoreScreen> {
         borderRadius: BorderRadius.circular(20),
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: () => _handleItemTap(data, docId, sku, isWeightedItem),
+          onTap: () {
+            if (widget.isFromInvoice && widget.invoiceType == 'شراء') {
+              _handleItemLongPress(data, docId, sku);
+            } else {
+              _handleItemTap(data, docId, sku, isWeightedItem);
+            }
+          },
           onLongPress: widget.isFromInvoice
               ? () => _handleItemLongPress(data, docId, sku)
               : null,
@@ -871,9 +897,11 @@ class _StoreScreenState extends State<StoreScreen> {
             'notes': data['notes'],
             'createdAt': FieldValue.serverTimestamp(),
             'deleted': false,
-            'coast': itemBuyController.text.isNotEmpty
-                ? double.tryParse(itemBuyController.text)
-                : 0.0,
+            'coast':
+                double.tryParse(
+                  data['coast']?.toString() ?? data['price']?.toString() ?? '',
+                ) ??
+                0.0,
             'isNewlyAdded': false,
             'quantityInStock': data['quantity'] ?? 0,
           });
@@ -914,7 +942,10 @@ class _StoreScreenState extends State<StoreScreen> {
     itemPriceController = TextEditingController(
       text: data['price']?.toString() ?? '0',
     );
-    itemBuyController.clear();
+    itemBuyController = TextEditingController(
+      text: data['coast']?.toString() ?? '0',
+    );
+    //  itemBuyController.clear();
 
     showModalBottomSheet(
       context: context,
@@ -1137,8 +1168,20 @@ class _StoreScreenState extends State<StoreScreen> {
                             'quantity': qty,
                             'unit': data['unit'],
                             'sku': sku,
-                            'price':
-                                double.tryParse(itemPriceController.text) ?? 0,
+                            'price': widget.invoiceType == 'شراء'
+                                ? ((double.tryParse(itemBuyController.text) !=
+                                              null &&
+                                          double.tryParse(
+                                                itemBuyController.text,
+                                              )! >
+                                              0)
+                                      ? double.tryParse(itemBuyController.text)
+                                      : double.tryParse(
+                                              itemPriceController.text,
+                                            ) ??
+                                            data['price'] ??
+                                            0)
+                                : data['price'] ?? 0,
                             'location': data['location'],
                             'notes': data['notes'],
                             'createdAt': FieldValue.serverTimestamp(),
@@ -1247,7 +1290,7 @@ class _StoreScreenState extends State<StoreScreen> {
                       }
                     }
                   }
-                  await Navigator.push(
+                  await Navigator.pushAndRemoveUntil(
                     context,
                     MaterialPageRoute(
                       builder: (_) => InvoicePage(
@@ -1271,6 +1314,7 @@ class _StoreScreenState extends State<StoreScreen> {
                         isEditMode: widget.isEditMode,
                       ),
                     ),
+                    (route) => false,
                   );
                 },
                 icon: const Icon(Icons.check_circle_outline, size: 22),

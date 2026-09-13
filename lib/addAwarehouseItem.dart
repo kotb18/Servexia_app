@@ -602,7 +602,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                         const SizedBox(height: 12),
                         _buildField(
                           controller: coastController,
-                          label: 'سعر التكلفة (اختياري)',
+                          label: 'سعر التكلفة',
                           keyboard: TextInputType.number,
                           icon: Icons.attach_money,
                           validator: (v) {

@@ -43,7 +43,7 @@ class _SplashScreenState extends State<SplashScreen>
     if (groupId != null && groupId != 'default') {
       await Future.delayed(const Duration(seconds: 3)); // انتظر Animation
       if (!mounted) return;
-
+      print('Navigating to shop with groupId: $groupId');
       // استخدم GoRouter للتنقل للمتجر
       context.go('/shop/$groupId');
       return;
@@ -85,7 +85,9 @@ class _SplashScreenState extends State<SplashScreen>
 
     // للـ Firebase Hosting: groupId.web.app
     final parts = host.split('.');
-    if (parts.length >= 3 && parts.first != 'maintenance-b7282') {
+    if (parts.length >= 3 &&
+        parts.first != 'maintenance-b7282' &&
+        parts.first != 'servexia-2498k') {
       return parts.first; // ahmed-store.web.app => ahmed-store
     }
 

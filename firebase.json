@@ -50,7 +50,8 @@
       }
     }
   },
- "hosting": {
+  "hosting": {
+    "site": "servexia-2498k",
     "public": "build/web",
     "ignore": [
       "firebase.json",

@@ -119,7 +119,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   String? get logoUrl => _store?.logoUrl;
 
   String _generateStoreLink() {
-    const baseUrl = 'https://maintenance-b7282.web.app';
+    const baseUrl = 'https://servexia-2498k.web.app';
     return '$baseUrl/shop/${widget.groupId}';
   }
 
