@@ -3487,11 +3487,9 @@ class InvoiceGenerator {
       clientLabel = 'العميل';
     }
 
-    String footerText = 'فاتورة إلكترونية - لا تحتاج توقيعاً';
+    String footerText = '';
     if (isQuote) {
       footerText = 'عرض سعر صالح لمدة 15 يوماً';
-    } else if (invoiceType == 'مرتجع') {
-      footerText = 'فاتورة مرتجعة - يتم إعادة الكميات للمخزون';
     }
 
     // Table setup
