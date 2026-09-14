@@ -273,7 +273,7 @@ class _HomepageState extends State<Homepage>
           const SizedBox(width: 15),
           Expanded(
             child: _buildActionButton(
-              title: "انضمام لمجموعة",
+              title: "إنضمام لمجموعة",
               icon: Icons.group_add_rounded,
               color: AppColors.accentColor,
               onTap: () {
@@ -382,9 +382,14 @@ class _HomepageState extends State<Homepage>
         if (groups.isEmpty) {
           return SliverFillRemaining(
             child: Center(
-              child: Text(
-                "لا توجد مجموعات حالياً",
-                style: TextStyle(color: Colors.white.withOpacity(0.4)),
+              child: Column(
+                children: [
+                  Text(
+                    "لا توجد مجموعات حالياً",
+                    style: TextStyle(color: Colors.white.withOpacity(0.4)),
+                  ),
+                  Text('إنشيء مجموعة الاّن وابدأ التجربة.'),
+                ],
               ),
             ),
           );

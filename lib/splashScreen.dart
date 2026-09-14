@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:async';
 
+import 'package:maintenance/utils/browser_detector.dart';
+
 bool? isCompleted;
 int? versionNumber;
 String? linkStore;
@@ -100,32 +102,37 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> getAdmins() async {
-    final doc = await FirebaseFirestore.instance
-        .collection('admins')
-        .doc('masry')
-        .get();
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('admins')
+          .doc('masry')
+          .get()
+          .timeout(const Duration(seconds: 10));
 
-    if (!doc.exists) {
-      return;
+      if (!doc.exists) return;
+
+      final data = doc.data();
+
+      if (data == null) {
+        admins = [];
+        return;
+      }
+
+      versionNumber = data['versionNo'];
+      linkStore = data['shareLink'];
+      appRun = data['appRun'];
+      admins = data['admins'] ?? [];
+
+      if (user != null && mounted) {
+        setState(() {
+          isAdmin = admins.contains(FirebaseAuth.instance.currentUser?.email);
+        });
+      }
+    } on TimeoutException {
+      debugPrint('Firestore timeout');
+    } catch (e) {
+      debugPrint('getAdmins error: $e');
     }
-
-    final data = doc.data();
-    if (data == null || data['admins'] == null) {
-      admins = [];
-      return;
-    }
-    versionNumber = data['versionNo'];
-    linkStore = data['shareLink'];
-    appRun = data['appRun'];
-    admins = data['admins'];
-
-    if (user != null) {
-      setState(() {
-        isAdmin = admins.contains(FirebaseAuth.instance.currentUser!.email);
-      });
-    }
-
-    print(admins);
   }
 
   @override
@@ -152,17 +159,75 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+
     return Scaffold(
-      body: Center(
-        child: AnimatedBuilder(
-          animation: _animation,
-          builder: (context, child) =>
-              Transform.scale(scale: _animation.value, child: child),
-          child: SizedBox(
-            height: size.height,
-            child: Image.asset('images/222.png', fit: BoxFit.fill),
+      body: Column(
+        children: [
+          // ✅ البانر يظهر لو المستخدم في In-App Browser
+          if (BrowserDetector.isInAppBrowser)
+            Center(
+              child: Container(
+                width: double.infinity,
+                color: const Color.fromARGB(255, 9, 165, 51),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: SafeArea(
+                  bottom: false,
+                  child: Row(
+                    textDirection: TextDirection.rtl,
+                    children: [
+                      const Icon(Icons.ios_share, color: Colors.white),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'للتجربة الأفضل، افتح الموقع في المتصفح الخارجي',
+                          style: TextStyle(color: Colors.white, fontSize: 13),
+                          textAlign: TextAlign.right,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: BrowserDetector.openInExternalBrowser,
+                        style: TextButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: const Color.fromARGB(
+                            255,
+                            56,
+                            34,
+                            218,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                        ),
+                        child: const Text(
+                          'افتح الآن',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // ✅ باقي شاشة السبلاش
+          Expanded(
+            child: Center(
+              child: AnimatedBuilder(
+                animation: _animation,
+                builder: (context, child) =>
+                    Transform.scale(scale: _animation.value, child: child),
+                child: SizedBox(
+                  height: size.height,
+                  child: Image.asset('images/222.png', fit: BoxFit.fill),
+                ),
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

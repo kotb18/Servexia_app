@@ -52,6 +52,36 @@
   <!-- This script adds the flutter initialization JS code -->
   <script src="flutter.js" defer></script>
 </head>
+<!-- ✅ بانر فتح في المتصفح الخارجي -->
+<div id="in-app-banner" style="display:none; position:fixed; top:0; left:0; right:0; background:#ff9800; color:white; padding:14px; text-align:center; z-index:99999; font-family:sans-serif; direction:rtl;">
+  <span>⚠️ للتجربة الأفضل، افتح الموقع في المتصفح الخارجي</span>
+  <button onclick="openExternalBrowser()" style="margin-right:10px; padding:6px 14px; background:white; color:#ff9800; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">
+    افتح الآن
+  </button>
+</div>
+
+<script>
+  function isInAppBrowser() {
+    var ua = navigator.userAgent.toLowerCase();
+    return ua.indexOf('fbav') > -1 || ua.indexOf('instagram') > -1 || 
+           ua.indexOf('whatsapp') > -1 || ua.indexOf('telegram') > -1 ||
+           ua.indexOf('tiktok') > -1;
+  }
+
+  function openExternalBrowser() {
+    var url = window.location.href;
+    if (/android/i.test(navigator.userAgent)) {
+      // Intent لـ Chrome على أندرويد
+      window.location.href = 'intent://' + window.location.host + window.location.pathname + window.location.search + '#Intent;scheme=https;package=com.android.chrome;end';
+    } else {
+      window.open(url, '_blank');
+    }
+  }
+
+  if (isInAppBrowser()) {
+    document.getElementById('in-app-banner').style.display = 'block';
+  }
+</script>
 <body>
   <script>
     window.addEventListener('load', function(ev) {
