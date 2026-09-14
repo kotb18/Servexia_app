@@ -388,7 +388,11 @@ class _HomepageState extends State<Homepage>
                     "لا توجد مجموعات حالياً",
                     style: TextStyle(color: Colors.white.withOpacity(0.4)),
                   ),
-                  Text('إنشيء مجموعة الاّن وابدأ التجربة.'),
+                  const SizedBox(height: 10),
+                  Text(
+                    'إنشيء مجموعة الاّن وابدأ التجربة.',
+                    style: TextStyle(color: Colors.white.withOpacity(0.65)),
+                  ),
                 ],
               ),
             ),
