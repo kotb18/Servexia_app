@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:maintenance/admin/usersDetails.dart';
 
 class GroupsMintor extends StatefulWidget {
   const GroupsMintor({super.key});
@@ -42,7 +43,7 @@ class _GroupsMintorState extends State<GroupsMintor> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -91,63 +92,72 @@ class _GroupsMintorState extends State<GroupsMintor> {
 
   // تصميم بطاقة المجموعة
   Widget _buildGroupCard(String name, String admin, String id) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 10,
-        ),
-        leading: CircleAvatar(
-          backgroundColor: primaryColor.withOpacity(0.1),
-          child: Icon(Icons.group_work_rounded, color: primaryColor),
-        ),
-        title: Text(
-          name,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-            fontFamily: 'Cairo',
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(Icons.person_outline, size: 14, color: Colors.grey[600]),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    'المسؤول: $admin',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                  ),
-                ),
-              ],
+    return InkWell(
+      onTap: () {
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => UserDetails(groupId: id)));
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
-            Text(id, style: TextStyle(color: Colors.grey[500], fontSize: 12)),
           ],
         ),
-        trailing: Icon(
-          Icons.arrow_forward_ios_rounded,
-          size: 16,
-          color: Colors.grey[400],
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 10,
+          ),
+          leading: CircleAvatar(
+            backgroundColor: primaryColor.withValues(alpha: 0.1),
+            child: Icon(Icons.group_work_rounded, color: primaryColor),
+          ),
+          title: Text(
+            name,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              fontFamily: 'Cairo',
+            ),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(Icons.person_outline, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'المسؤول: $admin',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+              Text(id, style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+            ],
+          ),
+          trailing: Icon(
+            Icons.arrow_forward_ios_rounded,
+            size: 16,
+            color: Colors.grey[400],
+          ),
+          onTap: () {
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => UserDetails(groupId: id)));
+          },
         ),
-        onTap: () {
-          // انتقل لتفاصيل المجموعة هنا
-        },
       ),
     );
   }

@@ -1,8 +1,10 @@
+```html
 <!DOCTYPE html>
 <html>
 <head>
-  <meta name="google-signin-client_id" content="840926699694-r9mnr3amfb0hsv5mrkicgc62k8a0bp47.apps.googleusercontent.com">
-  
+  <meta name="google-signin-client_id"
+        content="840926699694-r9mnr3amfb0hsv5mrkicgc62k8a0bp47.apps.googleusercontent.com">
+
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
@@ -22,81 +24,277 @@
   <link rel="icon" type="image/png" href="favicon.png"/>
 
   <title>Servexia</title>
+
   <link rel="manifest" href="manifest.json">
 
   <script>
     // The value below is injected by flutter build, do not touch.
     const serviceWorkerVersion = null;
   </script>
-  
+
   <!-- ✅ سكريبت CORS -->
   <script>
     document.addEventListener('DOMContentLoaded', function() {
+
       const observer = new MutationObserver(function(mutations) {
+
         mutations.forEach(function(mutation) {
+
           mutation.addedNodes.forEach(function(node) {
+
             if (node.tagName === 'IMG') {
               node.crossOrigin = 'anonymous';
             }
+
           });
+
         });
+
       });
-      
-      observer.observe(document.body, { 
-        childList: true, 
-        subtree: true 
+
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true
       });
+
     });
   </script>
 
-  <!-- This script adds the flutter initialization JS code -->
+  <!-- Flutter initialization -->
   <script src="flutter.js" defer></script>
+
 </head>
-<!-- ✅ بانر فتح في المتصفح الخارجي -->
-<div id="in-app-banner" style="display:none; position:fixed; top:0; left:0; right:0; background:#ff9800; color:white; padding:14px; text-align:center; z-index:99999; font-family:sans-serif; direction:rtl;">
-  <span>⚠️ للتجربة الأفضل، افتح الموقع في المتصفح الخارجي</span>
-  <button onclick="openExternalBrowser()" style="margin-right:10px; padding:6px 14px; background:white; color:#ff9800; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">
-    افتح الآن
-  </button>
-</div>
 
-<script>
-  function isInAppBrowser() {
-    var ua = navigator.userAgent.toLowerCase();
-    return ua.indexOf('fbav') > -1 || ua.indexOf('instagram') > -1 || 
-           ua.indexOf('whatsapp') > -1 || ua.indexOf('telegram') > -1 ||
-           ua.indexOf('tiktok') > -1;
-  }
-
-  function openExternalBrowser() {
-    var url = window.location.href;
-    if (/android/i.test(navigator.userAgent)) {
-      // Intent لـ Chrome على أندرويد
-      window.location.href = 'intent://' + window.location.host + window.location.pathname + window.location.search + '#Intent;scheme=https;package=com.android.chrome;end';
-    } else {
-      window.open(url, '_blank');
-    }
-  }
-
-  if (isInAppBrowser()) {
-    document.getElementById('in-app-banner').style.display = 'block';
-  }
-</script>
 <body>
+
+  <!-- ================================================= -->
+  <!-- ✅ بانر فتح الموقع في المتصفح الخارجي -->
+  <!-- ================================================= -->
+
+  <div id="in-app-banner"
+       style="
+         display:none;
+         position:fixed;
+         inset:0;
+         background:rgba(0,0,0,0.55);
+         z-index:99999;
+         font-family:sans-serif;
+         direction:rtl;
+         align-items:center;
+         justify-content:center;
+       ">
+
+    <!-- الصندوق الأبيض -->
+    <div style="
+      width:calc(100% - 40px);
+      max-width:380px;
+      background:#ffffff;
+      border-radius:20px;
+      padding:30px 22px 24px;
+      text-align:center;
+      box-shadow:0 12px 40px rgba(0,0,0,0.30);
+    ">
+
+      <!-- =============================== -->
+      <!-- أيقونة Share بأسلوب iOS -->
+      <!-- =============================== -->
+
+      <div style="
+        width:70px;
+        height:70px;
+        margin:0 auto 18px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+      ">
+
+        <svg
+          width="64"
+          height="64"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        >
+
+          <!-- سهم المشاركة -->
+          <path
+            d="M12 3L7 8H10V15H14V8H17L12 3Z"
+            fill="#007AFF"
+          />
+
+          <!-- الصندوق -->
+          <path
+            d="M5 11V19C5 20.1 5.9 21 7 21H17C18.1 21 19 20.1 19 19V11"
+            stroke="#007AFF"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+
+        </svg>
+
+      </div>
+
+      <!-- العنوان -->
+
+      <div style="
+        font-size:21px;
+        font-weight:700;
+        color:#222222;
+        margin-bottom:10px;
+      ">
+        افتح الموقع في المتصفح
+      </div>
+
+      <!-- النص -->
+
+      <div style="
+        font-size:15px;
+        line-height:1.9;
+        color:#666666;
+        margin-bottom:24px;
+      ">
+        للتجربة الأفضل واستخدام جميع إمكانيات
+        Servexia، يُفضل فتح الموقع في المتصفح الخارجي.
+      </div>
+
+      <!-- زر فتح المتصفح -->
+
+      <button
+        onclick="openExternalBrowser()"
+        style="
+          width:100%;
+          padding:14px 20px;
+          background:#007AFF;
+          color:#ffffff;
+          border:none;
+          border-radius:11px;
+          font-size:16px;
+          font-weight:700;
+          cursor:pointer;
+          box-shadow:0 4px 12px rgba(0,122,255,0.25);
+        "
+      >
+        افتح الآن
+      </button>
+
+    </div>
+
+  </div>
+
+
+  <!-- ================================================= -->
+  <!-- فحص المتصفح الداخلي -->
+  <!-- ================================================= -->
+
   <script>
+
+    function isInAppBrowser() {
+
+      var ua = navigator.userAgent.toLowerCase();
+
+      return (
+        ua.indexOf('fbav') > -1 ||
+        ua.indexOf('fban') > -1 ||
+        ua.indexOf('instagram') > -1 ||
+        ua.indexOf('whatsapp') > -1 ||
+        ua.indexOf('telegram') > -1 ||
+        ua.indexOf('tiktok') > -1
+      );
+
+    }
+
+
+    function openExternalBrowser() {
+
+      var url = window.location.href;
+
+      if (/android/i.test(navigator.userAgent)) {
+
+        // ========================================
+        // فتح Chrome على Android باستخدام Intent
+        // ========================================
+
+        var cleanUrl =
+          window.location.host +
+          window.location.pathname +
+          window.location.search;
+
+        window.location.href =
+          'intent://' +
+          cleanUrl +
+          '#Intent;' +
+          'scheme=https;' +
+          'package=com.android.chrome;' +
+          'end';
+
+      } else {
+
+        // ========================================
+        // iPhone / iPad
+        // ========================================
+
+        window.open(url, '_blank');
+
+      }
+
+    }
+
+
+    // ========================================
+    // إظهار البانر إذا كان In-App Browser
+    // ========================================
+
+    if (isInAppBrowser()) {
+
+      var banner = document.getElementById('in-app-banner');
+
+      if (banner) {
+
+        banner.style.display = 'flex';
+
+      }
+
+    }
+
+  </script>
+
+
+  <!-- ================================================= -->
+  <!-- Flutter -->
+  <!-- ================================================= -->
+
+  <script>
+
     window.addEventListener('load', function(ev) {
+
       // Download main.dart.js
+
       _flutter.loader.loadEntrypoint({
+
         serviceWorker: {
           serviceWorkerVersion: serviceWorkerVersion,
         },
+
         onEntrypointLoaded: function(engineInitializer) {
-          engineInitializer.initializeEngine().then(function(appRunner) {
-            appRunner.runApp();
-          });
+
+          engineInitializer
+            .initializeEngine()
+            .then(function(appRunner) {
+
+              appRunner.runApp();
+
+            });
+
         }
+
       });
+
     });
+
   </script>
+
 </body>
 </html>
+```
