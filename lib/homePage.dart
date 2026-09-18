@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
@@ -438,23 +439,51 @@ class _HomepageState extends State<Homepage>
           _buildDrawerItem(Icons.feedback_outlined, 'الاقتراحات والشكاوى', () {
             _showFeedbackDialog(context);
           }),
+          _buildDrawerItem(
+            kIsWeb ? Icons.download : Icons.ios_share,
+            kIsWeb ? 'تحميل التطبيق' : 'مشاركة التطبيق',
+            () async {
+              const appUrl =
+                  'https://play.google.com/store/apps/details?id=com.masry.maintenance';
 
-          _buildDrawerItem(Icons.share, 'مشاركة التطبيق', () {
-            Share.share(
-              'جرب تطبيق Servexia لإدارة المبيعات والصيانة👷‍♂️🔧\n'
-              'حمّل التطبيق من هنا:\n'
-              'https://play.google.com/store/apps/details?id=com.masry.maintenance',
-              sharePositionOrigin: Rect.fromLTWH(0, 0, 100, 100),
-            );
-          }),
-          _buildDrawerItem(Icons.ios_share, 'مشاركة الموقع', () {
-            Share.share(
-              'جرب موقع Servexia لإدارة المبيعات والصيانة👷‍♂️🔧\n'
-              'زيارة الموقع من هنا:\n'
-              '${websiteUrl ?? 'https://servexia-2498k.web.app/'}',
-              sharePositionOrigin: Rect.fromLTWH(0, 0, 100, 100),
-            );
-          }),
+              if (kIsWeb) {
+                final uri = Uri.parse(appUrl);
+
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              } else {
+                await Share.share(
+                  'جرب تطبيق Servexia لإدارة المبيعات والصيانة 👷‍♂️🔧\n'
+                  'حمّل التطبيق من هنا:\n'
+                  '$appUrl',
+                  sharePositionOrigin: const Rect.fromLTWH(0, 0, 100, 100),
+                );
+              }
+            },
+          ),
+          _buildDrawerItem(
+            kIsWeb ? Icons.ios_share : Icons.language,
+            kIsWeb ? 'مشاركة الموقع' : 'فتح الموقع',
+            () async {
+              final url = websiteUrl ?? 'https://servexia-2498k.web.app/';
+
+              if (kIsWeb) {
+                await Share.share(
+                  'جرب موقع Servexia لإدارة المبيعات والصيانة 👷‍♂️🔧\n'
+                  'زيارة الموقع من هنا:\n'
+                  '$url',
+                  sharePositionOrigin: const Rect.fromLTWH(0, 0, 100, 100),
+                );
+              } else {
+                final uri = Uri.parse(url);
+
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.platformDefault);
+                }
+              }
+            },
+          ),
           _buildDrawerItem(Icons.help_outline, 'شرح طريقة عمل التطبيق', () {
             launchUrl(Uri.parse(youTubeUrl ?? 'https://youtu.be/F-NiFb6uWQ0'));
           }),

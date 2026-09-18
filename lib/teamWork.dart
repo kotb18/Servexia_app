@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:maintenance/employeeDetailsPage.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -55,8 +55,25 @@ class _TeamScreenState extends State<TeamScreen> {
 
     if (cleanEmail.isEmpty) return;
 
-    // Android: فتح شاشة إنشاء رسالة داخل تطبيق Gmail
-    if (Platform.isAndroid) {
+    // Web: فتح Gmail في تبويب جديد
+    if (kIsWeb) {
+      final gmailUrl = Uri.https('mail.google.com', '/mail/u/0/', {
+        'view': 'cm',
+        'fs': '1',
+        'to': cleanEmail,
+      });
+
+      final opened = await launchUrl(gmailUrl, webOnlyWindowName: '_blank');
+
+      if (!opened) {
+        debugPrint('تعذر فتح Gmail في تبويب جديد');
+      }
+
+      return;
+    }
+
+    // Android: فتح تطبيق Gmail
+    if (defaultTargetPlatform == TargetPlatform.android) {
       try {
         final gmailIntent = AndroidIntent(
           action: 'android.intent.action.SENDTO',
@@ -65,35 +82,17 @@ class _TeamScreenState extends State<TeamScreen> {
         );
 
         await gmailIntent.launch();
-
-        // تم فتح Gmail بنجاح، لا تفتح المتصفح
         return;
       } catch (error, stackTrace) {
-        debugPrint('Gmail launch error: $error');
+        debugPrint('Gmail Android error: $error');
         debugPrintStack(stackTrace: stackTrace);
       }
     }
 
-    // fallback: فتح Gmail من المتصفح
-    try {
-      final browserUri = Uri.https(
-        'mail.google.com',
-        '/mail/',
-        <String, String>{'view': 'cm', 'fs': '1', 'to': cleanEmail},
-      );
+    // Fallback للأنظمة الأخرى
+    final mailtoUri = Uri(scheme: 'mailto', path: cleanEmail);
 
-      final opened = await launchUrl(
-        browserUri,
-        mode: LaunchMode.externalApplication,
-      );
-
-      if (!opened) {
-        debugPrint('تعذر فتح Gmail من المتصفح');
-      }
-    } catch (error, stackTrace) {
-      debugPrint('Browser launch error: $error');
-      debugPrintStack(stackTrace: stackTrace);
-    }
+    await launchUrl(mailtoUri, mode: LaunchMode.externalApplication);
   }
 
   @override
