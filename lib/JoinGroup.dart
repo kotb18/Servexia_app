@@ -16,8 +16,6 @@ import 'package:maintenance/ai/ai_service.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-String? intPhone;
-
 class JoinGroupScreen extends StatefulWidget {
   const JoinGroupScreen({super.key});
   static const String screenroute = 'joinGroup';
@@ -39,8 +37,20 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
   File? _image;
   String? _imageUrl;
   List<double> faceEmbedding = [];
+  final _phoneController = TextEditingController();
 
   final String uid = FirebaseAuth.instance.currentUser!.uid;
+  @override
+  void initState() {
+    _phoneController.text =
+        FirebaseAuth.instance.currentUser!.phoneNumber ?? '';
+    if (FirebaseAuth.instance.currentUser!.phoneNumber != null &&
+        _phoneController.text.startsWith('0')) {
+      _phoneController.text = _phoneController.text.substring(1);
+    }
+
+    super.initState();
+  }
 
   @override
   void dispose() {
@@ -122,6 +132,7 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
                       Directionality(
                         textDirection: TextDirection.ltr,
                         child: IntlPhoneField(
+                          controller: _phoneController,
                           decoration: _inputDecoration(
                             'رقم الهاتف',
                             Icons.phone_android,
@@ -129,7 +140,7 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
                           initialCountryCode: 'EG',
 
                           onChanged: (phone) {
-                            intPhone = phone.number;
+                            _phoneController.text = phone.number;
                             _completePhoneNumber = phone.completeNumber;
                             // مثال: +201012345678
                           },
@@ -243,7 +254,7 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
       _showError("رقم الهاتف مطلوب");
       return;
     }
-    if (intPhone != null && intPhone!.startsWith('0')) {
+    if (_phoneController.text.startsWith('0')) {
       _showError('لا تبدأ الرقم بـ 0 بعد كود الدولة');
       return;
     }
@@ -251,7 +262,7 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
       _showError("بصمة الوجه مطلوبة");
       return;
     } */
-    intPhone = null;
+    _phoneController.text = '';
     final scanResult = await Navigator.push<String>(
       context,
       MaterialPageRoute(builder: (_) => const QrScanScreen()),
@@ -331,6 +342,7 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
       'confirm': false,
       'photoURL': FirebaseAuth.instance.currentUser!.photoURL ?? '',
       'faceImageUrl': _imageUrl,
+      'userGmail': FirebaseAuth.instance.currentUser?.email ?? '',
     });
     FirebaseFirestore.instance
         .collection('faceEmbedding')

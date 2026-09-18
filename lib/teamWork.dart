@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:android_intent_plus/android_intent.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -46,6 +48,52 @@ class _TeamScreenState extends State<TeamScreen> {
       return value;
     }
     return null;
+  }
+
+  Future<void> openGmailComposer(String email) async {
+    final cleanEmail = email.trim();
+
+    if (cleanEmail.isEmpty) return;
+
+    // Android: فتح شاشة إنشاء رسالة داخل تطبيق Gmail
+    if (Platform.isAndroid) {
+      try {
+        final gmailIntent = AndroidIntent(
+          action: 'android.intent.action.SENDTO',
+          data: Uri(scheme: 'mailto', path: cleanEmail).toString(),
+          package: 'com.google.android.gm',
+        );
+
+        await gmailIntent.launch();
+
+        // تم فتح Gmail بنجاح، لا تفتح المتصفح
+        return;
+      } catch (error, stackTrace) {
+        debugPrint('Gmail launch error: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+    }
+
+    // fallback: فتح Gmail من المتصفح
+    try {
+      final browserUri = Uri.https(
+        'mail.google.com',
+        '/mail/',
+        <String, String>{'view': 'cm', 'fs': '1', 'to': cleanEmail},
+      );
+
+      final opened = await launchUrl(
+        browserUri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!opened) {
+        debugPrint('تعذر فتح Gmail من المتصفح');
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Browser launch error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 
   @override
@@ -213,7 +261,10 @@ class _TeamScreenState extends State<TeamScreen> {
             final faceImageUrl = _imageUrl(member['faceImageUrl']);
             final photoUrl = _imageUrl(member['photoURL']);
             final avatarUrl = faceImageUrl ?? photoUrl;
-
+            final canDelete =
+                member['id'] != widget.adminId &&
+                member['id'] != uid &&
+                (admins.contains(uid) || admins.contains(member['id']));
             return InkWell(
               onTap: !widget.isAdmin
                   ? null
@@ -301,84 +352,77 @@ class _TeamScreenState extends State<TeamScreen> {
 
                       /// -------- Actions --------
                       const SizedBox(height: 6),
-                      Wrap(
-                        alignment: WrapAlignment.end,
-                        spacing: 6,
-                        children: [
-                          /// WhatsApp
-                          TextButton.icon(
-                            onPressed: () {
-                              openWhatsApp(
-                                '${member['phone']}',
-                                'مرحباً ${member['name']}',
-                              );
-                            },
-                            icon: Image.asset('images/whatsapp.png', width: 18),
-                            label: const Text('واتساب'),
-                          ),
+                      SizedBox(
+                        width: double.infinity,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _actionButton(
+                              icon: const Icon(
+                                Icons.call_rounded,
+                                color: Colors.blue,
+                              ),
+                              tooltip: 'اتصال',
+                              backgroundColor: Colors.blue.withOpacity(.10),
+                              onPressed: () async {
+                                final phone = member['phone']?.toString();
 
-                          /// Call
-                          TextButton.icon(
-                            onPressed: () async {
-                              final url = Uri(
-                                scheme: 'tel',
-                                path: member['phone'],
-                              );
-                              if (await canLaunchUrl(url)) {
-                                await launchUrl(url);
-                              }
-                            },
-                            icon: const Icon(Icons.call, size: 18),
-                            label: const Text('اتصال'),
-                          ),
+                                if (phone == null || phone.trim().isEmpty)
+                                  return;
 
-                          /// Remove (Admin only)
-                          if ((member['id'] != widget.adminId &&
-                                  member['id'] != uid &&
-                                  admins.contains(uid)) ||
-                              member['id'] != widget.adminId &&
-                                  (member['id'] != uid &&
-                                      admins.contains(member['id'])))
-                            TextButton.icon(
+                                final url = Uri(scheme: 'tel', path: phone);
+
+                                if (await canLaunchUrl(url)) {
+                                  await launchUrl(url);
+                                }
+                              },
+                            ),
+                            _actionButton(
+                              icon: Image.asset(
+                                'images/whatsapp.png',
+                                width: 21,
+                                height: 21,
+                              ),
+                              tooltip: 'واتساب',
+                              backgroundColor: Colors.green.withOpacity(.10),
                               onPressed: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (_) => AlertDialog(
-                                    content: const Text(
-                                      'هل تريد بالفعل مسح العضو؟',
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        child: const Text('إلغاء'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () async {
-                                          await removeMemberFromGroupAndTeam(
-                                            groupId: widget.groupId,
-                                            memberId: member['id'],
-                                          );
-                                          await getAdmins();
-                                          setState(() {});
-                                          Navigator.pop(context);
-                                          setState(() {});
-                                        },
-                                        child: const Text('تأكيد'),
-                                      ),
-                                    ],
-                                  ),
+                                openWhatsApp(
+                                  '${member['phone']}',
+                                  'مرحباً ${member['name']}',
                                 );
                               },
+                            ),
+                            _actionButton(
                               icon: const Icon(
-                                Icons.person_remove_alt_1,
-                                color: Colors.red,
-                                size: 18,
+                                Icons.email_rounded,
+                                color: Colors.orange,
                               ),
-                              label: const Text('حذف'),
-                            )
-                          else
-                            const SizedBox.shrink(),
-                        ],
+                              tooltip: 'Gmail',
+                              backgroundColor: Colors.orange.withOpacity(.10),
+                              onPressed: () async {
+                                final email = member['userGmail']?.toString();
+
+                                if (email == null || email.trim().isEmpty)
+                                  return;
+
+                                await openGmailComposer(email);
+                              },
+                            ),
+
+                            if (canDelete)
+                              _actionButton(
+                                icon: const Icon(
+                                  Icons.person_remove_alt_1_rounded,
+                                  color: Colors.red,
+                                ),
+                                tooltip: 'حذف',
+                                backgroundColor: Colors.red.withOpacity(.10),
+                                onPressed: () {
+                                  // حذف العضو
+                                },
+                              ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -388,6 +432,24 @@ class _TeamScreenState extends State<TeamScreen> {
           }).toList(),
         );
       },
+    );
+  }
+
+  Widget _actionButton({
+    required Widget icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+    required Color backgroundColor,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: IconButton(onPressed: onPressed, icon: icon),
+      ),
     );
   }
 

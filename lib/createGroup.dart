@@ -9,6 +9,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:maintenance/JoinGroup.dart';
 import 'package:maintenance/homePage.dart';
@@ -45,7 +47,6 @@ class _CreategroupState extends State<Creategroup> {
   DateTime? expiredAt;
   String? status;
   List? faceEmbeddingAdmin = [];
-  String? intPhone;
   String? _imageUrl;
   // الحصول على معرف المستخدم الحالي بسهولة
   String get uid => FirebaseAuth.instance.currentUser!.uid;
@@ -90,12 +91,95 @@ class _CreategroupState extends State<Creategroup> {
     'إضافة مهمة': true,
     'طلبات الانضمام': true,
   };
+
+  Future<String?> getGooglePhoneNumber() async {
+    try {
+      final googleSignIn = GoogleSignIn.instance;
+
+      await googleSignIn.initialize(
+        serverClientId:
+            '840926699694-qslfjros665j55vtofid6rghqe4qsiii.apps.googleusercontent.com',
+      );
+
+      // الحصول على الحساب المسجل بالفعل بدون تسجيل دخول تفاعلي
+      final googleUser = await googleSignIn.attemptLightweightAuthentication();
+
+      if (googleUser == null) {
+        print('❌ لا يوجد حساب Google مسجل');
+        return null;
+      }
+
+      print('Google Email: ${googleUser.email}');
+
+      // طلب صلاحية قراءة رقم الهاتف
+      final authorization = await googleUser.authorizationClient
+          .authorizeScopes([
+            'https://www.googleapis.com/auth/user.phonenumbers.read',
+          ]);
+
+      final accessToken = authorization.accessToken;
+
+      // قراءة رقم الهاتف من Google People API
+      final response = await http.get(
+        Uri.parse(
+          'https://people.googleapis.com/v1/people/me'
+          '?personFields=names,emailAddresses,phoneNumbers',
+        ),
+        headers: {'Authorization': 'Bearer $accessToken'},
+      );
+
+      print('People API status: ${response.statusCode}');
+      print('People API response: ${response.body}');
+      if (response.statusCode != 200) {
+        return null;
+      }
+
+      final data = jsonDecode(response.body);
+
+      final phones = data['phoneNumbers'];
+
+      if (phones == null || phones.isEmpty) {
+        print('❌ لا يوجد رقم هاتف في حساب Google');
+        return null;
+      }
+
+      final phone = phones.first['value']?.toString();
+
+      print('✅ Google Phone: $phone');
+
+      return phone;
+    } catch (e, stack) {
+      print('❌ Google Phone Error: $e');
+      print(stack);
+      return null;
+    }
+  }
+
+  Future<void> _loadGooglePhoneNumber() async {
+    final phone = await getGooglePhoneNumber();
+    if (!mounted || phone == null) return;
+
+    _phoneController.text = phone;
+    if (FirebaseAuth.instance.currentUser?.phoneNumber != null &&
+        _phoneController.text.startsWith('0')) {
+      _phoneController.text = _phoneController.text.substring(1);
+    }
+  }
+
   @override
   void initState() {
+    print(FirebaseAuth.instance.currentUser!.phoneNumber);
     _checkSubscriptionStatus();
     super.initState();
     faceEmbeddingAdmin!.clear();
     billingService.init();
+    // _loadGooglePhoneNumber();
+    _phoneController.text =
+        FirebaseAuth.instance.currentUser?.phoneNumber ?? '';
+    if (FirebaseAuth.instance.currentUser?.phoneNumber != null &&
+        _phoneController.text.startsWith('0')) {
+      _phoneController.text = _phoneController.text.substring(1);
+    }
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       _adminController.text = user.displayName ?? 'Admin';
@@ -377,6 +461,7 @@ class _CreategroupState extends State<Creategroup> {
       'confirm': true,
       'photoURL': FirebaseAuth.instance.currentUser?.photoURL ?? '',
       'faceImageUrl': _imageUrl ?? '',
+      'userGmail': FirebaseAuth.instance.currentUser?.email ?? '',
     });
 
     // attendance
@@ -549,6 +634,7 @@ class _CreategroupState extends State<Creategroup> {
                           Directionality(
                             textDirection: TextDirection.ltr,
                             child: IntlPhoneField(
+                              controller: _phoneController,
                               key: ValueKey(_selectedCountryCode),
 
                               decoration: _inputDecoration(
@@ -559,7 +645,7 @@ class _CreategroupState extends State<Creategroup> {
                               initialCountryCode: _selectedCountryCode,
 
                               onChanged: (phone) {
-                                intPhone = phone.number;
+                                _phoneController.text = phone.number;
                                 _completePhoneNumber = phone.completeNumber;
                               },
                             ),
@@ -663,8 +749,9 @@ class _CreategroupState extends State<Creategroup> {
                                         ).show();
                                         return;
                                       }
-                                      if (intPhone != null &&
-                                          intPhone!.startsWith('0')) {
+                                      if (_phoneController.text.startsWith(
+                                        '0',
+                                      )) {
                                         _showError(
                                           'لا تبدأ الرقم بـ 0 بعد كود الدولة',
                                         );
@@ -675,7 +762,7 @@ class _CreategroupState extends State<Creategroup> {
                                         return;
                                       } */
                                       if (_formKey.currentState!.validate()) {
-                                        intPhone = null;
+                                        _phoneController.text = '';
                                         _showPreview();
                                       }
                                     },
