@@ -33,6 +33,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
     'الأصول والمعدات': false,
     'إضافة أصل أو معدة': false,
     'إضافة مهمة': false,
+    'إنهاء المهام': false,
     'طلبات الانضمام': false,
   };
 
@@ -466,6 +467,8 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
         break;
       case 'إضافة مهمة':
         icon = Icons.build_outlined;
+      case 'إنهاء المهام':
+        icon = Icons.done;
         break;
       case 'طلبات الانضمام':
         icon = Icons.groups_outlined;

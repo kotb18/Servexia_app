@@ -89,6 +89,7 @@ class _CreategroupState extends State<Creategroup> {
     'الأصول والمعدات': true,
     'إضافة أصل أو معدة': true,
     'إضافة مهمة': true,
+    'إنهاء المهام': true,
     'طلبات الانضمام': true,
   };
 
@@ -335,6 +336,8 @@ class _CreategroupState extends State<Creategroup> {
       context: context,
       title: 'جرب لمدة شهر مجانا',
       desc: 'يمكنك تجربة التطبيق لمدة شهر مجانا.',
+
+      /// variableText
       dialogType: DialogType.info,
       btnOkText: 'ابدأ التجربة',
       btnOkOnPress: () async {

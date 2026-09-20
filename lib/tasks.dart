@@ -10,8 +10,14 @@ TextEditingController commentController = TextEditingController();
 class TasksScreen extends StatefulWidget {
   final String groupId;
   final bool isAdmin;
+  final bool isFinishTasks;
 
-  const TasksScreen({super.key, required this.groupId, required this.isAdmin});
+  const TasksScreen({
+    super.key,
+    required this.groupId,
+    required this.isAdmin,
+    required this.isFinishTasks,
+  });
 
   static const String screenroute = 'tasks';
 
@@ -297,7 +303,7 @@ class _TasksScreenState extends State<TasksScreen> {
                       ),
 
                       /// ================== ADMIN ACTIONS ==================
-                      if (widget.isAdmin)
+                      if (widget.isFinishTasks)
                         Align(
                           alignment: Alignment.centerRight,
                           child: PopupMenuButton<String>(

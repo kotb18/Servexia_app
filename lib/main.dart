@@ -385,7 +385,13 @@ final GoRouter _router = GoRouter(
       builder: (context, state) {
         final groupId = state.pathParameters['groupId'] ?? '';
         final isAdmin = state.uri.queryParameters['isAdmin'] == 'true';
-        return TasksScreen(groupId: groupId, isAdmin: isAdmin);
+        final isFinishTasks =
+            state.uri.queryParameters['isFinishTasks'] == 'true';
+        return TasksScreen(
+          groupId: groupId,
+          isAdmin: isAdmin,
+          isFinishTasks: isFinishTasks,
+        );
       },
     ),
     GoRoute(

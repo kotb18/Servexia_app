@@ -44,6 +44,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
     'الأصول والمعدات': false,
     'إضافة أصل أو معدة': false,
     'إضافة مهمة': false,
+    'إنهاء المهام': false,
     'طلبات الانضمام': false,
   };
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
@@ -487,8 +488,9 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                     icon: Icons.assignment,
                     title: 'المهام والأعطال',
                     color: Colors.blue,
-                    onTap: () =>
-                        _goTo('/tasks/${widget.workspaceId}?isAdmin=$isAdmin'),
+                    onTap: () => _goTo(
+                      '/tasks/${widget.workspaceId}?isAdmin=$isAdmin&isFinishTasks=${permissions['إنهاء المهام']}',
+                    ),
                   ),
                   // Admin Add Task Card
                   if (permissions['إضافة مهمة'] == true)

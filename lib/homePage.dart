@@ -441,7 +441,7 @@ class _HomepageState extends State<Homepage>
           }),
           _buildDrawerItem(
             kIsWeb ? Icons.download : Icons.ios_share,
-            kIsWeb ? 'تحميل التطبيق' : 'مشاركة التطبيق',
+            kIsWeb ? 'تحميل التطبيق للأندرويد' : 'مشاركة التطبيق',
             () async {
               const appUrl =
                   'https://play.google.com/store/apps/details?id=com.masry.maintenance';
