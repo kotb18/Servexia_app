@@ -905,6 +905,7 @@ Future<void> sendTopicNotification({
       },
     }),
   );
+  print('45123');
 }
 
 Future<void> sendNotificationToDevice({

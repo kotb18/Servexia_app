@@ -817,7 +817,9 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
         ).show();
         return;
       }
-
+      if (!kIsWeb) {
+        await FirebaseMessaging.instance.subscribeToTopic(group['docId']);
+      }
       if (!context.mounted) return;
       widget.onLoadingChanged(false);
       context.push(

@@ -186,6 +186,9 @@ class _AssetsScreenState extends State<AssetsScreen>
               .map((e) => e['site'] as String)
               .toSet()
               .toList();
+          final safeSelectedSite = sites.contains(selectedSite)
+              ? selectedSite
+              : null;
 
           return DropdownButtonFormField<String>(
             decoration: InputDecoration(
@@ -211,7 +214,7 @@ class _AssetsScreenState extends State<AssetsScreen>
               filled: true,
               fillColor: Colors.white,
             ),
-            initialValue: selectedSite,
+            initialValue: safeSelectedSite,
             hint: const Text('اختر الموقع'),
             items: sites
                 .map((s) => DropdownMenuItem(value: s, child: Text(s)))
@@ -259,6 +262,9 @@ class _AssetsScreenState extends State<AssetsScreen>
               .map((e) => e['location'] as String)
               .toSet()
               .toList();
+          final safeSelectedLocation = locations.contains(selectedLocation)
+              ? selectedLocation
+              : null;
 
           return DropdownButtonFormField<String>(
             decoration: InputDecoration(
@@ -283,7 +289,7 @@ class _AssetsScreenState extends State<AssetsScreen>
               filled: true,
               fillColor: Colors.white,
             ),
-            initialValue: selectedLocation,
+            initialValue: safeSelectedLocation,
             hint: const Text('اختر المكان'),
             items: locations
                 .map((l) => DropdownMenuItem(value: l, child: Text(l)))
@@ -331,6 +337,10 @@ class _AssetsScreenState extends State<AssetsScreen>
               .map((e) => e['name'] as String)
               .toSet()
               .toList();
+          // قد تصل لقطة Firestore القديمة لحظيًا بعد تعديل الاسم.
+          final safeSelectedAssetName = names.contains(selectedAssetName)
+              ? selectedAssetName
+              : null;
 
           return DropdownButtonFormField<String>(
             decoration: InputDecoration(
@@ -355,7 +365,7 @@ class _AssetsScreenState extends State<AssetsScreen>
               filled: true,
               fillColor: Colors.white,
             ),
-            initialValue: selectedAssetName,
+            initialValue: safeSelectedAssetName,
             hint: const Text('اختر اسم المعدة'),
             items: names
                 .map((n) => DropdownMenuItem(value: n, child: Text(n)))
@@ -399,6 +409,12 @@ class _AssetsScreenState extends State<AssetsScreen>
             );
           }
 
+          final assetDocs = snap.data!.docs;
+          final safeSelectedAssetId =
+              assetDocs.any((doc) => doc.id == selectedAssetId)
+              ? selectedAssetId
+              : null;
+
           return DropdownButtonFormField<String>(
             decoration: InputDecoration(
               border: OutlineInputBorder(
@@ -422,7 +438,7 @@ class _AssetsScreenState extends State<AssetsScreen>
               filled: true,
               fillColor: Colors.white,
             ),
-            initialValue: selectedAssetId,
+            initialValue: safeSelectedAssetId,
             hint: const Text('اختر رقم المعدة'),
             items: snap.data!.docs
                 .map(
@@ -452,7 +468,7 @@ class _AssetsScreenState extends State<AssetsScreen>
             Expanded(
               child: _buildActionButton(
                 icon: Icons.picture_as_pdf,
-                label: 'تقرير PDF',
+                //   label: 'تقرير PDF',
                 color: Colors.blueGrey,
                 onPressed: _generateAssetPdf,
               ),
@@ -460,8 +476,17 @@ class _AssetsScreenState extends State<AssetsScreen>
             const SizedBox(width: 12),
             Expanded(
               child: _buildActionButton(
+                icon: Icons.edit,
+                // label: 'تعديل الأصل',
+                color: const Color.fromARGB(255, 69, 47, 157),
+                onPressed: _editSelectedAsset,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildActionButton(
                 icon: Icons.delete_outline,
-                label: 'حذف الأصل',
+                // label: 'حذف الأصل',
                 color: Colors.red,
                 onPressed: _showDeleteConfirmation,
               ),
@@ -475,14 +500,14 @@ class _AssetsScreenState extends State<AssetsScreen>
   /// 🔘 زر الإجراء
   Widget _buildActionButton({
     required IconData icon,
-    required String label,
+    // required String label,
     required Color color,
     required VoidCallback onPressed,
   }) {
-    return ElevatedButton.icon(
+    return IconButton(
       onPressed: onPressed,
       icon: Icon(icon),
-      label: Text(label),
+      //  label: Text(label),
       style: ElevatedButton.styleFrom(
         backgroundColor: color.withOpacity(0.1),
         foregroundColor: color,
@@ -1174,6 +1199,174 @@ class _AssetsScreenState extends State<AssetsScreen>
     );
   }
 
+  /// تحميل الأصل المحدد ثم فتح نافذة التعديل
+  Future<void> _editSelectedAsset() async {
+    // ثبّت المعرّف قبل أي عملية async حتى لا يتغير أثناء فتح نافذة التعديل.
+    final assetId = selectedAssetId;
+    if (assetId == null || assetId.isEmpty) return;
+
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('assets')
+          .doc(widget.groupId)
+          .collection('items')
+          .doc(assetId)
+          .get();
+
+      if (!mounted) return;
+      if (snapshot.exists) {
+        await _editAssetNameAndStatus(snapshot.data()!, assetId);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('تعذر تحميل الأصل للتعديل: $e')));
+    }
+  }
+
+  /// تعديل الأصل
+  Future<void> _editAssetNameAndStatus(
+    Map<String, dynamic> asset,
+    String assetId,
+  ) async {
+    final nameController = TextEditingController(
+      text: asset['name']?.toString() ?? '',
+    );
+
+    String selectedStatus = asset['status']?.toString() ?? 'active';
+    bool isSaving = false;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('تعديل الأصل'),
+              content: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.55,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'اسم المعدة',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      DropdownButtonFormField<String>(
+                        value:
+                            const [
+                              'active',
+                              'inactive',
+                              'maintenance',
+                            ].contains(selectedStatus)
+                            ? selectedStatus
+                            : 'active',
+                        decoration: const InputDecoration(
+                          labelText: 'الحالة',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'active', child: Text('نشط')),
+                          DropdownMenuItem(
+                            value: 'inactive',
+                            child: Text('غير نشط'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'maintenance',
+                            child: Text('تحت الصيانة'),
+                          ),
+                        ],
+                        onChanged: isSaving
+                            ? null
+                            : (value) {
+                                if (value != null) {
+                                  setDialogState(() {
+                                    selectedStatus = value;
+                                  });
+                                }
+                              },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('إلغاء'),
+                ),
+
+                ElevatedButton(
+                  onPressed: () async {
+                    final name = nameController.text.trim();
+
+                    if (name.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('من فضلك أدخل اسم المعدة'),
+                        ),
+                      );
+                      return;
+                    }
+
+                    try {
+                      setDialogState(() {
+                        isSaving = true;
+                      });
+                      // نفّذ التحديث مباشرة؛ التأخير السابق كان يجعل الزر يبدو معطّلًا.
+                      await FirebaseFirestore.instance
+                          .collection('assets')
+                          .doc(widget.groupId)
+                          .collection('items')
+                          .doc(assetId)
+                          .update({'name': name, 'status': selectedStatus});
+
+                      if (!mounted) return;
+                      setState(() {
+                        selectedAssetName = name;
+                      });
+                      Navigator.of(context).pop();
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        const SnackBar(content: Text('تم تعديل الأصل بنجاح')),
+                      );
+                    } catch (e) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(content: Text('حدث خطأ أثناء التعديل: $e')),
+                      );
+                    }
+                  },
+                  child: isSaving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('حفظ'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    // انتظر انتهاء انتقال إغلاق الحوار قبل التخلص من الكنترولر؛
+    // التخلص المبكر كان يسبب: TextEditingController was used after disposed.
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    nameController.dispose();
+  }
+
   /// 🗑️ تأكيد الحذف
   void _showDeleteConfirmation() {
     showDialog(
@@ -1577,27 +1770,51 @@ class _AssetsScreenState extends State<AssetsScreen>
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Text(
-                    'الموقع: ${asset['site'] ?? ''}',
-                    style: boldTextStyle,
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+                    children: [
+                      pw.Text(
+                        'الموقع: ${asset['site'] ?? ''}',
+                        style: boldTextStyle,
+                      ),
+                      //  pw.SizedBox(width: 80),
+                      pw.Text(
+                        'المكان: ${asset['location'] ?? ''}',
+                        style: boldTextStyle,
+                      ),
+                    ],
                   ),
                   pw.SizedBox(height: 6),
-                  pw.Text(
-                    'المكان: ${asset['location'] ?? ''}',
-                    style: boldTextStyle,
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+                    children: [
+                      pw.Text(
+                        'اسم المعدة: ${asset['name'] ?? ''}',
+                        style: boldTextStyle,
+                      ),
+                      //  pw.SizedBox(width: 80),
+                      pw.Text(
+                        'رقم المعدة: ${asset['number'] ?? ''}',
+                        style: boldTextStyle,
+                      ),
+                    ],
                   ),
                   pw.SizedBox(height: 6),
-                  pw.Text(
-                    'اسم المعدة: ${asset['name'] ?? ''}',
-                    style: boldTextStyle,
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+                    children: [
+                      pw.Text(
+                        'الحالة: ${asset['status'] == 'active'
+                            ? 'نشط'
+                            : asset['status'] == 'inactive'
+                            ? 'غير نشط'
+                            : 'تحت الصيانة'}',
+                        style: boldTextStyle,
+                      ),
+                      //  pw.SizedBox(width: 80),
+                      pw.Text('الفترة: $reportPeriod', style: boldTextStyle),
+                    ],
                   ),
-                  pw.SizedBox(height: 6),
-                  pw.Text(
-                    'رقم المعدة: ${asset['number'] ?? ''}',
-                    style: boldTextStyle,
-                  ),
-                  pw.SizedBox(height: 6),
-                  pw.Text('الفترة: $reportPeriod', style: boldTextStyle),
                 ],
               ),
             ),
