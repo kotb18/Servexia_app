@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:maintenance/addTask.dart';
-import 'package:maintenance/homePage.dart';
 
 TextEditingController commentController = TextEditingController();
 
@@ -28,7 +27,6 @@ class TasksScreen extends StatefulWidget {
 class _TasksScreenState extends State<TasksScreen> {
   @override
   void dispose() {
-    // TODO: implement dispose
     super.dispose();
     commentController.dispose();
   }
@@ -195,7 +193,7 @@ class _TasksScreenState extends State<TasksScreen> {
                           ),
                           !isReport
                               ? _StatusChip(status: task['status'])
-                              : SizedBox.shrink(),
+                              : const SizedBox.shrink(),
                         ],
                       ),
 
@@ -210,13 +208,13 @@ class _TasksScreenState extends State<TasksScreen> {
                       ],
 
                       const SizedBox(height: 10),
-                      Divider(),
+                      const Divider(),
 
                       /// ================== ASSIGNED TO ==================
                       !isReport
                           ? Column(
                               children: [
-                                Text(
+                                const Text(
                                   'المكلفون بأنهاء المهمة:',
                                   style: TextStyle(color: Colors.blueGrey),
                                 ),
@@ -242,12 +240,11 @@ class _TasksScreenState extends State<TasksScreen> {
                               label: Text('المبلغ: ${assignedTo[0]}'),
                             ),
 
-                      Divider(),
+                      const Divider(),
                       if (timeReq.isNotEmpty && !isReport)
                         Row(
                           children: [
-                            // const Icon(Icons.schedule, size: 16),
-                            Text('التاريخ المطلوب للبدء في المهمة:'),
+                            const Text('التاريخ المطلوب للبدء في المهمة:'),
                             const SizedBox(width: 6),
                             Text(timeReq, style: const TextStyle(fontSize: 12)),
                           ],
@@ -255,8 +252,7 @@ class _TasksScreenState extends State<TasksScreen> {
                       if (isReport)
                         Row(
                           children: [
-                            // const Icon(Icons.schedule, size: 16),
-                            Text('حالة العطل: '),
+                            const Text('حالة العطل: '),
                             const SizedBox(width: 6),
                             Text(
                               task['priority'],
@@ -287,16 +283,16 @@ class _TasksScreenState extends State<TasksScreen> {
                               onPressed: () async {
                                 await addComment(task.id);
                               },
-                              label: Text('أضف تعليق'),
-                              icon: Icon(Icons.comment),
+                              label: const Text('أضف تعليق'),
+                              icon: const Icon(Icons.comment),
                             ),
-                            SizedBox(width: 10),
+                            const SizedBox(width: 10),
                             ElevatedButton.icon(
                               onPressed: () async {
                                 showComments(task.id);
                               },
-                              label: Text('عرض التعليقات'),
-                              icon: Icon(Icons.comment_bank),
+                              label: const Text('عرض التعليقات'),
+                              icon: const Icon(Icons.comment_bank),
                             ),
                           ],
                         ),
@@ -323,7 +319,7 @@ class _TasksScreenState extends State<TasksScreen> {
                                   builder: (context) => AlertDialog(
                                     title: Text(
                                       isReport ? "حذف البلاغ" : "حذف المهمة",
-                                      style: TextStyle(color: Colors.red),
+                                      style: const TextStyle(color: Colors.red),
                                     ),
                                     content: Text(
                                       isReport
@@ -375,7 +371,7 @@ class _TasksScreenState extends State<TasksScreen> {
                                 value: 'delete',
                                 child: Text(
                                   isReport ? 'حذف البلاغ' : 'حذف المهمة',
-                                  style: TextStyle(color: Colors.red),
+                                  style: const TextStyle(color: Colors.red),
                                 ),
                               ),
                             ],
@@ -488,7 +484,7 @@ class _TasksScreenState extends State<TasksScreen> {
                             'comment': commentController.text,
                             'commenter': name ?? '',
                             'commentCreatedAt': Timestamp.now(),
-                            'id': uid,
+                            'id': FirebaseAuth.instance.currentUser!.uid,
                           },
                         ]),
                       });
@@ -531,7 +527,6 @@ class _TasksScreenState extends State<TasksScreen> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 20),
-
                 Expanded(
                   child: StreamBuilder<DocumentSnapshot>(
                     stream: FirebaseFirestore.instance
@@ -559,7 +554,8 @@ class _TasksScreenState extends State<TasksScreen> {
 
                           return InkWell(
                             onLongPress: () {
-                              if (comment['id'] == uid) {
+                              if (comment['id'] ==
+                                  FirebaseAuth.instance.currentUser!.uid) {
                                 showDialog(
                                   context: context,
                                   builder: (context) => AlertDialog(
@@ -627,7 +623,7 @@ class _TasksScreenState extends State<TasksScreen> {
                                   const SizedBox(height: 5),
                                   Text(
                                     comment['comment'] ?? '',
-                                    style: TextStyle(color: Colors.blue),
+                                    style: const TextStyle(color: Colors.blue),
                                   ),
                                   const SizedBox(height: 8),
                                   Align(
@@ -661,7 +657,7 @@ class _TasksScreenState extends State<TasksScreen> {
     );
   }
 
-  /// ================== CONFIRM TASK ==================
+  /// ================== CONFIRM TASK (معدّل: تخزين بيانات الأصل جوه الصيانة) ==================
   Future<void> _confirmTask(
     QueryDocumentSnapshot task,
     List assetIds,
@@ -708,6 +704,16 @@ class _TasksScreenState extends State<TasksScreen> {
     final cost = double.tryParse(costController.text) ?? 0;
 
     for (var assetId in assetIds) {
+      /// ⬇️ قراءة واحدة فقط لجلب بيانات الأصل (تتدفع وقت التأكيد مش وقت التقرير)
+      final assetDoc = await FirebaseFirestore.instance
+          .collection('assets')
+          .doc(widget.groupId)
+          .collection('items')
+          .doc(assetId)
+          .get();
+
+      final assetData = assetDoc.data() ?? {};
+
       await FirebaseFirestore.instance
           .collection('assets')
           .doc(widget.groupId)
@@ -719,7 +725,16 @@ class _TasksScreenState extends State<TasksScreen> {
             'note': notesController.text.trim(),
             'cost': cost,
             'assignedTo': task['assignedTo'],
-            'taskDateTime': task['taskDateTime'],
+            'taskDateTime': Timestamp.now(),
+
+            /// ⬇️ حقول Denormalization — بتوّفر قراءات كتير في التقرير الشهري
+            'groupId': widget.groupId,
+            'assetId': assetId,
+            'site': assetData['site'] ?? '',
+            'location': assetData['location'] ?? '',
+            'assetName': assetData['name'] ?? '',
+            'assetNumber': assetData['number'] ?? '',
+
             'description': task['description'],
             'createdAt': task['createdAt'],
           });

@@ -25,6 +25,10 @@ class _AssetsScreenState extends State<AssetsScreen>
   String? selectedAssetId;
   late AnimationController _animationController;
 
+  /// ⬇️ الشهر المحدد للفلتر — null يعني عرض كل الأعمال
+  DateTime? selectedMonth;
+  Future<List<Map<String, dynamic>>>? _scopedWorksFuture;
+
   @override
   void initState() {
     super.initState();
@@ -63,9 +67,12 @@ class _AssetsScreenState extends State<AssetsScreen>
               if (selectedAssetId != null) ...[
                 _buildActionButtons(),
                 const SizedBox(height: 16),
-                _buildAssetWorks(), // ← ListView داخلي
-              ] else
+                _buildAssetWorks(), // ← أعمال الأصل مع فلتر الشهر
+              ] else if (selectedSite != null) ...[
+                _buildScopedWorks(), // ← أعمال الموقع/المكان مع فلتر الشهر
+              ] else ...[
                 _buildEmptyState(),
+              ],
             ],
           ),
         ),
@@ -215,6 +222,8 @@ class _AssetsScreenState extends State<AssetsScreen>
                 selectedLocation = null;
                 selectedAssetName = null;
                 selectedAssetId = null;
+                selectedMonth = null;
+                _scopedWorksFuture = null; // إعادة تعيين الشهر
               });
             },
           );
@@ -284,6 +293,8 @@ class _AssetsScreenState extends State<AssetsScreen>
                 selectedLocation = v;
                 selectedAssetName = null;
                 selectedAssetId = null;
+                selectedMonth = null;
+                _scopedWorksFuture = null;
               });
             },
           );
@@ -353,6 +364,8 @@ class _AssetsScreenState extends State<AssetsScreen>
               setState(() {
                 selectedAssetName = v;
                 selectedAssetId = null;
+                selectedMonth = null;
+                _scopedWorksFuture = null;
               });
             },
           );
@@ -419,7 +432,11 @@ class _AssetsScreenState extends State<AssetsScreen>
                   ),
                 )
                 .toList(),
-            onChanged: (v) => setState(() => selectedAssetId = v),
+            onChanged: (v) => setState(() {
+              selectedAssetId = v;
+              selectedMonth = null;
+              _scopedWorksFuture = null; // إعادة تعيين الشهر عند تغيير الأصل
+            }),
           );
         },
       ),
@@ -479,44 +496,132 @@ class _AssetsScreenState extends State<AssetsScreen>
     );
   }
 
-  /// 📋 الأعمال المحسّنة
+  /// 📅 اختيار الشهر
+  Future<void> _pickMonth() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: selectedMonth ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      helpText: 'اختر شهر للفلترة',
+    );
+    if (picked != null) {
+      setState(() {
+        selectedMonth = DateTime(picked.year, picked.month);
+        _scopedWorksFuture = null;
+      });
+    }
+  }
+
+  /// 🧹 مسح فلتر الشهر
+  void _clearMonthFilter() {
+    setState(() {
+      selectedMonth = null;
+      _scopedWorksFuture = null;
+    });
+  }
+
+  /// 📋 شريط فلتر الشهر
+  Widget _buildMonthFilterBar({String? scopeLabel}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.calendar_month, color: Color(0xFF1E88E5)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              selectedMonth == null
+                  ? (scopeLabel == null
+                        ? 'عرض كل الأعمال'
+                        : 'عرض كل الأعمال — $scopeLabel')
+                  : '${scopeLabel == null ? '' : '$scopeLabel — '}شهر: ${DateFormat('MMMM - yyyy', 'ar').format(selectedMonth!)}',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E88E5),
+              ),
+            ),
+          ),
+          IconButton(
+            onPressed: _pickMonth,
+            icon: const Icon(Icons.edit_calendar, size: 20),
+            tooltip: 'اختر شهر',
+          ),
+          if (selectedMonth != null)
+            IconButton(
+              onPressed: _clearMonthFilter,
+              icon: const Icon(Icons.close, size: 20, color: Colors.red),
+              tooltip: 'عرض الكل',
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// 📋 الأعمال المحسّنة — مع فلتر الشهر
   Widget _buildAssetWorks() {
-    final ref = FirebaseFirestore.instance
+    // ⬇️ بناء الاستعلام: لو فيه شهر محدد، نفلتر بيه (قراءات أقل)
+    Query query = FirebaseFirestore.instance
         .collection('assets')
         .doc(widget.groupId)
         .collection('items')
         .doc(selectedAssetId)
         .collection('works')
-        .orderBy('createdAt', descending: true);
+        .orderBy('taskDateTime', descending: true);
+
+    if (selectedMonth != null) {
+      final start = DateTime(selectedMonth!.year, selectedMonth!.month, 1);
+      final end = DateTime(selectedMonth!.year, selectedMonth!.month + 1, 1);
+      query = query
+          .where(
+            'taskDateTime',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(start),
+          )
+          .where('taskDateTime', isLessThan: Timestamp.fromDate(end));
+    }
 
     return StreamBuilder<QuerySnapshot>(
-      stream: ref.snapshots(),
+      stream: query.snapshots(),
       builder: (context, snap) {
         if (!snap.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
+        // ⬇️ شريط الفلتر دايمًا ظاهر فوق النتائج
         if (snap.data!.docs.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.inbox_outlined,
-                  size: 64,
-                  color: Colors.grey.shade400,
+          return Column(
+            children: [
+              _buildMonthFilterBar(),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.inbox_outlined,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      selectedMonth == null
+                          ? 'لا توجد أعمال لهذا الأصل'
+                          : 'لا توجد أعمال في هذا الشهر',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'لا توجد أعمال لهذا الأصل',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           );
         }
 
@@ -525,35 +630,278 @@ class _AssetsScreenState extends State<AssetsScreen>
 
         for (var doc in works) {
           final d = doc.data() as Map<String, dynamic>;
-          total += (d['cost'] as num).toDouble();
+          total += (d['cost'] as num?)?.toDouble() ?? 0;
         }
 
-        return ListView.builder(
-          shrinkWrap: true, // ⭐ مهم جدًا
-          physics: const NeverScrollableScrollPhysics(),
-          // physics: const BouncingScrollPhysics(),
-          itemCount: works.length + 1,
-          itemBuilder: (context, index) {
-            if (index == works.length) {
-              return _buildTotalCard(total);
-            }
+        return Column(
+          children: [
+            _buildMonthFilterBar(),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: works.length + 1,
+              itemBuilder: (context, index) {
+                if (index == works.length) {
+                  return _buildTotalCard(total);
+                }
 
-            final doc = works[index];
-            final d = doc.data() as Map<String, dynamic>;
-            final date = (d['taskDateTime'] as Timestamp).toDate();
+                final doc = works[index];
+                final d = doc.data() as Map<String, dynamic>;
+                final date = d['taskDateTime'] != null
+                    ? (d['taskDateTime'] as Timestamp).toDate()
+                    : DateTime.now();
 
-            return _buildWorkCard(
-              title: d['title'] ?? 'بدون عنوان',
-              description: d['description'] ?? '',
-              date: DateFormat('yyyy/MM/dd').format(date),
-              cost: d['cost'] ?? 0,
-              note: d['note'] ?? '',
-              index: index,
-            );
-          },
+                return _buildWorkCard(
+                  title: d['title'] ?? 'بدون عنوان',
+                  description: d['description'] ?? '',
+                  date: DateFormat('yyyy/MM/dd').format(date),
+                  cost: (d['cost'] as num?)?.toDouble() ?? 0,
+                  note: d['note'] ?? '',
+                  index: index,
+                );
+              },
+            ),
+          ],
         );
       },
     );
+  }
+
+  /// 📋 الأعمال على مستوى الموقع أو المكان — لا يتم الاستعلام إلا عند الطلب
+  Widget _buildScopedWorks() {
+    final scopeLabel = selectedLocation != null
+        ? 'المكان: $selectedLocation'
+        : 'الموقع: $selectedSite';
+
+    if (_scopedWorksFuture == null) {
+      return Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              _buildMonthFilterBar(scopeLabel: scopeLabel),
+              const Icon(
+                Icons.manage_search,
+                size: 48,
+                color: Color(0xFF1E88E5),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'جاهز للاستعلام عن $scopeLabel',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'اضغط استعلام لتحميل الأعمال حسب النطاق والشهر المحدد.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _scopedWorksFuture = _loadScopedWorks();
+                  });
+                },
+                icon: const Icon(Icons.search),
+                label: const Text('استعلام'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1E88E5),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 28,
+                    vertical: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _scopedWorksFuture,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snap.hasError) {
+          return _buildScopeError(scopeLabel, snap.error.toString());
+        }
+
+        final works = snap.data ?? <Map<String, dynamic>>[];
+        double total = 0;
+        for (final work in works) {
+          total += (work['cost'] as num?)?.toDouble() ?? 0;
+        }
+
+        return Column(
+          children: [
+            _buildMonthFilterBar(scopeLabel: scopeLabel),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _generateScopedPdf,
+                    icon: const Icon(Icons.picture_as_pdf),
+                    label: const Text('تقرير PDF'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => setState(() {
+                      _scopedWorksFuture = _loadScopedWorks();
+                    }),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('إعادة الاستعلام'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (works.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.inbox_outlined,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      selectedMonth == null
+                          ? 'لا توجد أعمال لهذا النطاق'
+                          : 'لا توجد أعمال في هذا الشهر',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: works.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == works.length) {
+                    return _buildTotalCard(total);
+                  }
+
+                  final work = works[index];
+                  final date =
+                      (work['taskDateTime'] as Timestamp?)?.toDate() ??
+                      DateTime.now();
+                  final assetLabel =
+                      '${work['assetName'] ?? ''} - ${work['assetNumber'] ?? ''}'
+                          .replaceAll(RegExp(r'(^ - | - $)'), '');
+
+                  return _buildWorkCard(
+                    title: work['title'] ?? 'بدون عنوان',
+                    description: work['description'] ?? '',
+                    date: DateFormat('yyyy/MM/dd').format(date),
+                    cost: (work['cost'] as num?)?.toDouble() ?? 0,
+                    note: work['note'] ?? '',
+                    index: index,
+                    assetLabel: assetLabel,
+                  );
+                },
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildScopeError(String scopeLabel, String error) {
+    return Column(
+      children: [
+        Text('تعذر الاستعلام عن $scopeLabel'),
+        const SizedBox(height: 8),
+        Text(
+          error,
+          style: const TextStyle(color: Colors.red),
+          textAlign: TextAlign.center,
+        ),
+        TextButton(
+          onPressed: () => setState(() {
+            _scopedWorksFuture = _loadScopedWorks();
+          }),
+          child: const Text('إعادة المحاولة'),
+        ),
+      ],
+    );
+  }
+
+  /// تحميل أعمال كل أصول الموقع أو المكان المحدد عند طلب الاستعلام
+  Future<List<Map<String, dynamic>>> _loadScopedWorks() async {
+    Query itemsQuery = FirebaseFirestore.instance
+        .collection('assets')
+        .doc(widget.groupId)
+        .collection('items')
+        .where('site', isEqualTo: selectedSite);
+
+    if (selectedLocation != null) {
+      itemsQuery = itemsQuery.where('location', isEqualTo: selectedLocation);
+    }
+
+    final itemsSnap = await itemsQuery.get();
+    final result = <Map<String, dynamic>>[];
+    final start = selectedMonth == null
+        ? null
+        : DateTime(selectedMonth!.year, selectedMonth!.month, 1);
+    final end = selectedMonth == null
+        ? null
+        : DateTime(selectedMonth!.year, selectedMonth!.month + 1, 1);
+
+    for (final item in itemsSnap.docs) {
+      final itemData = item.data() as Map<String, dynamic>;
+      final worksSnap = await item.reference
+          .collection('works')
+          .orderBy('taskDateTime', descending: true)
+          .get();
+
+      for (final work in worksSnap.docs) {
+        final data = Map<String, dynamic>.from(work.data());
+        final timestamp = data['taskDateTime'];
+        final date = timestamp is Timestamp ? timestamp.toDate() : null;
+
+        if (start != null &&
+            end != null &&
+            (date == null || !date.isBefore(end) || date.isBefore(start))) {
+          continue;
+        }
+
+        result.add({
+          ...data,
+          'assetName': itemData['name'] ?? '',
+          'assetNumber': itemData['number'] ?? '',
+        });
+      }
+    }
+
+    result.sort((a, b) {
+      final aDate = (a['taskDateTime'] as Timestamp?)?.toDate();
+      final bDate = (b['taskDateTime'] as Timestamp?)?.toDate();
+      if (aDate == null && bDate == null) return 0;
+      if (aDate == null) return 1;
+      if (bDate == null) return -1;
+      return bDate.compareTo(aDate);
+    });
+    return result;
   }
 
   /// 💳 بطاقة العمل الواحد
@@ -561,9 +909,10 @@ class _AssetsScreenState extends State<AssetsScreen>
     required String title,
     required String description,
     required String date,
-    required dynamic cost,
+    required double cost,
     required String note,
     required int index,
+    String? assetLabel,
   }) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -621,6 +970,18 @@ class _AssetsScreenState extends State<AssetsScreen>
                             color: Colors.grey.shade600,
                           ),
                         ),
+                        if (assetLabel != null && assetLabel.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            'الأصل: $assetLabel',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.blueGrey.shade600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -638,7 +999,7 @@ class _AssetsScreenState extends State<AssetsScreen>
                       ),
                     ),
                     child: Text(
-                      '${cost.toStringAsFixed(2)}',
+                      cost.toStringAsFixed(2),
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -720,9 +1081,11 @@ class _AssetsScreenState extends State<AssetsScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'إجمالي التكلفة',
+                  selectedMonth == null
+                      ? 'إجمالي التكلفة (كل الأعمال)'
+                      : 'إجمالي تكلفة الشهر',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     color: Colors.grey.shade700,
                     fontWeight: FontWeight.w500,
                   ),
@@ -854,6 +1217,8 @@ class _AssetsScreenState extends State<AssetsScreen>
 
       setState(() {
         selectedAssetId = null;
+        selectedMonth = null;
+        _scopedWorksFuture = null;
       });
 
       if (mounted) {
@@ -892,7 +1257,176 @@ class _AssetsScreenState extends State<AssetsScreen>
     return pw.Font.ttf(fontData);
   }
 
-  /// 📄 إنشاء تقرير PDF احترافي
+  /// 📄 إنشاء تقرير PDF للموقع أو المكان المستعلم عنه
+  Future<void> _generateScopedPdf() async {
+    if (_scopedWorksFuture == null) return;
+
+    try {
+      final works = await _scopedWorksFuture!;
+      final arabicFont = await _loadArabicFont();
+      const PdfColor primaryColor = PdfColor.fromInt(0xFF1E88E5);
+      const PdfColor accentColor = PdfColor.fromInt(0xFFE3F2FD);
+      const PdfColor successColor = PdfColor.fromInt(0xFF4CAF50);
+      final scopeTitle = selectedLocation != null
+          ? 'تقرير أعمال المكان'
+          : 'تقرير أعمال الموقع';
+      final scopeValue = selectedLocation != null
+          ? '$selectedLocation'
+          : '$selectedSite';
+      final period = selectedMonth == null
+          ? 'كل الأعمال'
+          : DateFormat('MMMM - yyyy', 'ar').format(selectedMonth!);
+      final pdf = pw.Document();
+      double total = 0;
+      final rows = <List<String>>[];
+
+      for (final work in works) {
+        final cost = (work['cost'] as num?)?.toDouble() ?? 0;
+        total += cost;
+        final timestamp = work['taskDateTime'];
+        final date = timestamp is Timestamp
+            ? timestamp.toDate()
+            : DateTime.now();
+        final asset =
+            '${work['assetName'] ?? ''} - ${work['assetNumber'] ?? ''}'
+                .replaceAll(RegExp(r'(^ - | - $)'), '');
+        rows.add([
+          work['note'] ?? 'لا توجد',
+          DateFormat('yyyy/MM/dd').format(date),
+          cost.toStringAsFixed(2),
+          asset,
+          work['title'] ?? 'بدون عنوان',
+        ]);
+      }
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageTheme: pw.PageTheme(
+            textDirection: pw.TextDirection.rtl,
+            pageFormat: PdfPageFormat.a4,
+            margin: const pw.EdgeInsets.all(30),
+          ),
+          build: (context) => [
+            pw.Container(
+              padding: const pw.EdgeInsets.all(15),
+              decoration: pw.BoxDecoration(
+                color: primaryColor,
+                borderRadius: pw.BorderRadius.circular(8),
+              ),
+              child: pw.Text(
+                scopeTitle,
+                style: pw.TextStyle(
+                  font: arabicFont,
+                  fontSize: 20,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.white,
+                ),
+              ),
+            ),
+            pw.SizedBox(height: 20),
+            pw.Container(
+              padding: const pw.EdgeInsets.all(12),
+              decoration: pw.BoxDecoration(
+                color: accentColor,
+                borderRadius: pw.BorderRadius.circular(6),
+                border: pw.Border.all(color: primaryColor, width: 1),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'النطاق: $scopeValue',
+                    style: pw.TextStyle(font: arabicFont, fontSize: 11),
+                  ),
+                  pw.SizedBox(height: 6),
+                  pw.Text(
+                    'الفترة: $period',
+                    style: pw.TextStyle(font: arabicFont, fontSize: 11),
+                  ),
+                  pw.SizedBox(height: 6),
+                  pw.Text(
+                    'تاريخ التقرير: ${DateFormat('yyyy/MM/dd').format(DateTime.now())}',
+                    style: pw.TextStyle(font: arabicFont, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 20),
+            pw.Text(
+              'سجل الأعمال والصيانة',
+              style: pw.TextStyle(
+                font: arabicFont,
+                fontSize: 14,
+                fontWeight: pw.FontWeight.bold,
+                color: primaryColor,
+              ),
+            ),
+            pw.SizedBox(height: 10),
+            if (rows.isEmpty)
+              pw.Center(
+                child: pw.Text(
+                  'لا توجد أعمال في هذه الفترة',
+                  style: pw.TextStyle(font: arabicFont, fontSize: 12),
+                ),
+              )
+            else
+              pw.Table.fromTextArray(
+                headers: ['ملاحظات', 'التاريخ', 'التكلفة', 'الأصل', 'العنوان'],
+                data: rows,
+                border: pw.TableBorder.all(color: PdfColors.grey300),
+                headerStyle: pw.TextStyle(
+                  font: arabicFont,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.white,
+                  fontSize: 9,
+                ),
+                headerDecoration: const pw.BoxDecoration(color: primaryColor),
+                cellStyle: pw.TextStyle(font: arabicFont, fontSize: 9),
+                cellAlignment: pw.Alignment.centerRight,
+              ),
+            pw.SizedBox(height: 20),
+            pw.Container(
+              alignment: pw.Alignment.centerLeft,
+              padding: const pw.EdgeInsets.symmetric(
+                vertical: 12,
+                horizontal: 15,
+              ),
+              decoration: pw.BoxDecoration(
+                color: accentColor,
+                borderRadius: pw.BorderRadius.circular(6),
+                border: pw.Border.all(color: successColor, width: 2),
+              ),
+              child: pw.Text(
+                'إجمالي التكلفة: ${total.toStringAsFixed(2)}',
+                style: pw.TextStyle(
+                  font: arabicFont,
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                  color: successColor,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      await Printing.layoutPdf(onLayout: (_) => pdf.save());
+      await Printing.sharePdf(
+        bytes: await pdf.save(),
+        filename: selectedLocation != null
+            ? 'location_report.pdf'
+            : 'site_report.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطأ في إنشاء تقرير النطاق: $e')),
+        );
+      }
+    }
+  }
+
+  /// 📄 إنشاء تقرير PDF احترافي — بيحترم فلتر الشهر المحدد
   Future<void> _generateAssetPdf() async {
     try {
       final arabicFont = await _loadArabicFont();
@@ -933,24 +1467,51 @@ class _AssetsScreenState extends State<AssetsScreen>
           .doc(selectedAssetId);
 
       final assetSnap = await assetRef.get();
-      final worksSnap = await assetRef
-          .collection('works')
-          .orderBy('createdAt')
-          .get();
 
-      final asset = assetSnap.data()!;
+      // ⬇️ الـ PDF نفسه بيحترم فلتر الشهر
+      Query worksQuery = assetRef.collection('works').orderBy('taskDateTime');
+
+      String reportPeriod = 'كل الأعمال';
+      if (selectedMonth != null) {
+        final start = DateTime(selectedMonth!.year, selectedMonth!.month, 1);
+        final end = DateTime(selectedMonth!.year, selectedMonth!.month + 1, 1);
+        worksQuery = worksQuery
+            .where(
+              'taskDateTime',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(start),
+            )
+            .where('taskDateTime', isLessThan: Timestamp.fromDate(end));
+        reportPeriod = DateFormat('MMMM - yyyy', 'ar').format(selectedMonth!);
+      }
+
+      final worksSnap = await worksQuery.get();
+
+      final asset = assetSnap.data() ?? {};
       final pdf = pw.Document();
       double total = 0;
 
       final List<List<String>> worksData = [];
-      for (var w in worksSnap.docs) {
-        final d = w.data();
-        final date = (d['taskDateTime'] as Timestamp).toDate();
-        total += (d['cost'] as num).toDouble();
+      for (final w in worksSnap.docs) {
+        final rawData = w.data();
+
+        final Map<String, dynamic> d = rawData is Map
+            ? Map<String, dynamic>.from(rawData)
+            : <String, dynamic>{};
+
+        final taskDateTime = d['taskDateTime'];
+
+        final date = taskDateTime is Timestamp
+            ? taskDateTime.toDate()
+            : DateTime.now();
+
+        final cost = (d['cost'] as num?)?.toDouble() ?? 0.0;
+
+        total += cost;
+
         worksData.add([
           d['note'] ?? 'لا توجد',
           DateFormat('yyyy/MM/dd').format(date),
-          '${d['cost']} ',
+          '$cost',
           d['description'] ?? 'لا يوجد',
           d['title'] ?? 'بدون عنوان',
         ]);
@@ -1016,16 +1577,27 @@ class _AssetsScreenState extends State<AssetsScreen>
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Text('الموقع: ${asset['site']}', style: boldTextStyle),
-                  pw.SizedBox(height: 6),
-                  pw.Text('المكان: ${asset['location']}', style: boldTextStyle),
-                  pw.SizedBox(height: 6),
-                  pw.Text('اسم المعدة: ${asset['name']}', style: boldTextStyle),
-                  pw.SizedBox(height: 6),
                   pw.Text(
-                    'رقم المعدة: ${asset['number']}',
+                    'الموقع: ${asset['site'] ?? ''}',
                     style: boldTextStyle,
                   ),
+                  pw.SizedBox(height: 6),
+                  pw.Text(
+                    'المكان: ${asset['location'] ?? ''}',
+                    style: boldTextStyle,
+                  ),
+                  pw.SizedBox(height: 6),
+                  pw.Text(
+                    'اسم المعدة: ${asset['name'] ?? ''}',
+                    style: boldTextStyle,
+                  ),
+                  pw.SizedBox(height: 6),
+                  pw.Text(
+                    'رقم المعدة: ${asset['number'] ?? ''}',
+                    style: boldTextStyle,
+                  ),
+                  pw.SizedBox(height: 6),
+                  pw.Text('الفترة: $reportPeriod', style: boldTextStyle),
                 ],
               ),
             ),
@@ -1034,27 +1606,35 @@ class _AssetsScreenState extends State<AssetsScreen>
             // جدول الأعمال
             pw.Text('سجل الأعمال والصيانة', style: subHeaderTextStyle),
             pw.SizedBox(height: 10),
-            pw.Table.fromTextArray(
-              headers: ['ملاحظات', 'التاريخ', 'التكلفة', 'الوصف', 'العنوان'],
-              data: worksData,
-              border: pw.TableBorder.all(color: PdfColors.grey300),
-              headerStyle: pw.TextStyle(
-                font: arabicFont,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.white,
-                fontSize: 10,
+            if (worksData.isEmpty)
+              pw.Center(
+                child: pw.Text(
+                  'لا توجد أعمال في هذه الفترة',
+                  style: pw.TextStyle(font: arabicFont, fontSize: 12),
+                ),
+              )
+            else
+              pw.Table.fromTextArray(
+                headers: ['ملاحظات', 'التاريخ', 'التكلفة', 'الوصف', 'العنوان'],
+                data: worksData,
+                border: pw.TableBorder.all(color: PdfColors.grey300),
+                headerStyle: pw.TextStyle(
+                  font: arabicFont,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.white,
+                  fontSize: 10,
+                ),
+                headerDecoration: const pw.BoxDecoration(color: primaryColor),
+                cellStyle: baseTextStyle,
+                cellAlignment: pw.Alignment.centerRight,
+                columnWidths: {
+                  0: const pw.FlexColumnWidth(1.5),
+                  1: const pw.FlexColumnWidth(1.2),
+                  2: const pw.FlexColumnWidth(1.2),
+                  3: const pw.FlexColumnWidth(2),
+                  4: const pw.FlexColumnWidth(1.5),
+                },
               ),
-              headerDecoration: const pw.BoxDecoration(color: primaryColor),
-              cellStyle: baseTextStyle,
-              cellAlignment: pw.Alignment.centerRight,
-              columnWidths: {
-                0: const pw.FlexColumnWidth(1.5),
-                1: const pw.FlexColumnWidth(1.2),
-                2: const pw.FlexColumnWidth(1.2),
-                3: const pw.FlexColumnWidth(2),
-                4: const pw.FlexColumnWidth(1.5),
-              },
-            ),
             pw.SizedBox(height: 20),
 
             // الإجمالي
