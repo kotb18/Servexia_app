@@ -1,6 +1,16 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:maintenance/JoinGroup.dart';
+import 'package:maintenance/attendance.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:maintenance/homePage.dart';
 import 'package:maintenance/imageControl/platform_image.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class EmployeeDetailsPage extends StatefulWidget {
   final Map<String, dynamic> employeeData;
@@ -22,7 +32,8 @@ class EmployeeDetailsPage extends StatefulWidget {
 
 class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
   bool isLoading = false;
-
+  static String _localKey(String uid) => 'face_data_$uid';
+  File? _image;
   // Permissions state
   Map<String, bool> permissions = {
     'المخازن': false,
@@ -41,6 +52,322 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
   void initState() {
     super.initState();
     _loadExistingPermissions();
+  }
+
+  bool _isFaceEmbeddingFound = false;
+  void openGooglePlay() {
+    launchUrl(
+      Uri.parse(
+        'https://play.google.com/store/apps/details?id=com.masry.maintenance',
+      ),
+      mode: LaunchMode.externalApplication,
+    );
+  }
+
+  final Color successColor = const Color(0xFF4CAF50);
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(fontFamily: 'Cairo', fontSize: 14),
+          textAlign: TextAlign.right,
+        ),
+        backgroundColor: isError ? Colors.redAccent : successColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(10),
+      ),
+    );
+  }
+
+  Future<List<dynamic>?> loadFaceEmbedding() async {
+    final firestore = FirebaseFirestore.instance;
+    final auth = FirebaseAuth.instance;
+
+    /// 🔑 Key خاص بكل مستخدم
+    String localKey(String uid) => 'face_data_$uid';
+
+    final user = auth.currentUser;
+
+    if (user == null) return null;
+
+    final prefs = await SharedPreferences.getInstance();
+    final localValue = prefs.get(localKey('${widget.groupId} ${user.uid}'));
+
+    // ✅ 1. لو موجود محليًا
+    if (localValue != null) {
+      final List decoded = localValue is String
+          ? jsonDecode(localValue) as List
+          : localValue is List
+          ? localValue
+          : <dynamic>[];
+      setState(() {
+        _isFaceEmbeddingFound = true;
+        print('yessssssssssssssssssssssssssss');
+      });
+      return decoded.map((e) => e.toDouble()).toList();
+    }
+
+    // ☁️ 2. مش موجود محليًا → Firebase
+    final doc = await firestore
+        .collection('faceEmbedding')
+        .doc(widget.groupId)
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    if (!doc.exists || doc.data()?['faceEmbedding'] == null) {
+      return null;
+    }
+
+    final List cloudData = doc['faceEmbedding'];
+
+    final embedding = cloudData.map((e) => (e as num).toDouble()).toList();
+
+    // 💾 خزنه محليًا
+    await prefs.setString(
+      localKey('${widget.groupId} ${user.uid}'),
+      jsonEncode(embedding),
+    );
+    if (embedding.isNotEmpty) {
+      setState(() {
+        _isFaceEmbeddingFound = true;
+        //  print('yessssssssssssssssssssssssssss');
+      });
+      return embedding;
+    }
+    return embedding;
+  }
+
+  void _changePhoto() async {
+    await loadFaceEmbedding();
+    if (kIsWeb) {
+      print('المستخدم فاتح من Web');
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('بصمة الوجه متاحة عبر تطبيق الاندرويد فقط'),
+            content: const Text(
+              'لتسجيل الحضور الرجاء تحميل التطبيق (للاندرويد).',
+            ),
+            actions: [
+              TextButton(
+                child: const Text('الغاء'),
+                onPressed: () async {
+                  Navigator.pop(context);
+                },
+              ),
+              ElevatedButton(
+                child: const Text('تحميل'),
+                onPressed: () async {
+                  Navigator.pop(context);
+                  openGooglePlay();
+                },
+              ),
+            ],
+          );
+        },
+      );
+    } else {
+      print('المستخدم فاتح من App');
+      if (!_isFaceEmbeddingFound) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) {
+            return AlertDialog(
+              title: const Text('بصمة الوجه ليست مسجله.'),
+              content: const Text('سجل بصمة الوجه الاْن.'),
+              actions: [
+                TextButton(
+                  child: const Text('الغاء'),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                  },
+                ),
+                ElevatedButton(
+                  child: const Text('تسجيل'),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    final FaceRegisterResult? result =
+                        await Navigator.push<FaceRegisterResult>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const FaceRegisterScreen(),
+                          ),
+                        );
+
+                    if (result != null) {
+                      setState(() {
+                        isLoading = true;
+                        faceEmbeddingLive = result.embedding;
+                        _isFaceEmbeddingFound = true;
+                        _image = result.image;
+                        _showSnackBar('تم تسجيل بصمة الوجه بنجاح.');
+                      });
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setString(
+                        _localKey('${widget.groupId} $uid'),
+                        jsonEncode(faceEmbeddingLive),
+                      );
+
+                      // إنشاء Batch
+                      final batch = FirebaseFirestore.instance.batch();
+                      final memberRef = FirebaseFirestore.instance
+                          .collection('teams')
+                          .doc(widget.groupId)
+                          .collection('members')
+                          .doc(uid);
+                      final storageRef = FirebaseStorage.instance
+                          .ref()
+                          .child('users')
+                          .child(widget.groupId)
+                          .child(uid);
+
+                      await storageRef.putFile(
+                        _image!,
+                        SettableMetadata(contentType: 'image/jpeg'),
+                      );
+
+                      final imageUrl = await storageRef.getDownloadURL();
+                      batch.set(memberRef, {
+                        'faceImageUrl': imageUrl,
+                      }, SetOptions(merge: true));
+                      await prefs.setString(
+                        _localKey('faceImage${widget.groupId} $uid'),
+                        jsonEncode(imageUrl),
+                      );
+                      // faceEmbedding
+                      final faceRef = FirebaseFirestore.instance
+                          .collection('faceEmbedding')
+                          .doc(widget.groupId)
+                          .collection('users')
+                          .doc(uid);
+                      final facePreRef = FirebaseFirestore.instance
+                          .collection('faceEmbedding')
+                          .doc(widget.groupId);
+                      batch.set(facePreRef, {
+                        'lastFaceEmbeddingUpdate': FieldValue.serverTimestamp(),
+                      });
+                      batch.set(faceRef, {
+                        'faceEmbedding': faceEmbeddingLive,
+                        'updatedAt': FieldValue.serverTimestamp(),
+                      });
+                      await batch.commit();
+                      if (!mounted) return;
+                      Navigator.of(this.context).pop(true);
+                    } else if (mounted) {
+                      setState(() => isLoading = false);
+                    }
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      } else {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) {
+            return AlertDialog(
+              title: const Text('تعديل صورة الوجه والبصمة'),
+              content: const Text('تعديل بصمة الوجه الاَن.'),
+              actions: [
+                TextButton(
+                  child: const Text('الغاء'),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                  },
+                ),
+                ElevatedButton(
+                  child: const Text('تعديل'),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    final FaceRegisterResult? result =
+                        await Navigator.push<FaceRegisterResult>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const FaceRegisterScreen(),
+                          ),
+                        );
+
+                    if (result != null) {
+                      setState(() {
+                        isLoading = true;
+                        faceEmbeddingLive = result.embedding;
+                        _isFaceEmbeddingFound = true;
+                        _image = result.image;
+                      });
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setString(
+                        _localKey('${widget.groupId} $uid'),
+                        jsonEncode(faceEmbeddingLive),
+                      );
+
+                      // إنشاء Batch
+                      final batch = FirebaseFirestore.instance.batch();
+                      final memberRef = FirebaseFirestore.instance
+                          .collection('teams')
+                          .doc(widget.groupId)
+                          .collection('members')
+                          .doc(uid);
+                      final storageRef = FirebaseStorage.instance
+                          .ref()
+                          .child('users')
+                          .child(widget.groupId)
+                          .child(uid);
+                      await storageRef.delete();
+                      await storageRef.putFile(
+                        _image!,
+                        SettableMetadata(contentType: 'image/jpeg'),
+                      );
+
+                      final imageUrl = await storageRef.getDownloadURL();
+                      batch.update(memberRef, {'faceImageUrl': imageUrl});
+                      await prefs.setString(
+                        _localKey('faceImage${widget.groupId} $uid'),
+                        jsonEncode(imageUrl),
+                      );
+                      print('11111111111');
+                      // faceEmbedding
+                      final faceRef = FirebaseFirestore.instance
+                          .collection('faceEmbedding')
+                          .doc(widget.groupId)
+                          .collection('users')
+                          .doc(uid);
+                      final facePreRef = FirebaseFirestore.instance
+                          .collection('faceEmbedding')
+                          .doc(widget.groupId);
+                      batch.set(facePreRef, {
+                        'lastFaceEmbeddingUpdate': FieldValue.serverTimestamp(),
+                      });
+                      batch.update(faceRef, {
+                        'faceEmbedding': faceEmbeddingLive,
+                        'updatedAt': FieldValue.serverTimestamp(),
+                      });
+                      await batch.commit();
+                      print('2222222222222222');
+                      _showSnackBar('تم تسجيل بصمة الوجه بنجاح.');
+                      if (!mounted) return;
+                      Navigator.of(this.context).pop(true);
+                    } else if (mounted) {
+                      setState(() => isLoading = false);
+                    }
+                    print('333333333333333333');
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      }
+    }
   }
 
   Future<void> _loadExistingPermissions() async {
@@ -205,48 +532,94 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
             child: Row(
               children: [
                 // Photo
-                Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 3),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 10,
+                SizedBox(
+                  width: 100,
+                  height: 100,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 92,
+                        height: 92,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.grey.shade200,
+                          border: Border.all(color: Colors.white, width: 4),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.30),
+                              blurRadius: 14,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child:
+                              employee['faceImageUrl'] != null &&
+                                  employee['faceImageUrl'].isNotEmpty
+                              ? WebImage(
+                                  src: employee['faceImageUrl'],
+                                  width: 92,
+                                  height: 92,
+                                  fit: BoxFit.cover,
+                                )
+                              : employee['photoURL'] != null &&
+                                    employee['photoURL'].isNotEmpty
+                              ? WebImage(
+                                  src: employee['photoURL'],
+                                  width: 92,
+                                  height: 92,
+                                  fit: BoxFit.cover,
+                                )
+                              : Icon(
+                                  Icons.person,
+                                  size: 52,
+                                  color: Colors.grey.shade500,
+                                ),
+                        ),
                       ),
+
+                      // أيقونة تغيير الصورة
+                      if (widget.isAdmin && employee['id'] == uid)
+                        Positioned(
+                          bottom: -2,
+                          right: -2,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: _changePhoto,
+                              borderRadius: BorderRadius.circular(24),
+                              child: Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1976D2),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 3,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.30),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.camera_alt_rounded,
+                                  color: Colors.white,
+                                  size: 23,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
-                  child: CircleAvatar(
-                    radius: 26,
-                    backgroundColor: Colors.grey.shade300,
-                    child:
-                        employee['faceImageUrl'] != null &&
-                            employee['faceImageUrl'].isNotEmpty
-                        ? ClipOval(
-                            child: WebImage(
-                              src: employee['faceImageUrl'],
-                              width: 52, // ضعف الـ radius
-                              height: 52,
-                              fit: BoxFit.cover,
-                            ),
-                          )
-                        : employee['photoURL'] != null &&
-                              employee['photoURL'].isNotEmpty
-                        ? ClipOval(
-                            child: WebImage(
-                              src: employee['photoURL'],
-                              width: 52, // ضعف الـ radius
-                              height: 52,
-                              fit: BoxFit.cover,
-                            ),
-                          )
-                        : const Icon(
-                            Icons.person,
-                            size: 30,
-                            color: Colors.grey,
-                          ),
-                  ),
                 ),
+
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(

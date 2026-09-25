@@ -306,7 +306,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       } else if (mounted)
         Navigator.pop(context);
     } catch (e) {
-      _snack('حدث خطأ أثناء الحفظ');
+      //  _snack('حدث خطأ أثناء الحفظ');
     } finally {
       if (mounted) setState(() => loading = false);
     }

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:maintenance/addTask.dart';
+
 // import 'package:maintenance/addTask.dart'; // Assuming this is not directly needed for the UI redesign
 
 class AddReportPage extends StatefulWidget {
@@ -99,9 +100,9 @@ class _AddReportPageState extends State<AddReportPage> {
       );
     } catch (e) {
       print('Error submitting report: $e');
-      ScaffoldMessenger.of(
+      /*  ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('حدث خطأ أثناء إرسال البلاغ: $e')));
+      ).showSnackBar(SnackBar(content: Text('حدث خطأ أثناء إرسال البلاغ: $e'))); */
     } finally {
       setState(() => loading = false);
       if (mounted) Navigator.pop(context);
