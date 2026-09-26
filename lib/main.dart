@@ -47,30 +47,262 @@ import 'package:provider/provider.dart';
 
 // ✅ Conditional import للـ Platform Setup
 import 'mobile_setup.dart' if (dart.library.html) 'web_setup.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+final FlutterLocalNotificationsPlugin _notifications =
+    FlutterLocalNotificationsPlugin();
 
-  GoRouter.optionURLReflectsImperativeAPIs = true;
+bool _notificationsInitialized = false;
 
-  // ✅ Platform-specific setup
-  await PlatformSetup.init();
+Future<void> _initializeNotifications() async {
+  if (_notificationsInitialized) return;
+
+  tz.initializeTimeZones();
+  tz.setLocalLocation(tz.getLocation('Africa/Cairo'));
+
+  const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const initializationSettings = InitializationSettings(
+    android: androidSettings,
+  );
+
+  await _notifications.initialize(settings: initializationSettings);
+
+  const channel = AndroidNotificationChannel(
+    'task_reminders',
+    'تنبيهات المهام',
+    description: 'تنبيهات مواعيد بدء المهام',
+    importance: Importance.high,
+  );
+
+  final androidNotifications = _notifications
+      .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin
+      >();
+
+  await androidNotifications?.createNotificationChannel(channel);
+  await androidNotifications?.requestNotificationsPermission();
+
+  _notificationsInitialized = true;
+}
+
+Future<void> scheduleTaskReminder({
+  required String taskId,
+  required String taskTitle,
+  required DateTime startTime,
+  int reminderMinutes = 15,
+}) async {
+  if (taskId.trim().isEmpty || taskTitle.trim().isEmpty) {
+    debugPrint('⚠️ لا يمكن جدولة تنبيه بدون taskId أو عنوان المهمة');
+    return;
+  }
+
+  if (reminderMinutes < 0) {
+    debugPrint('⚠️ عدد دقائق التذكير لا يمكن أن يكون سالبًا');
+    return;
+  }
+
+  await _initializeNotifications();
+
+  final now = DateTime.now();
+  final reminderTime = startTime.subtract(Duration(minutes: reminderMinutes));
+
+  // لا نستخدم isBefore فقط؛ الوقت الحالي نفسه لا يصلح للجدولة أيضًا.
+  if (!reminderTime.isAfter(now)) {
+    debugPrint('⚠️ وقت التنبيه عدى بالفعل: $reminderTime');
+    return;
+  }
+
+  // تحويل الوقت إلى المنطقة الزمنية المهيأة قبل إرساله إلى الإضافة.
+  final scheduledDate = tz.TZDateTime.from(reminderTime, tz.local);
+  final notificationId = taskId.hashCode & 0x7fffffff;
+
+  const notificationDetails = NotificationDetails(
+    android: AndroidNotificationDetails(
+      'task_reminders',
+      'تنبيهات المهام',
+      channelDescription: 'تنبيهات مواعيد بدء المهام',
+      importance: Importance.high,
+      priority: Priority.high,
+      enableVibration: true,
+      playSound: true,
+    ),
+  );
+
+  await _notifications.zonedSchedule(
+    id: notificationId,
+    title: 'تنبيه مهمة',
+    body: '$taskTitle ستبدأ بعد $reminderMinutes دقيقة',
+    scheduledDate: scheduledDate,
+    notificationDetails: notificationDetails,
+    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    payload: 'task:$taskId',
+  );
+
+  debugPrint('✅ تم جدولة تنبيه المهمة: $taskTitle');
+  debugPrint('⏰ وقت التنبيه: $scheduledDate');
+  debugPrint('🆔 Notification ID: $notificationId');
+}
+
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // ============================================================
+  // هذه الدالة تعمل عندما تصل رسالة FCM والتطبيق في الخلفية
+  // أو مغلق.
+  //
+  // يجب تهيئة Firebase داخل الـ Background Isolate.
+  // ============================================================
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  final FirebaseMessaging fcm = FirebaseMessaging.instance;
+  // ============================================================
+  // نتأكد أن الرسالة خاصة بجدولة مهمة
+  // ============================================================
 
-  await fcm.requestPermission(alert: true, badge: true, sound: true);
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    print(message.notification?.title);
-    print(message.notification?.body);
-  });
-  Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-    await Firebase.initializeApp();
-    print("Background message: ${message.messageId}");
+  if (message.data['type'] != 'schedule_task') {
+    return;
   }
 
+  // ============================================================
+  // قراءة بيانات المهمة القادمة من FCM
+  // ============================================================
+
+  final taskId = message.data['taskId'];
+  final taskTitle = message.data['title'];
+
+  final taskDateTimeString = message.data['taskDateTime'];
+
+  final reminderMinutes =
+      int.tryParse(message.data['reminderMinutes'] ?? '15') ?? 15;
+
+  // ============================================================
+  // التأكد من وجود البيانات المطلوبة
+  // ============================================================
+
+  if (taskId == null || taskTitle == null || taskDateTimeString == null) {
+    return;
+  }
+
+  // ============================================================
+  // تحويل وقت المهمة من String إلى DateTime
+  // ============================================================
+
+  final taskDateTime = DateTime.tryParse(taskDateTimeString);
+  if (taskDateTime == null) {
+    debugPrint('⚠️ تاريخ المهمة غير صالح: $taskDateTimeString');
+    return;
+  }
+
+  // ============================================================
+  // جدولة التنبيه محليًا على هاتف الموظف
+  // ============================================================
+
+  await scheduleTaskReminder(
+    taskId: taskId,
+    taskTitle: taskTitle,
+    startTime: taskDateTime,
+    reminderMinutes: reminderMinutes,
+  );
+}
+
+Future<void> main() async {
+  // ============================================================
+  // 1️⃣ تجهيز Flutter قبل تشغيل أي Plugin
+  // ============================================================
+
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // ============================================================
+  // 2️⃣ إعداد GoRouter
+  // ============================================================
+
+  GoRouter.optionURLReflectsImperativeAPIs = true;
+
+  // ============================================================
+  // 3️⃣ إعدادات الـ Platform الخاصة بتطبيقك
+  // ============================================================
+
+  await PlatformSetup.init();
+
+  // ============================================================
+  // 4️⃣ تهيئة Firebase
+  // ============================================================
+
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // ============================================================
+  // 5️⃣ تهيئة Firebase Cloud Messaging
+  // ============================================================
+
+  final FirebaseMessaging fcm = FirebaseMessaging.instance;
+
+  // ============================================================
+  // 6️⃣ طلب صلاحية الإشعارات من المستخدم
+  //
+  // خصوصًا Android 13+
+  // ============================================================
+
+  await fcm.requestPermission(alert: true, badge: true, sound: true);
+
+  // ============================================================
+  // 7️⃣ استقبال الإشعارات عندما يكون التطبيق مفتوحًا
+  //
+  // هنا يمكنك التعامل مع الإشعار إذا كان التطبيق Foreground.
+  //
+  // لاحظ أن الـ Data Message الخاصة بجدولة المهمة
+  // سيتم التعامل معها أيضًا من خلال البيانات.
+  // ============================================================
+
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    debugPrint('Foreground message: ${message.messageId}');
+
+    debugPrint('Title: ${message.notification?.title}');
+
+    debugPrint('Body: ${message.notification?.body}');
+
+    debugPrint('Data: ${message.data}');
+
+    if (message.data['type'] == 'schedule_task') {
+      final taskId = message.data['taskId'];
+      final taskTitle = message.data['title'];
+      final taskDateTimeString = message.data['taskDateTime'];
+      final taskDateTime = taskDateTimeString == null
+          ? null
+          : DateTime.tryParse(taskDateTimeString);
+      final reminderMinutes =
+          int.tryParse(message.data['reminderMinutes'] ?? '15') ?? 15;
+
+      if (taskId != null && taskTitle != null && taskDateTime != null) {
+        scheduleTaskReminder(
+          taskId: taskId,
+          taskTitle: taskTitle,
+          startTime: taskDateTime,
+          reminderMinutes: reminderMinutes,
+        );
+      }
+    }
+  });
+
+  // ============================================================
+  // 8️⃣ تسجيل Background Handler
+  //
+  // مهم جدًا:
+  // الدالة يجب أن تكون خارج main()
+  // وأن تكون Top-Level Function.
+  //
+  // لذلك وضعنا:
+  //
+  // @pragma('vm:entry-point')
+  //
+  // فوقها.
+  // ============================================================
+
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+  // ============================================================
+  // 9️⃣ تشغيل التطبيق
+  // ============================================================
 
   runApp(
     Provider<BillingService>(

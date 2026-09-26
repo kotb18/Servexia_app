@@ -4,6 +4,7 @@ import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 List assetIds = [];
 String? selectedAssetId;
@@ -242,7 +243,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     });
   }
 
-  Future<void> _saveTask() async {
+  Future<void> _saveTask1() async {
     if (!_formKey.currentState!.validate()) return;
 
     if (selectedMembers.isEmpty) {
@@ -310,6 +311,228 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     } finally {
       if (mounted) setState(() => loading = false);
     }
+  }
+
+  Future<void> _saveTask() async {
+    // ============================================================
+    // 1️⃣ التأكد من صحة بيانات الفورم
+    // ============================================================
+    if (!_formKey.currentState!.validate()) return;
+
+    // ============================================================
+    // 2️⃣ لازم يكون فيه عضو واحد على الأقل مكلف بالمهمة
+    // ============================================================
+    if (selectedMembers.isEmpty) {
+      _snack('اختر عضو واحد على الأقل');
+      return;
+    }
+
+    // ============================================================
+    // 3️⃣ لازم يتم اختيار معدة واحدة على الأقل
+    // ============================================================
+    if (assetIds.isEmpty) {
+      _snack('اختر المعدة');
+      return;
+    }
+
+    // ============================================================
+    // 4️⃣ لازم يتم تحديد تاريخ ووقت بداية المهمة
+    // ============================================================
+    if (taskDateTime == null) {
+      _snack('اختر تاريخ ووقت المهمة');
+      return;
+    }
+
+    setState(() => loading = true);
+
+    try {
+      // ============================================================
+      // 5️⃣ التأكد من وجود Document للمجموعة
+      // ============================================================
+      await FirebaseFirestore.instance
+          .collection('tasks')
+          .doc(widget.groupId)
+          .set({'groupId': widget.groupId}, SetOptions(merge: true));
+
+      // ============================================================
+      // 6️⃣ إنشاء ID للمهمة
+      // ============================================================
+      final taskRef = FirebaseFirestore.instance
+          .collection('tasks')
+          .doc(widget.groupId)
+          .collection('items')
+          .doc();
+
+      // ============================================================
+      // 7️⃣ تحديد اسم المهمة
+      // ============================================================
+      final taskTitle = widget.fromConstTasks
+          ? widget.title.text.trim()
+          : titleController.text.trim();
+
+      // ============================================================
+      // 8️⃣ حفظ المهمة في Firestore
+      // ============================================================
+      await taskRef.set({
+        'id': taskRef.id,
+
+        'title': taskTitle,
+
+        'description': widget.fromConstTasks
+            ? widget.description.text.trim()
+            : descController.text.trim(),
+
+        // أعضاء الفريق المكلفين بالمهمة
+        'assignedTo': members
+            .where((m) => selectedMembers.contains(m['id']))
+            .toList(),
+
+        // المعدات المرتبطة بالمهمة
+        'assets': selectedAssets,
+
+        'assetIds': assetIds,
+
+        // وقت بداية المهمة
+        'taskDateTime': Timestamp.fromDate(taskDateTime!),
+
+        // حالة المهمة
+        'status': 'pending',
+
+        'createdAt': FieldValue.serverTimestamp(),
+
+        'isReport': false,
+
+        'comments': [],
+      });
+
+      // ============================================================
+      // 9️⃣ إرسال Data Message للفريق
+      //
+      // ⚠️ هنا الفرق المهم:
+      //
+      // لا نرسل Notification فقط.
+      //
+      // نرسل بيانات المهمة إلى الهاتف.
+      //
+      // Background Handler في هاتف الموظف يستطيع استقبال
+      // البيانات حتى لو التطبيق مغلق، ثم يقوم بجدولة
+      // Local Notification على هاتفه.
+      // ============================================================
+
+      await sendTaskDataMessage(
+        topic: widget.groupId,
+        taskId: taskRef.id,
+        title: taskTitle,
+        taskDateTime: taskDateTime!,
+        reminderMinutes: 15,
+      );
+
+      // ============================================================
+      // 🔟 إشعار عادي للمجموعة
+      //
+      // ده اختياري فقط لإظهار:
+      //
+      // "تم إضافة مهمة جديدة"
+      //
+      // أما جدولة تنبيه موعد المهمة فتتم من خلال الـ Data Message.
+      // ============================================================
+
+      await sendTopicNotification(
+        topic: widget.groupId,
+        title: 'مهمة جديدة',
+        body: 'تم إضافة مهمة جديدة: $taskTitle',
+      );
+
+      // ============================================================
+      // 1️⃣1️⃣ الرجوع بعد نجاح الحفظ
+      // ============================================================
+      if (mounted && widget.fromConstTasks) {
+        Navigator.pop(context);
+        Navigator.pop(context);
+      } else if (mounted) {
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      // ============================================================
+      // في حالة حدوث أي خطأ
+      // ============================================================
+      debugPrint('Error saving task: $e');
+
+      if (mounted) {
+        _snack('حدث خطأ أثناء حفظ المهمة');
+      }
+    } finally {
+      // ============================================================
+      // إيقاف Loading
+      // ============================================================
+      if (mounted) {
+        setState(() => loading = false);
+      }
+    }
+  }
+
+  /// إرسال بيانات المهمة إلى أجهزة الفريق.
+  ///
+  /// الـ Cloud Function تقوم بإرسال FCM Data Message
+  /// إلى الـ Topic الخاص بالمجموعة.
+  ///
+  /// لا يتم جدولة التنبيه هنا.
+  ///
+  /// عند وصول الرسالة إلى هاتف الموظف في الخلفية:
+  /// FirebaseMessaging.onBackgroundMessage
+  /// سيقوم باستقبال البيانات وجدولة التنبيه محليًا.
+  Future<void> sendTaskDataMessage({
+    required String topic,
+    required String taskId,
+    required String title,
+    required DateTime taskDateTime,
+    int reminderMinutes = 15,
+  }) async {
+    // ============================================================
+    // 1️⃣ حساب وقت التنبيه
+    //
+    // مثال:
+    // المهمة 18:00
+    // التنبيه قبلها بـ 15 دقيقة
+    // إذن التنبيه سيكون 17:45
+    // ============================================================
+
+    final reminderTime = taskDateTime.subtract(
+      Duration(minutes: reminderMinutes),
+    );
+
+    // ============================================================
+    // 2️⃣ لو وقت التنبيه عدى بالفعل
+    // لا يوجد داعي لإرسال Data Message.
+    // ============================================================
+
+    if (reminderTime.isBefore(DateTime.now())) {
+      return;
+    }
+
+    // ============================================================
+    // 3️⃣ استدعاء Cloud Function
+    // ============================================================
+
+    final callable = FirebaseFunctions.instance.httpsCallable(
+      'sendTaskDataMessage',
+    );
+
+    // ============================================================
+    // 4️⃣ إرسال بيانات المهمة إلى Cloud Function
+    // ============================================================
+
+    await callable.call({
+      'topic': topic,
+      'taskId': taskId,
+      'title': title,
+
+      // نحول التاريخ إلى String حتى نستطيع إرساله
+      // داخل FCM Data Message.
+      'taskDateTime': taskDateTime.toIso8601String(),
+
+      'reminderMinutes': reminderMinutes,
+    });
   }
 
   void _snack(String msg) {

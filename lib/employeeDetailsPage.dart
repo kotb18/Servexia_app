@@ -590,8 +590,8 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
                               onTap: _changePhoto,
                               borderRadius: BorderRadius.circular(24),
                               child: Container(
-                                width: 42,
-                                height: 42,
+                                width: 35,
+                                height: 35,
                                 decoration: BoxDecoration(
                                   color: const Color(0xFF1976D2),
                                   shape: BoxShape.circle,
@@ -610,7 +610,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
                                 child: const Icon(
                                   Icons.camera_alt_rounded,
                                   color: Colors.white,
-                                  size: 23,
+                                  size: 18,
                                 ),
                               ),
                             ),
