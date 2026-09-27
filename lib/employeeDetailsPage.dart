@@ -46,6 +46,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
     'إضافة مهمة': false,
     'إنهاء المهام': false,
     'طلبات الانضمام': false,
+    'الحضور والانصراف': false,
   };
 
   @override
@@ -845,6 +846,9 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
         break;
       case 'طلبات الانضمام':
         icon = Icons.groups_outlined;
+        break;
+      case 'الحضور والانصراف':
+        icon = Icons.face;
         break;
       default:
         icon = Icons.check_circle_outline;

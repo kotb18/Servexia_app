@@ -91,6 +91,7 @@ class _CreategroupState extends State<Creategroup> {
     'إضافة مهمة': true,
     'إنهاء المهام': true,
     'طلبات الانضمام': true,
+    'الحضور والانصراف': true,
   };
 
   Future<String?> getGooglePhoneNumber() async {

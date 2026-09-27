@@ -519,14 +519,15 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                       '/team/${widget.workspaceId}?adminId=${Uri.encodeQueryComponent((workspaceData!['adminId'] ?? '').toString())}&isXadmin=${workspaceData!['adminId'] == uid}&isAdmin=$isAdmin',
                     ),
                   ),
-                  _buildDashboardCard(
-                    icon: Icons.badge,
-                    title: 'الحضور والانصراف',
-                    color: const Color.fromARGB(255, 6, 104, 160),
-                    onTap: () => _goTo(
-                      '/attendance/${widget.workspaceId}?isAdmin=$isAdmin',
+                  if (permissions['الحضور والانصراف'] == true)
+                    _buildDashboardCard(
+                      icon: Icons.badge,
+                      title: 'الحضور والانصراف',
+                      color: const Color.fromARGB(255, 6, 104, 160),
+                      onTap: () => _goTo(
+                        '/attendance/${widget.workspaceId}?isAdmin=$isAdmin',
+                      ),
                     ),
-                  ),
                   // Admin Join Requests Card with Badge
                   if (permissions['طلبات الانضمام'] == true)
                     StreamBuilder<QuerySnapshot>(

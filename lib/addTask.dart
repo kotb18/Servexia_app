@@ -243,7 +243,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     });
   }
 
-  Future<void> _saveTask1() async {
+  Future<void> _saveTask() async {
     if (!_formKey.currentState!.validate()) return;
 
     if (selectedMembers.isEmpty) {
@@ -313,7 +313,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     }
   }
 
-  Future<void> _saveTask() async {
+  Future<void> _saveTask1() async {
     // ============================================================
     // 1️⃣ التأكد من صحة بيانات الفورم
     // ============================================================
@@ -424,7 +424,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
         taskId: taskRef.id,
         title: taskTitle,
         taskDateTime: taskDateTime!,
-        reminderMinutes: 15,
+        reminderMinutes: 10,
       );
 
       // ============================================================
@@ -486,7 +486,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
     required String taskId,
     required String title,
     required DateTime taskDateTime,
-    int reminderMinutes = 15,
+    int reminderMinutes = 10,
   }) async {
     // ============================================================
     // 1️⃣ حساب وقت التنبيه
@@ -866,6 +866,24 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                       ),
                     ),
                     const SizedBox(height: 30),
+                    /*  ElevatedButton(
+                      onPressed: () async {
+                        print('🧪 بدء اختبار التنبيه المحلي');
+
+                        await scheduleTaskReminder(
+                          taskId:
+                              'manual_test_${DateTime.now().millisecondsSinceEpoch}',
+                          taskTitle: '🔔 اختبار تنبيه Servexia',
+                          startTime: DateTime.now().add(
+                            const Duration(seconds: 90),
+                          ),
+                          reminderMinutes: 0,
+                        );
+
+                        print('✅ تم جدولة التنبيه ليظهر بعد 50 ثانية');
+                      },
+                      child: const Text('اختبار التنبيه بعد 50 ثانية'),
+                    ), */
                   ],
                 ),
               ),

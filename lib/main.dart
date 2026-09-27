@@ -56,7 +56,7 @@ final FlutterLocalNotificationsPlugin _notifications =
 
 bool _notificationsInitialized = false;
 
-Future<void> _initializeNotifications() async {
+Future<void> initializeNotifications() async {
   if (_notificationsInitialized) return;
 
   tz.initializeTimeZones();
@@ -103,7 +103,7 @@ Future<void> scheduleTaskReminder({
     return;
   }
 
-  await _initializeNotifications();
+  await initializeNotifications();
 
   final now = DateTime.now();
   final reminderTime = startTime.subtract(Duration(minutes: reminderMinutes));
@@ -130,80 +130,76 @@ Future<void> scheduleTaskReminder({
     ),
   );
 
+  // التحقق من صلاحية Exact Alarms (Android 12+)
+  // إذا لم تكن ممنوحة نستخدم الجدولة غير الدقيقة حتى لا يفشل التنبيه
+  final androidNotifications = _notifications
+      .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin
+      >();
+  final canScheduleExact =
+      await androidNotifications?.canScheduleExactNotifications() ?? false;
+
+  final androidScheduleMode = canScheduleExact
+      ? AndroidScheduleMode.exactAllowWhileIdle
+      : AndroidScheduleMode.inexactAllowWhileIdle;
+
   await _notifications.zonedSchedule(
     id: notificationId,
     title: 'تنبيه مهمة',
     body: '$taskTitle ستبدأ بعد $reminderMinutes دقيقة',
     scheduledDate: scheduledDate,
     notificationDetails: notificationDetails,
-    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    androidScheduleMode: androidScheduleMode,
     payload: 'task:$taskId',
   );
 
-  debugPrint('✅ تم جدولة تنبيه المهمة: $taskTitle');
+  debugPrint('⏰ mode: $androidScheduleMode');
+
+  print('✅ تم جدولة تنبيه المهمة: $taskTitle');
   debugPrint('⏰ وقت التنبيه: $scheduledDate');
   debugPrint('🆔 Notification ID: $notificationId');
 }
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // ============================================================
-  // هذه الدالة تعمل عندما تصل رسالة FCM والتطبيق في الخلفية
-  // أو مغلق.
-  //
-  // يجب تهيئة Firebase داخل الـ Background Isolate.
-  // ============================================================
+  try {
+    debugPrint('✅ وصلت رسالة في الخلفية');
+    debugPrint('📦 البيانات: ${message.data}');
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    if (message.data['type'] != 'schedule_task') {
+      debugPrint('⚠️ الرسالة ليست رسالة جدولة');
+      return;
+    }
 
-  // ============================================================
-  // نتأكد أن الرسالة خاصة بجدولة مهمة
-  // ============================================================
+    final taskId = message.data['taskId'];
+    final taskTitle = message.data['title'];
+    final taskDateTimeString = message.data['taskDateTime'];
+    final reminderMinutes =
+        int.tryParse(message.data['reminderMinutes'] ?? '15') ?? 15;
 
-  if (message.data['type'] != 'schedule_task') {
-    return;
+    if (taskId == null || taskTitle == null || taskDateTimeString == null) {
+      debugPrint('❌ بيانات الجدولة ناقصة');
+      return;
+    }
+
+    final taskDateTime = DateTime.tryParse(taskDateTimeString);
+    if (taskDateTime == null) {
+      debugPrint('❌ تنسيق taskDateTime غير صالح: $taskDateTimeString');
+      return;
+    }
+
+    await scheduleTaskReminder(
+      taskId: taskId,
+      taskTitle: taskTitle,
+      startTime: taskDateTime,
+      reminderMinutes: reminderMinutes,
+    );
+
+    print('✅ تمت جدولة تنبيه المهمة في الخلفية: $taskTitle');
+  } catch (e, stackTrace) {
+    print('❌ خطأ داخل Background Handler: $e');
+    print('$stackTrace');
   }
-
-  // ============================================================
-  // قراءة بيانات المهمة القادمة من FCM
-  // ============================================================
-
-  final taskId = message.data['taskId'];
-  final taskTitle = message.data['title'];
-
-  final taskDateTimeString = message.data['taskDateTime'];
-
-  final reminderMinutes =
-      int.tryParse(message.data['reminderMinutes'] ?? '15') ?? 15;
-
-  // ============================================================
-  // التأكد من وجود البيانات المطلوبة
-  // ============================================================
-
-  if (taskId == null || taskTitle == null || taskDateTimeString == null) {
-    return;
-  }
-
-  // ============================================================
-  // تحويل وقت المهمة من String إلى DateTime
-  // ============================================================
-
-  final taskDateTime = DateTime.tryParse(taskDateTimeString);
-  if (taskDateTime == null) {
-    debugPrint('⚠️ تاريخ المهمة غير صالح: $taskDateTimeString');
-    return;
-  }
-
-  // ============================================================
-  // جدولة التنبيه محليًا على هاتف الموظف
-  // ============================================================
-
-  await scheduleTaskReminder(
-    taskId: taskId,
-    taskTitle: taskTitle,
-    startTime: taskDateTime,
-    reminderMinutes: reminderMinutes,
-  );
 }
 
 Future<void> main() async {
@@ -242,9 +238,12 @@ Future<void> main() async {
   //
   // خصوصًا Android 13+
   // ============================================================
-
+  /* final androidPlugin = _notifications
+      .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin
+      >(); */
   await fcm.requestPermission(alert: true, badge: true, sound: true);
-
+  // await androidPlugin?.requestExactAlarmsPermission();
   // ============================================================
   // 7️⃣ استقبال الإشعارات عندما يكون التطبيق مفتوحًا
   //
