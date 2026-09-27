@@ -46,6 +46,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
     'إضافة مهمة': false,
     'إنهاء المهام': false,
     'طلبات الانضمام': false,
+    'الحضور والانصراف': false,
   };
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
   _permissionsSubscription;
