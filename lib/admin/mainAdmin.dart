@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:maintenance/admin/feedBack.dart';
 import 'package:maintenance/admin/groups.dart';
+import 'package:maintenance/admin/notificationPage.dart';
+import 'package:maintenance/admin/settingsGroups.dart';
 
 class MainAdmin extends StatefulWidget {
   const MainAdmin({super.key});
@@ -50,7 +52,18 @@ class _MainAdminState extends State<MainAdmin> {
                       );
                     },
                   ),
-
+                  _adminButton(
+                    icon: Iconsax.notification,
+                    title: 'ارسال اشعار الى المستخدمين',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const Notificationpage(),
+                        ),
+                      );
+                    },
+                  ),
                   _adminButton(
                     icon: Iconsax.user,
                     title: 'مسح السجلات المنتهية',
@@ -62,7 +75,12 @@ class _MainAdminState extends State<MainAdmin> {
                   _adminButton(
                     icon: Iconsax.setting,
                     title: 'الإعدادات',
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => SettingsGroups()),
+                      );
+                    },
                   ),
 
                   _adminButton(

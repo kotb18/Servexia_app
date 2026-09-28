@@ -94,6 +94,7 @@ class _HomepageState extends State<Homepage>
   String? token = '';
   String? youTubeUrl;
   String? websiteUrl;
+  String? whatsNumber;
   Future<void> getVariables() async {
     final doc = await FirebaseFirestore.instance
         .collection('variables')
@@ -109,6 +110,7 @@ class _HomepageState extends State<Homepage>
     maxGroup = data!['maxGroup'];
     youTubeUrl = data['youTubeUrl'];
     websiteUrl = data['websiteUrl'];
+    whatsNumber = data['whatsNumber'];
   }
 
   @override
@@ -484,6 +486,16 @@ class _HomepageState extends State<Homepage>
               }
             },
           ),
+          _buildDrawerItem(Icons.chat_outlined, 'تواصل واتـــــس اب', () async {
+            final Uri url = Uri.parse(
+              'https://wa.me/$whatsNumber?text=${Uri.encodeComponent('')}',
+            );
+            if (await canLaunchUrl(url)) {
+              await launchUrl(url, mode: LaunchMode.externalApplication);
+            } else {
+              throw 'تعذر فتح واتساب';
+            }
+          }),
           _buildDrawerItem(Icons.help_outline, 'شرح طريقة عمل التطبيق', () {
             launchUrl(Uri.parse(youTubeUrl ?? 'https://youtu.be/F-NiFb6uWQ0'));
           }),

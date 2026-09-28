@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class UserDetails extends StatefulWidget {
   const UserDetails({super.key, required this.groupId});
@@ -12,6 +13,7 @@ class UserDetails extends StatefulWidget {
 
 class _UserDetailsState extends State<UserDetails> {
   late Future<_GroupOverview> _overviewFuture;
+  // String? _ownerId;
 
   @override
   void initState() {
@@ -110,43 +112,40 @@ class _UserDetailsState extends State<UserDetails> {
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF5F7FB),
-        appBar: AppBar(
-          title: const Text('تفاصيل المجموعة'),
-          centerTitle: true,
-          actions: [
-            IconButton(
-              tooltip: 'تحديث البيانات',
-              onPressed: _refresh,
-              icon: const Icon(Icons.refresh_rounded),
-            ),
-          ],
-        ),
-        body: FutureBuilder<_GroupOverview>(
-          future: _overviewFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return _ErrorView(
-                message: 'تعذر تحميل بيانات المجموعة',
-                onRetry: _refresh,
-              );
-            }
-            if (!snapshot.hasData || snapshot.data!.group.isEmpty) {
-              return _ErrorView(
-                message: 'المجموعة غير موجودة أو تم حذفها',
-                onRetry: _refresh,
-              );
-            }
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FB),
+      appBar: AppBar(
+        title: const Text('تفاصيل المجموعة'),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: 'تحديث البيانات',
+            onPressed: _refresh,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
+      ),
+      body: FutureBuilder<_GroupOverview>(
+        future: _overviewFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return _ErrorView(
+              message: 'تعذر تحميل بيانات المجموعة',
+              onRetry: _refresh,
+            );
+          }
+          if (!snapshot.hasData || snapshot.data!.group.isEmpty) {
+            return _ErrorView(
+              message: 'المجموعة غير موجودة أو تم حذفها',
+              onRetry: _refresh,
+            );
+          }
 
-            return _buildContent(snapshot.data!);
-          },
-        ),
+          return _buildContent(snapshot.data!);
+        },
       ),
     );
   }
@@ -184,8 +183,235 @@ class _UserDetailsState extends State<UserDetails> {
             ...activeSections.map(
               (entry) => _buildSection(entry.key, entry.value),
             ),
+          Card(
+            elevation: 0,
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                children: [
+                  // الأيقونة
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(
+                      Icons.event_available_rounded,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 28,
+                    ),
+                  ),
+
+                  const SizedBox(width: 14),
+
+                  // النص
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'فترة السماح',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          'تعديل موعد انتهاء اشتراك مالك المجموعة',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(width: 10),
+
+                  // زر التعديل
+                  IconButton.filled(
+                    tooltip: 'تعديل فترة السماح',
+                    onPressed: () {
+                      _adjustingGracePeriod(group: group);
+                    },
+                    icon: const Icon(Icons.edit_calendar_rounded),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 40),
+          SizedBox(height: 60),
         ],
       ),
+    );
+  }
+
+  Future<void> _adjustingGracePeriod({
+    required Map<String, dynamic> group,
+  }) async {
+    final adminId = group['admins'][0];
+
+    final userRef = FirebaseFirestore.instance.collection('users').doc(adminId);
+
+    final userSnap = await userRef.get();
+    final firestore = FirebaseFirestore.instance;
+    final batch = firestore.batch();
+
+    final groupsQuery = await firestore
+        .collection('groups')
+        .where('adminId', isEqualTo: adminId)
+        .get();
+
+    if (!userSnap.exists) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لم يتم العثور على بيانات المستخدم')),
+      );
+
+      return;
+    }
+
+    final data = userSnap.data()!;
+
+    DateTime expiredAt;
+
+    final expiredValue = data['expiredAt'];
+
+    if (expiredValue is Timestamp) {
+      expiredAt = expiredValue.toDate();
+    } else if (expiredValue is DateTime) {
+      expiredAt = expiredValue;
+    } else {
+      // لو مفيش تاريخ انتهاء، نبدأ من اليوم
+      expiredAt = DateTime.now();
+    }
+
+    if (!mounted) return;
+
+    DateTime selectedDate = expiredAt;
+    DateTime newDateOfRemoveGroups = selectedDate.add(Duration(days: 70));
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text(
+                'تعديل موعد انتهاء الاشتراك',
+                // textDirection: TextDirection.rtl,
+              ),
+
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'موعد انتهاء الاشتراك الحالي:',
+                    // textDirection: TextDirection.rtl,
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  Text(
+                    DateFormat('yyyy/MM/dd - hh:mm a').format(expiredAt),
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    //  textDirection: TextDirection.rtl,
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2100),
+                      );
+
+                      if (date == null) return;
+
+                      setState(() {
+                        selectedDate = DateTime(
+                          date.year,
+                          date.month,
+                          date.day,
+                          selectedDate.hour,
+                          selectedDate.minute,
+                        );
+                        newDateOfRemoveGroups = selectedDate.add(
+                          Duration(days: 70),
+                        );
+                      });
+                    },
+                    icon: const Icon(Icons.calendar_month),
+                    label: Text(DateFormat('yyyy/MM/dd').format(selectedDate)),
+                  ),
+                ],
+              ),
+
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                  },
+                  child: const Text('إلغاء'),
+                ),
+
+                FilledButton(
+                  onPressed: () async {
+                    try {
+                      batch.update(userRef, {
+                        'expiredAt': Timestamp.fromDate(selectedDate),
+                        'status': '1',
+                      });
+                      for (final doc in groupsQuery.docs) {
+                        batch.update(doc.reference, {
+                          'willDeleteAt': newDateOfRemoveGroups,
+                        });
+                      }
+                      await batch.commit();
+                      if (!dialogContext.mounted) return;
+
+                      Navigator.pop(dialogContext);
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('تم تعديل موعد انتهاء الاشتراك بنجاح'),
+                        ),
+                      );
+                    } catch (e) {
+                      if (!dialogContext.mounted) return;
+
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text('حدث خطأ: $e')));
+                    }
+                  },
+                  child: const Text('حفظ'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
