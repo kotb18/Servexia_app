@@ -172,7 +172,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
               ),
               const SizedBox(height: 16),
               Text(
-                'لم يتم العثور على بيانات المساحة',
+                'لم يتم العثور على بيانات المجموعة',
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey.shade700,
@@ -292,7 +292,27 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 9),
+          if (data['admins'][0] == uid)
+            InkWell(
+              onTap: () {
+                _handleEditeGroupName(
+                  data,
+                  TextEditingController(text: data['name']?.toString() ?? ''),
+                  context,
+                );
+              },
+              child: Text(
+                'لتعديل اسم المجموعة اضغط هنا.',
+                style: TextStyle(
+                  color: const Color.fromARGB(255, 187, 210, 222),
+                  decoration: TextDecoration.underline,
+                  decorationColor: Colors.blue,
+                  decorationThickness: 2,
+                ),
+              ),
+            ),
+          const SizedBox(height: 9),
           Row(
             children: [
               const Icon(Icons.location_on, color: Colors.white70, size: 18),
@@ -343,6 +363,110 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
           ),
         ],
       ),
+    );
+  }
+
+  void _handleEditeGroupName(
+    Map<String, dynamic> data,
+    TextEditingController name,
+    BuildContext dialogContext,
+  ) {
+    showDialog(
+      context: dialogContext,
+      builder: (dialogContext) {
+        bool isLoading = false;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text(
+                'تغيير اسم المجموعة',
+                textAlign: TextAlign.center,
+              ),
+              content: TextField(
+                controller: name,
+                autofocus: true,
+                textAlign: TextAlign.right,
+                decoration: InputDecoration(
+                  labelText: 'اسم المجموعة',
+                  hintText: 'اكتب اسم المجموعة',
+                  prefixIcon: const Icon(Icons.groups_outlined),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onTap: () {
+                  name.selection = TextSelection(
+                    baseOffset: 0,
+                    extentOffset: name.text.length,
+                  );
+                },
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isLoading
+                      ? null
+                      : () {
+                          Navigator.pop(dialogContext);
+                        },
+                  child: const Text('إلغاء'),
+                ),
+
+                ElevatedButton.icon(
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          if (name.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('من فضلك أدخل اسم المجموعة'),
+                              ),
+                            );
+                            return;
+                          }
+
+                          setState(() {
+                            isLoading = true;
+                          });
+
+                          try {
+                            final newName = name.text.trim();
+
+                            await FirebaseFirestore.instance
+                                .collection('groups')
+                                .doc(data['docId'])
+                                .update({'name': newName});
+
+                            if (context.mounted) {
+                              Navigator.pop(dialogContext);
+                              Navigator.pop(dialogContext);
+                            }
+                          } catch (e) {
+                            setState(() {
+                              isLoading = false;
+                            });
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('حدث خطأ أثناء الحفظ: $e'),
+                              ),
+                            );
+                          }
+                        },
+                  icon: isLoading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save_outlined),
+                  label: Text(isLoading ? 'جاري الحفظ...' : 'حفظ'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

@@ -100,9 +100,9 @@ class _AddReportPageState extends State<AddReportPage> {
       );
     } catch (e) {
       print('Error submitting report: $e');
-      /*  ScaffoldMessenger.of(
+      ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('حدث خطأ أثناء إرسال البلاغ: $e'))); */
+      ).showSnackBar(SnackBar(content: Text('حدث خطأ أثناء إرسال البلاغ: $e')));
     } finally {
       setState(() => loading = false);
       if (mounted) Navigator.pop(context);

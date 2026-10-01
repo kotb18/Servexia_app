@@ -25,70 +25,88 @@ class _MainAdminState extends State<MainAdmin> {
           ? const Center(child: CircularProgressIndicator())
           : Padding(
               padding: const EdgeInsets.all(16),
-              child: GridView.count(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                children: [
-                  _adminButton(
-                    icon: Iconsax.message_question,
-                    title: 'الاقتراحات\nوالشكاوى',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const FeedbacksPage(),
-                        ),
-                      );
-                    },
-                  ),
-                  _adminButton(
-                    icon: Icons.group,
-                    title: 'متابعة المجموعات',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const GroupsMintor()),
-                      );
-                    },
-                  ),
-                  _adminButton(
-                    icon: Iconsax.notification,
-                    title: 'ارسال اشعار الى المستخدمين',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const Notificationpage(),
-                        ),
-                      );
-                    },
-                  ),
-                  _adminButton(
-                    icon: Iconsax.user,
-                    title: 'مسح السجلات المنتهية',
-                    onTap: () {
-                      deleteExpiredAttendance(context);
-                    },
-                  ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth;
 
-                  _adminButton(
-                    icon: Iconsax.setting,
-                    title: 'الإعدادات',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => SettingsGroups()),
-                      );
-                    },
-                  ),
+                  int crossAxisCount;
 
-                  _adminButton(
-                    icon: Iconsax.logout,
-                    title: 'تسجيل الخروج',
-                    onTap: () {},
-                  ),
-                ],
+                  if (width < 600) {
+                    crossAxisCount = 2; // موبايل
+                  } else if (width < 1000) {
+                    crossAxisCount = 3; // تابلت / شاشة متوسطة
+                  } else {
+                    crossAxisCount = 4; // ويب
+                  }
+
+                  return GridView.count(
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    children: [
+                      _adminButton(
+                        icon: Iconsax.message_question,
+                        title: 'الاقتراحات\nوالشكاوى',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const FeedbacksPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      _adminButton(
+                        icon: Icons.group,
+                        title: 'متابعة المجموعات',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const GroupsMintor(),
+                            ),
+                          );
+                        },
+                      ),
+                      _adminButton(
+                        icon: Iconsax.notification,
+                        title: 'ارسال اشعار الى المستخدمين',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const Notificationpage(),
+                            ),
+                          );
+                        },
+                      ),
+                      _adminButton(
+                        icon: Iconsax.user,
+                        title: 'مسح السجلات المنتهية',
+                        onTap: () {
+                          deleteExpiredAttendance(context);
+                        },
+                      ),
+
+                      _adminButton(
+                        icon: Iconsax.setting,
+                        title: 'الإعدادات',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => SettingsGroups()),
+                          );
+                        },
+                      ),
+
+                      _adminButton(
+                        icon: Iconsax.logout,
+                        title: 'تسجيل الخروج',
+                        onTap: () {},
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
     );

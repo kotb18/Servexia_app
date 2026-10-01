@@ -24,6 +24,7 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
   final siteController = TextEditingController();
   final locationController = TextEditingController();
   final assetNameController = TextEditingController();
+  final modelController = TextEditingController();
   final assetNumberController = TextEditingController();
 
   bool loading = false;
@@ -66,6 +67,7 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
     siteController.dispose();
     locationController.dispose();
     assetNameController.dispose();
+    modelController.dispose();
     assetNumberController.dispose();
     super.dispose();
   }
@@ -100,6 +102,7 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
       'site': siteController.text.trim(), // الموقع
       'location': locationController.text.trim(), // مكانه داخل الموقع
       'name': assetNameController.text.trim(), // اسم المعدة
+      'model': modelController.text.trim(), // موديل المعدة
       'number': assetNumberController.text.trim(), // رقم المعدة
       'createdAt': FieldValue.serverTimestamp(),
       'status': 'active',
@@ -112,58 +115,91 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('إضافة أصل'), centerTitle: true),
-      bottomNavigationBar: SafeArea(
+      appBar: AppBar(
+        title: const Text(
+          'إضافة أصل جديد',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: const Color(0xFF1E88E5),
+        foregroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 18),
           child: SizedBox(
             width: double.infinity,
-            height: 52,
-            child: ElevatedButton.icon(
+            child: FloatingActionButton.extended(
+              heroTag: 'saveAsset',
               onPressed: loading ? null : _saveAsset,
-              icon: const Icon(Icons.save),
-              label: const Text('حفظ الأصل'),
-              style: ElevatedButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
+              backgroundColor: const Color(0xFF1E88E5),
+              foregroundColor: Colors.white,
+              elevation: 6,
+              icon: loading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: Text(loading ? 'جاري الحفظ...' : 'حفظ الأصل'),
             ),
           ),
         ),
       ),
-
       body: loading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16),
-              child: Form(
-                key: _formKey,
-                child: ListView(
-                  children: [
-                    _sectionCard(
-                      title: 'الموقع',
-                      icon: Icons.location_city,
-                      child: _siteDropdown(),
+          : Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.blue.shade50, Colors.grey.shade50],
+                ),
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Form(
+                    key: _formKey,
+                    child: ListView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.only(bottom: 100),
+                      children: [
+                        _sectionCard(
+                          title: 'الموقع',
+                          icon: Icons.location_city,
+                          child: _siteDropdown(),
+                        ),
+                        _sectionCard(
+                          title: 'المكان داخل الموقع',
+                          icon: Icons.place,
+                          child: _locationDropdown(),
+                        ),
+                        _sectionCard(
+                          title: 'بيانات المعدة',
+                          icon: Icons.precision_manufacturing,
+                          child: Column(
+                            children: [
+                              _assetNameDropdown(),
+                              const SizedBox(height: 12),
+                              _assetModelField(),
+                              const SizedBox(height: 12),
+                              _assetNumberField(),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    _sectionCard(
-                      title: 'المكان داخل الموقع',
-                      icon: Icons.place,
-                      child: _locationDropdown(),
-                    ),
-                    _sectionCard(
-                      title: 'بيانات المعدة',
-                      icon: Icons.precision_manufacturing,
-                      child: Column(
-                        children: [
-                          _assetNameDropdown(),
-                          const SizedBox(height: 12),
-                          _assetNumberField(),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 80),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -332,6 +368,20 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
               },
         );
       },
+    );
+  }
+
+  /// 🔽 موديل المعدة
+  Widget _assetModelField() {
+    return TextFormField(
+      controller: modelController,
+      textInputAction: TextInputAction.next,
+      decoration: InputDecoration(
+        labelText: 'موديل المعدة',
+        hintText: 'Caterpillar C15',
+        prefixIcon: const Icon(Icons.settings_outlined),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      ),
     );
   }
 

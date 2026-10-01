@@ -307,7 +307,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       } else if (mounted)
         Navigator.pop(context);
     } catch (e) {
-      //  _snack('حدث خطأ أثناء الحفظ');
+      _snack('حدث خطأ أثناء الحفظ');
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -1122,67 +1122,129 @@ Future<void> sendTopicNotification({
   print(
     "Sending notification to topic: $topic with title: $title and body: $body",
   );
-  final accessToken = await getAccessToken();
-  print("Obtained access token: $accessToken");
+
+  String? accessToken;
+
+  try {
+    accessToken = await getAccessToken();
+  } catch (e) {
+    print("❌ Failed to get access token: $e");
+    return;
+  }
+
+  // لو getAccessToken رجع null أو فاضي
+  if (accessToken.trim().isEmpty) {
+    print("❌ Access token is null or empty");
+    return;
+  }
+
+  print("✅ Obtained access token");
+
   final url = Uri.parse(
     "https://fcm.googleapis.com/v1/projects/maintenance-b7282/messages:send",
   );
 
-  await http.post(
-    url,
-    headers: {
-      "Authorization": "Bearer $accessToken",
-      "Content-Type": "application/json",
-    },
-    body: jsonEncode({
-      "message": {
-        "topic": topic,
-        "notification": {"title": title, "body": body},
-        "data": {"route": "home"},
-        "android": {
-          "priority": "HIGH", // ملاحظة: يجب أن تكون HIGH وليس high
-          "notification": {"channel_id": "high_importance_channel"},
-        },
+  try {
+    final response = await http.post(
+      url,
+      headers: {
+        "Authorization": "Bearer $accessToken",
+        "Content-Type": "application/json",
       },
-    }),
-  );
-  print('45123');
+      body: jsonEncode({
+        "message": {
+          "topic": topic,
+          "notification": {"title": title, "body": body},
+          "data": {"route": "home"},
+          "android": {
+            "priority": "HIGH",
+            "notification": {"channel_id": "high_importance_channel"},
+          },
+        },
+      }),
+    );
+
+    print("FCM status: ${response.statusCode}");
+    print("FCM response: ${response.body}");
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      print("✅ Notification sent successfully");
+    } else {
+      print("❌ Failed to send notification");
+    }
+  } catch (e) {
+    print("❌ Error sending notification: $e");
+  }
 }
 
 Future<void> sendNotificationToDevice({
-  required String deviceToken, // FCM Device Token
+  required String deviceToken,
   required String title,
   required String body,
-  // الـ Access Token اللي حصلت عليه
 }) async {
   print('111111111111111111111111111111111');
+
+  // التأكد من وجود Device Token
+  if (deviceToken.trim().isEmpty) {
+    print("❌ Device token is empty");
+    return;
+  }
+
+  String? accessToken;
+
+  // الحصول على Access Token
+  try {
+    accessToken = await getAccessToken();
+  } catch (e) {
+    print("❌ Failed to get access token: $e");
+    return;
+  }
+
+  // التأكد من أن Access Token موجود
+  if (accessToken.trim().isEmpty) {
+    print("❌ Access token is null or empty");
+    return;
+  }
+
+  print("✅ Access token obtained");
+
   final url = Uri.parse(
     "https://fcm.googleapis.com/v1/projects/maintenance-b7282/messages:send",
   );
 
   final payload = {
     "message": {
-      "token": deviceToken, // هنا نستخدم token بدل topic
+      "token": deviceToken,
       "notification": {"title": title, "body": body},
       "android": {
-        "priority": "HIGH", // ملاحظة: يجب أن تكون HIGH وليس high
+        "priority": "HIGH",
         "notification": {"channel_id": "high_importance_channel"},
       },
       "data": {"route": "home"},
     },
   };
-  final accessToken = await getAccessToken();
-  final response = await http.post(
-    url,
-    headers: {
-      "Authorization": "Bearer $accessToken",
-      "Content-Type": "application/json",
-    },
-    body: jsonEncode(payload),
-  );
 
-  print("FCM Response Status: ${response.statusCode}");
-  print("FCM Response Body: ${response.body}");
+  try {
+    final response = await http.post(
+      url,
+      headers: {
+        "Authorization": "Bearer $accessToken",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode(payload),
+    );
+
+    print("FCM Response Status: ${response.statusCode}");
+    print("FCM Response Body: ${response.body}");
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      print("✅ Notification sent successfully");
+    } else {
+      print("❌ Failed to send notification");
+    }
+  } catch (e) {
+    print("❌ Error sending notification: $e");
+  }
 }
 
 class ConstTasksManager extends StatefulWidget {

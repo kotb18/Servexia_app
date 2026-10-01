@@ -1,8 +1,43 @@
 import 'dart:convert';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
+class _PendingNotification {
+  const _PendingNotification({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String title;
+  final String body;
+  final DateTime createdAt;
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'body': body,
+    'createdAt': createdAt.toIso8601String(),
+  };
+
+  factory _PendingNotification.fromJson(Map<String, dynamic> json) {
+    return _PendingNotification(
+      id: (json['id'] ?? '').toString(),
+      title: (json['title'] ?? '').toString(),
+      body: (json['body'] ?? '').toString(),
+      createdAt:
+          DateTime.tryParse((json['createdAt'] ?? '').toString()) ??
+          DateTime.now(),
+    );
+  }
+}
 
 class Notificationpage extends StatefulWidget {
   const Notificationpage({super.key});
@@ -13,76 +48,426 @@ class Notificationpage extends StatefulWidget {
 }
 
 class _NotificationpageState extends State<Notificationpage> {
+  static const _localStorageKey = 'pending_notifications';
+  static const _firestoreCollection = 'pending_notifications';
+
   final _formKey = GlobalKey<FormState>();
-  TextEditingController notTitle = TextEditingController();
-  TextEditingController notBody = TextEditingController();
+  final _notTitle = TextEditingController();
+  final _notBody = TextEditingController();
+  final List<_PendingNotification> _pendingNotifications = [];
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  bool _isLoading = true;
+  bool _isSending = false;
+  String? _selectedNotificationId;
+  String? _storageMessage;
+
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
-    getAccessToken();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
+    List<_PendingNotification>? localNotifications;
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final encoded = preferences.getString(_localStorageKey);
+      if (encoded != null && encoded.isNotEmpty) {
+        final decoded = jsonDecode(encoded);
+        if (decoded is List) {
+          localNotifications = decoded
+              .whereType<Map>()
+              .map(
+                (item) => _PendingNotification.fromJson(
+                  Map<String, dynamic>.from(item),
+                ),
+              )
+              .where((item) => item.id.isNotEmpty && item.title.isNotEmpty)
+              .toList();
+        }
+      }
+    } catch (error) {
+      debugPrint('Local notifications read failed: $error');
+    }
+
+    // المحلية لها الأولوية. نستخدم Firestore فقط عند عدم وجود بيانات محلية
+    // أو عند فشل/تعذر قراءة التخزين المحلي.
+    if (localNotifications != null && localNotifications.isNotEmpty) {
+      _replaceNotifications(localNotifications);
+      return;
+    }
+
+    try {
+      final remote = await _readFromFirestore();
+      await _saveLocal(remote);
+      _replaceNotifications(remote);
+    } catch (error) {
+      _setStorageMessage('تعذر تحميل الإشعارات من الهاتف أو Firestore');
+      debugPrint('Firestore notifications read failed: $error');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<List<_PendingNotification>> _readFromFirestore() async {
+    final snapshot = await _firestore
+        .collection(_firestoreCollection)
+        .get(const GetOptions(source: Source.server));
+
+    final notifications = snapshot.docs
+        .map((doc) {
+          final data = doc.data();
+          return _PendingNotification(
+            id: doc.id,
+            title: (data['title'] ?? '').toString(),
+            body: (data['body'] ?? '').toString(),
+            createdAt: (data['createdAt'] is Timestamp)
+                ? (data['createdAt'] as Timestamp).toDate()
+                : DateTime.tryParse((data['createdAt'] ?? '').toString()) ??
+                      DateTime.now(),
+          );
+        })
+        .where((item) => item.title.isNotEmpty && item.body.isNotEmpty)
+        .toList();
+    notifications.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return notifications;
+  }
+
+  Future<void> _saveLocal(List<_PendingNotification> notifications) async {
+    final preferences = await SharedPreferences.getInstance();
+    final encoded = jsonEncode(
+      notifications.map((item) => item.toJson()).toList(),
+    );
+    final saved = await preferences.setString(_localStorageKey, encoded);
+    if (!saved) throw Exception('تعذر حفظ الإشعارات محلياً');
+  }
+
+  void _replaceNotifications(List<_PendingNotification> notifications) {
+    if (!mounted) return;
+    setState(() {
+      _pendingNotifications
+        ..clear()
+        ..addAll(notifications);
+      _isLoading = false;
+    });
+  }
+
+  void _setStorageMessage(String message) {
+    if (!mounted) return;
+    setState(() {
+      _storageMessage = message;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _addNotification(String title, String body) async {
+    final notification = _PendingNotification(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      title: title,
+      body: body,
+      createdAt: DateTime.now(),
+    );
+    final updated = [..._pendingNotifications, notification];
+
+    // الحفظ المحلي أولاً حتى لا تضيع القائمة عند انقطاع الإنترنت.
+    try {
+      await _saveLocal(updated);
+      if (mounted) {
+        setState(() {
+          _pendingNotifications.add(notification);
+          _storageMessage = null;
+        });
+      }
+    } catch (error) {
+      _showMessage('تعذر حفظ الإشعار على الهاتف: $error');
+      return;
+    }
+
+    // فشل Firestore لا يلغي الحفظ المحلي؛ تتم المحاولة مرة أخرى لاحقاً.
+    try {
+      await _firestore
+          .collection(_firestoreCollection)
+          .doc(notification.id)
+          .set({
+            'title': notification.title,
+            'body': notification.body,
+            'createdAt': Timestamp.fromDate(notification.createdAt),
+          });
+    } catch (error) {
+      _showMessage('تم الحفظ محلياً، لكن تعذر الحفظ في Firestore');
+      debugPrint('Firestore notification write failed: $error');
+    }
+  }
+
+  Future<void> _deleteNotification(int index) async {
+    final notification = _pendingNotifications[index];
+    final updated = [..._pendingNotifications]..removeAt(index);
+    try {
+      await _saveLocal(updated);
+      if (mounted) {
+        setState(() {
+          _pendingNotifications.removeAt(index);
+          if (_selectedNotificationId == notification.id) {
+            _selectedNotificationId = null;
+            _notTitle.clear();
+            _notBody.clear();
+          }
+        });
+      }
+    } catch (error) {
+      _showMessage('تعذر حذف الإشعار محلياً: $error');
+      return;
+    }
+
+    try {
+      await _firestore
+          .collection(_firestoreCollection)
+          .doc(notification.id)
+          .delete();
+    } catch (error) {
+      _showMessage('حُذف محلياً، لكن تعذر حذفه من Firestore');
+      debugPrint('Firestore notification delete failed: $error');
+    }
+  }
+
+  void _selectNotification(_PendingNotification notification) {
+    setState(() {
+      _selectedNotificationId = notification.id;
+      _notTitle
+        ..text = notification.title
+        ..selection = TextSelection.collapsed(
+          offset: notification.title.length,
+        );
+      _notBody
+        ..text = notification.body
+        ..selection = TextSelection.collapsed(offset: notification.body.length);
+    });
+  }
+
+  _PendingNotification? get _selectedNotification {
+    for (final notification in _pendingNotifications) {
+      if (notification.id == _selectedNotificationId) return notification;
+    }
+    return null;
+  }
+
+  void _handleAddNotification() {
+    final titleController = TextEditingController();
+    final bodyController = TextEditingController();
+
+    showModalBottomSheet<List<String>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('إضافة إشعار إلى القائمة'),
+            const SizedBox(height: 16),
+            _textField(titleController, 'العنوان', 'اكتب عنوان الرسالة'),
+            const SizedBox(height: 16),
+            _textField(bodyController, 'الرسالة', 'اكتب الرسالة هنا'),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton(
+                  onPressed: () async {
+                    final title = titleController.text.trim();
+                    final body = bodyController.text.trim();
+                    if (title.isEmpty || body.isEmpty) {
+                      _showMessage('من فضلك أدخل العنوان والرسالة');
+                      return;
+                    }
+                    // نعيد البيانات فقط. الحفظ و setState يتمان بعد إغلاق
+                    // الـ BottomSheet حتى لا يحدث تعارض في build scope.
+                    Navigator.pop(sheetContext, <String>[title, body]);
+                  },
+                  child: const Text('إضافة'),
+                ),
+                OutlinedButton(
+                  onPressed: () => Navigator.pop(sheetContext),
+                  child: const Text('إلغاء'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ).then((result) async {
+      // ننتظر اكتمال إزالة الـ BottomSheet قبل تحديث الصفحة الأب.
+      if (result != null && result.length == 2 && mounted) {
+        await Future<void>.delayed(Duration.zero);
+        if (mounted) await _addNotification(result[0], result[1]);
+      }
+      titleController.dispose();
+      bodyController.dispose();
+    });
+  }
+
+  Future<void> _sendNotifications() async {
+    // await FirebaseMessaging.instance.subscribeToTopic('mainAdmin0');
+    final selectedNotification = _selectedNotification;
+    if (selectedNotification == null &&
+        (_notTitle.text.trim().isEmpty || _notBody.text.trim().isEmpty)) {
+      if (!_formKey.currentState!.validate()) return;
+    }
+
+    final notificationToSend =
+        selectedNotification ??
+        _PendingNotification(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          title: _notTitle.text.trim(),
+          body: _notBody.text.trim(),
+          createdAt: DateTime.now(),
+        );
+
+    setState(() => _isSending = true);
+    try {
+      await sendTopicNotification(
+        topic: 'mainAdmin',
+        title: notificationToSend.title,
+        body: notificationToSend.body,
+      );
+
+      if (!mounted) return;
+      _showMessage('تم إرسال الإشعار المحدد، وما زال محفوظاً لإعادة إرساله');
+    } catch (error) {
+      _showMessage('تعذر إرسال الإشعارات، وبقيت محفوظة محلياً: $error');
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   void dispose() {
-    // TODO: implement dispose
+    _notTitle.dispose();
+    _notBody.dispose();
     super.dispose();
-    notBody.dispose();
-    notTitle.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('إرسال إشعارات الى المستخدمين')),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _isLoading ? null : _handleAddNotification,
+        child: const Icon(Icons.add),
+      ),
+      appBar: AppBar(title: const Text('إرسال إشعارات إلى المستخدمين')),
       backgroundColor: const Color.fromARGB(255, 232, 229, 220),
       body: Form(
         key: _formKey,
-        child: Container(
-          padding: EdgeInsets.all(10),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Center(
+              const Center(
                 child: Text(
                   'الإشعارات',
-                  style: TextStyle(
-                    fontSize: 20,
-                    color: const Color.fromARGB(255, 6, 80, 208),
-                  ),
-                ),
-              ),
-              SizedBox(height: 20),
-              _textField(notTitle, 'العنوان', 'اكتب عنوان الرساله'),
-              SizedBox(height: 20),
-              _textField(notBody, 'الرسالة', 'اكتب الرساله هنا'),
-              SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: () {
-                  if (!_formKey.currentState!.validate()) return;
-                  sendTopicNotification(
-                    topic: 'mainAdmin',
-                    title: notTitle.text,
-                    body: notBody.text,
-                  );
-                },
-                icon: Icon(Icons.send),
-                style: ButtonStyle(
-                  iconColor: WidgetStatePropertyAll<Color>(
-                    const Color.fromARGB(255, 6, 80, 208),
-                  ),
-                  backgroundColor: WidgetStatePropertyAll<Color>(
-                    const Color.fromARGB(255, 214, 223, 161),
-                  ),
-                ),
-                label: Text(
-                  'إرسال',
                   style: TextStyle(
                     fontSize: 20,
                     color: Color.fromARGB(255, 6, 80, 208),
                   ),
                 ),
+              ),
+              const SizedBox(height: 20),
+              _textField(_notTitle, 'العنوان', 'اكتب عنوان الرسالة'),
+              const SizedBox(height: 20),
+              _textField(_notBody, 'الرسالة', 'اكتب الرسالة هنا'),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: _isLoading || _isSending ? null : _sendNotifications,
+                icon: _isSending
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.send),
+                label: Text(_isSending ? 'جارٍ الإرسال...' : 'إرسال'),
+              ),
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  'الإشعارات الجاهزة للإرسال (${_pendingNotifications.length})',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              if (_storageMessage != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    _storageMessage!,
+                    textDirection: TextDirection.rtl,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _pendingNotifications.isEmpty
+                    ? const Center(child: Text('لا توجد إشعارات مضافة حالياً'))
+                    : ListView.separated(
+                        itemCount: _pendingNotifications.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) {
+                          final notification = _pendingNotifications[index];
+                          return Card(
+                            child: ListTile(
+                              selected:
+                                  notification.id == _selectedNotificationId,
+                              selectedTileColor: Theme.of(
+                                context,
+                              ).colorScheme.primaryContainer,
+                              onTap: _isSending
+                                  ? null
+                                  : () => _selectNotification(notification),
+                              leading: CircleAvatar(
+                                child: Text('${index + 1}'),
+                              ),
+                              title: Text(
+                                notification.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(
+                                notification.body,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              trailing: IconButton(
+                                tooltip: 'حذف الإشعار',
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: _isSending
+                                    ? null
+                                    : () => _deleteNotification(index),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
               ),
             ],
           ),
@@ -95,7 +480,6 @@ class _NotificationpageState extends State<Notificationpage> {
     TextEditingController controller,
     String label,
     String hint,
-    //  String validator,
   ) {
     return TextFormField(
       controller: controller,
@@ -104,58 +488,24 @@ class _NotificationpageState extends State<Notificationpage> {
         labelText: label,
         hintText: hint,
         prefixIcon: const Icon(Icons.message_outlined),
-
         filled: true,
         fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 18,
           vertical: 18,
         ),
-
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
         ),
-
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
-        ),
-
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(
-            color: Theme.of(context).colorScheme.primary,
-            width: 2,
-          ),
-        ),
-
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Theme.of(context).colorScheme.error),
-        ),
-
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(
-            color: Theme.of(context).colorScheme.error,
-            width: 2,
-          ),
-        ),
       ),
-
-      validator: (value) {
-        if (value == null || value.trim().isEmpty) {
-          return 'من فضلك أدخل الرسالة';
-        }
-        return null;
-      },
+      validator: (value) => value == null || value.trim().isEmpty
+          ? 'من فضلك أدخل العنوان والرسالة'
+          : null,
     );
   }
 
-  // --- FCM Functions (Keep original logic) ---
-
+  // انقل هذا المنطق إلى Backend/Cloud Function قبل نشر التطبيق.
   Future<String> getAccessToken() async {
     const serviceAccount = {
       "client_email":
@@ -203,66 +553,128 @@ class _NotificationpageState extends State<Notificationpage> {
     print(
       "Sending notification to topic: $topic with title: $title and body: $body",
     );
-    final accessToken = await getAccessToken();
-    print("Obtained access token: $accessToken");
+
+    String? accessToken;
+
+    try {
+      accessToken = await getAccessToken();
+    } catch (e) {
+      print("❌ Failed to get access token: $e");
+      return;
+    }
+
+    // لو getAccessToken رجع null أو فاضي
+    if (accessToken.trim().isEmpty) {
+      print("❌ Access token is null or empty");
+      return;
+    }
+
+    print("✅ Obtained access token");
+
     final url = Uri.parse(
       "https://fcm.googleapis.com/v1/projects/maintenance-b7282/messages:send",
     );
 
-    await http.post(
-      url,
-      headers: {
-        "Authorization": "Bearer $accessToken",
-        "Content-Type": "application/json",
-      },
-      body: jsonEncode({
-        "message": {
-          "topic": topic,
-          "notification": {"title": title, "body": body},
-          "data": {"route": "home"},
-          "android": {
-            "priority": "HIGH", // ملاحظة: يجب أن تكون HIGH وليس high
-            "notification": {"channel_id": "high_importance_channel"},
-          },
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          "Authorization": "Bearer $accessToken",
+          "Content-Type": "application/json",
         },
-      }),
-    );
-    print('45123');
+        body: jsonEncode({
+          "message": {
+            "topic": topic,
+            "notification": {"title": title, "body": body},
+            "data": {"route": "home"},
+            "android": {
+              "priority": "HIGH",
+              "notification": {"channel_id": "high_importance_channel"},
+            },
+          },
+        }),
+      );
+
+      print("FCM status: ${response.statusCode}");
+      print("FCM response: ${response.body}");
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        print("✅ Notification sent successfully");
+      } else {
+        print("❌ Failed to send notification");
+      }
+    } catch (e) {
+      print("❌ Error sending notification: $e");
+    }
   }
 
   Future<void> sendNotificationToDevice({
-    required String deviceToken, // FCM Device Token
+    required String deviceToken,
     required String title,
     required String body,
-    // الـ Access Token اللي حصلت عليه
   }) async {
     print('111111111111111111111111111111111');
+
+    // التأكد من وجود Device Token
+    if (deviceToken.trim().isEmpty) {
+      print("❌ Device token is empty");
+      return;
+    }
+
+    String? accessToken;
+
+    // الحصول على Access Token
+    try {
+      accessToken = await getAccessToken();
+    } catch (e) {
+      print("❌ Failed to get access token: $e");
+      return;
+    }
+
+    // التأكد من أن Access Token موجود
+    if (accessToken.trim().isEmpty) {
+      print("❌ Access token is null or empty");
+      return;
+    }
+
+    print("✅ Access token obtained");
+
     final url = Uri.parse(
       "https://fcm.googleapis.com/v1/projects/maintenance-b7282/messages:send",
     );
 
     final payload = {
       "message": {
-        "token": deviceToken, // هنا نستخدم token بدل topic
+        "token": deviceToken,
         "notification": {"title": title, "body": body},
         "android": {
-          "priority": "HIGH", // ملاحظة: يجب أن تكون HIGH وليس high
+          "priority": "HIGH",
           "notification": {"channel_id": "high_importance_channel"},
         },
         "data": {"route": "home"},
       },
     };
-    final accessToken = await getAccessToken();
-    final response = await http.post(
-      url,
-      headers: {
-        "Authorization": "Bearer $accessToken",
-        "Content-Type": "application/json",
-      },
-      body: jsonEncode(payload),
-    );
 
-    print("FCM Response Status: ${response.statusCode}");
-    print("FCM Response Body: ${response.body}");
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          "Authorization": "Bearer $accessToken",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode(payload),
+      );
+
+      print("FCM Response Status: ${response.statusCode}");
+      print("FCM Response Body: ${response.body}");
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        print("✅ Notification sent successfully");
+      } else {
+        print("❌ Failed to send notification");
+      }
+    } catch (e) {
+      print("❌ Error sending notification: $e");
+    }
   }
 }

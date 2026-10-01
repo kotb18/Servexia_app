@@ -85,16 +85,19 @@ class _AssetsScreenState extends State<AssetsScreen>
     return AppBar(
       title: const Text(
         'الأصول والمعدات',
-        style: TextStyle(
-          fontWeight: FontWeight.w700,
-          fontSize: 22,
-          letterSpacing: 0.5,
-        ),
+        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 22),
       ),
       centerTitle: true,
       elevation: 0,
       backgroundColor: const Color(0xFF1E88E5),
       foregroundColor: Colors.white,
+      actions: [
+        IconButton(
+          tooltip: 'عرض الأصول حسب الموقع',
+          icon: const Icon(Icons.view_agenda_outlined),
+          onPressed: _showSitesSheet,
+        ),
+      ],
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
           bottomLeft: Radius.circular(20),
@@ -102,6 +105,157 @@ class _AssetsScreenState extends State<AssetsScreen>
         ),
       ),
       shadowColor: const Color(0xFF1E88E5).withOpacity(0.3),
+    );
+  }
+
+  /// فتح قائمة المواقع من أيقونة الـ AppBar ثم الانتقال لشاشة العرض.
+  Future<void> _showSitesSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'اختر الموقع لعرض الأصول',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection('assets')
+                      .doc(widget.groupId)
+                      .collection('items')
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return _buildSheetMessage(
+                        Icons.error_outline,
+                        'تعذر تحميل المواقع',
+                      );
+                    }
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+
+                    final sites =
+                        snapshot.data!.docs
+                            .map((doc) => doc.data()['site'])
+                            .whereType<String>()
+                            .where((site) => site.trim().isNotEmpty)
+                            .toSet()
+                            .toList()
+                          ..sort();
+
+                    if (sites.isEmpty) {
+                      return _buildSheetMessage(
+                        Icons.location_off_outlined,
+                        'لا توجد مواقع مسجلة',
+                      );
+                    }
+
+                    return ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 420),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: sites.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (_, index) {
+                          final site = sites[index];
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: const CircleAvatar(
+                              backgroundColor: Color(0xFFE3F2FD),
+                              child: Icon(
+                                Icons.location_city,
+                                color: Color(0xFF1E88E5),
+                              ),
+                            ),
+                            title: Text(site),
+                            trailing: const Icon(Icons.chevron_left),
+                            onTap: () async {
+                              Navigator.of(sheetContext).pop();
+                              setState(() {
+                                selectedSite = site;
+                                selectedLocation = null;
+                                selectedAssetName = null;
+                                selectedAssetId = null;
+                                selectedMonth = null;
+                                _scopedWorksFuture = null; // إعادة تعيين الشهر
+                              });
+
+                              final result = await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => ViewAssets(
+                                    groupId: widget.groupId,
+                                    siteName: site,
+                                  ),
+                                ),
+                              );
+
+                              // بعد await تكون result هي القيمة نفسها وليست Future،
+                              // لذلك لا نستخدم result.then هنا.
+                              if (!mounted) return;
+                              if (result is Map) {
+                                setState(() {
+                                  selectedSite =
+                                      result['site']?.toString() ?? site;
+                                  selectedLocation = result['location']
+                                      ?.toString();
+                                  selectedAssetName = result['name']
+                                      ?.toString();
+                                  selectedAssetId = result['id']?.toString();
+                                });
+                              }
+                            },
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSheetMessage(IconData icon, String message) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 28),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(icon, size: 44, color: Colors.grey.shade400),
+            const SizedBox(height: 8),
+            Text(message, style: TextStyle(color: Colors.grey.shade600)),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1911,5 +2065,602 @@ Future<void> deleteAllWorks(String groupId, String assetId) async {
 
   for (final doc in snapshot.docs) {
     await doc.reference.delete();
+  }
+}
+
+/// شاشة عرض الأصول فقط.
+///
+/// مسار البيانات:
+/// assets/{groupId}/items
+/// مع تصفية العناصر حسب الحقل site = siteName.
+class ViewAssets extends StatelessWidget {
+  const ViewAssets({super.key, required this.siteName, required this.groupId});
+
+  final String groupId;
+  final String siteName;
+
+  CollectionReference<Map<String, dynamic>> get _itemsRef => FirebaseFirestore
+      .instance
+      .collection('assets')
+      .doc(groupId)
+      .collection('items');
+
+  Query<Map<String, dynamic>> get _siteQuery =>
+      _itemsRef.where('site', isEqualTo: siteName);
+
+  String _text(
+    Map<String, dynamic> data,
+    String key, {
+    String fallback = 'غير محدد',
+  }) {
+    final value = data[key];
+    if (value == null || value.toString().trim().isEmpty) return fallback;
+    if (key == 'status') {
+      switch (value.toString()) {
+        case 'active':
+          return 'نشط';
+        case 'inactive':
+          return 'غير نشط';
+        case 'maintenance':
+          return 'تحت الصيانة';
+        default:
+          return fallback;
+      }
+    }
+    return value.toString();
+  }
+
+  /// ترتيب الأصول بعد جلبها من Firestore:
+  /// 1) تجميع الأصول التي في نفس المكان معًا.
+  /// 2) ترتيب اسم الأصل داخل المكان.
+  /// 3) عند تشابه اسم الأصل، ترتيب الرقم من الأصغر إلى الأكبر.
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _sortAssets(
+    Iterable<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    final sortedDocs = docs.toList();
+
+    String textValue(Map<String, dynamic> data, String key) {
+      final value = data[key];
+      return value?.toString().trim().toLowerCase() ?? '';
+    }
+
+    int? numericAssetNumber(dynamic value) {
+      if (value is num) return value.toInt();
+      final text = value?.toString().trim() ?? '';
+      if (text.isEmpty) return null;
+
+      final directNumber = int.tryParse(text);
+      if (directNumber != null) return directNumber;
+
+      // يدعم أرقامًا مثل: AST-002 أو أصل 12.
+      final match = RegExp(r'\d+').firstMatch(text);
+      return match == null ? null : int.tryParse(match.group(0)!);
+    }
+
+    sortedDocs.sort((a, b) {
+      final aData = a.data();
+      final bData = b.data();
+
+      // المكان أولًا حتى تكون كل أصول المكان الواحد متجاورة.
+      final locationCompare = textValue(
+        aData,
+        'location',
+      ).compareTo(textValue(bData, 'location'));
+      if (locationCompare != 0) return locationCompare;
+
+      // ثم اسم الأصل لتجميع الأصول ذات الاسم المتشابه.
+      final nameCompare = textValue(
+        aData,
+        'name',
+      ).compareTo(textValue(bData, 'name'));
+      if (nameCompare != 0) return nameCompare;
+
+      // ثم الرقم تصاعديًا كرقم وليس كنص: 2 قبل 10.
+      final aNumber = numericAssetNumber(aData['number']);
+      final bNumber = numericAssetNumber(bData['number']);
+      if (aNumber != null && bNumber != null && aNumber != bNumber) {
+        return aNumber.compareTo(bNumber);
+      }
+      if (aNumber != null && bNumber == null) return -1;
+      if (aNumber == null && bNumber != null) return 1;
+
+      // ترتيب ثابت عند تساوي كل الحقول السابقة.
+      return a.id.compareTo(b.id);
+    });
+
+    return sortedDocs;
+  }
+
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
+  _loadAssets() async {
+    final snapshot = await _siteQuery.get();
+    return _sortAssets(snapshot.docs);
+  }
+
+  Future<void> _makePdf(BuildContext context, {required bool share}) async {
+    try {
+      final docs = await _loadAssets();
+      if (docs.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('لا توجد أصول لإنشاء ملف PDF')),
+          );
+        }
+        return;
+      }
+
+      // الخط الافتراضي في package:pdf لا يحتوي على الحروف العربية.
+      // أضف ملفات Cairo إلى assets/fonts في المشروع كما هو موضح في الرد.
+      final arabicRegular = pw.Font.ttf(
+        await rootBundle.load('assets/fonts/Cairo-Regular.ttf'),
+      );
+      final arabicBold = pw.Font.ttf(
+        await rootBundle.load('assets/fonts/ElMessiri-Bold.ttf'),
+      );
+      final pdf = pw.Document();
+      final rows = docs.map((doc) {
+        final data = doc.data();
+        return [
+          _text(data, 'status'),
+          _text(data, 'model'),
+          _text(data, 'location'),
+          _text(data, 'number', fallback: 'بدون رقم'),
+          _text(data, 'name', fallback: 'بدون اسم'),
+        ];
+      }).toList();
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          textDirection: pw.TextDirection.rtl,
+          theme: pw.ThemeData.withFont(base: arabicRegular, bold: arabicBold),
+          build: (_) => [
+            pw.Header(level: 0, child: pw.Text('تقرير أصول الموقع: $siteName')),
+            pw.SizedBox(height: 12),
+            pw.Text('عدد الأصول: ${docs.length}'),
+            pw.SizedBox(height: 16),
+            pw.Table.fromTextArray(
+              headers: const [
+                'الحالة',
+                'الموديل',
+                'المكان',
+                'الرقم',
+                'اسم الأصل',
+              ],
+              data: rows,
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              headerDecoration: const pw.BoxDecoration(
+                color: PdfColors.blue100,
+              ),
+              cellAlignment: pw.Alignment.centerRight,
+              cellPadding: const pw.EdgeInsets.all(6),
+              border: pw.TableBorder.all(color: PdfColors.grey400),
+            ),
+          ],
+        ),
+      );
+
+      final bytes = await pdf.save();
+      if (share) {
+        await Printing.sharePdf(
+          bytes: bytes,
+          filename: 'assets_${siteName.replaceAll(RegExp(r'\s+'), '_')}.pdf',
+        );
+      } else {
+        await Printing.layoutPdf(onLayout: (_) async => bytes);
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تعذر إنشاء ملف PDF: $error'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
+  }
+
+  bool _matchesSearch(Map<String, dynamic> data, String query) {
+    final normalizedQuery = query.trim().toLowerCase();
+    if (normalizedQuery.isEmpty) return true;
+
+    const searchableFields = [
+      'name',
+      'number',
+      'location',
+      'type',
+      'status',
+      'serialNumber',
+      'model',
+      'manufacturer',
+    ];
+
+    return searchableFields.any((field) {
+      final value = data[field]?.toString().toLowerCase() ?? '';
+      return value.contains(normalizedQuery);
+    });
+  }
+
+  Widget _buildSearchableBody() {
+    var searchText = '';
+    final searchController = TextEditingController();
+
+    return StatefulBuilder(
+      builder: (context, setLocalState) {
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: TextField(
+                controller: searchController,
+                //  textDirection: TextDirection.RTL,
+                onChanged: (value) {
+                  setLocalState(() => searchText = value);
+                },
+                decoration: InputDecoration(
+                  hintText: 'ابحث باسم الأصل أو الرقم أو المكان...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: searchText.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'مسح البحث',
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            searchController.clear();
+                            setLocalState(() => searchText = '');
+                          },
+                        ),
+                  filled: true,
+                  fillColor: Colors.grey.shade100,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF1E88E5),
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: _siteQuery.snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return _MessageState(
+                      icon: Icons.error_outline,
+                      title: 'تعذر تحميل الأصول',
+                      subtitle: snapshot.error.toString(),
+                      action: ElevatedButton.icon(
+                        onPressed: () => (context as Element).markNeedsBuild(),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('إعادة المحاولة'),
+                      ),
+                    );
+                  }
+
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final sortedDocs = _sortAssets(
+                    snapshot.data?.docs ?? const [],
+                  );
+                  final docs = sortedDocs
+                      .where((doc) => _matchesSearch(doc.data(), searchText))
+                      .toList();
+
+                  if (docs.isEmpty) {
+                    return _MessageState(
+                      icon: searchText.trim().isEmpty
+                          ? Icons.inventory_2_outlined
+                          : Icons.search_off,
+                      title: searchText.trim().isEmpty
+                          ? 'لا توجد أصول'
+                          : 'لا توجد نتائج مطابقة',
+                      subtitle: searchText.trim().isEmpty
+                          ? 'لا توجد أصول مسجلة في موقع $siteName'
+                          : 'جرّب البحث باسم أو رقم أصل آخر',
+                    );
+                  }
+
+                  return ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
+                    itemCount: docs.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) => _AssetCard(
+                      data: docs[index].data(),
+                      documentId: docs[index].id,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('أصول $siteName'),
+        centerTitle: true,
+        backgroundColor: const Color(0xFF1E88E5),
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          tooltip: 'رجوع',
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'تحديث',
+            icon: const Icon(Icons.refresh),
+            onPressed: () => (context as Element).markNeedsBuild(),
+          ),
+        ],
+      ),
+      body: _buildSearchableBody(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: FloatingActionButton.extended(
+                  heroTag: 'previewAssetsPdf',
+                  onPressed: () => _makePdf(context, share: false),
+                  backgroundColor: const Color(0xFF1E88E5),
+                  foregroundColor: Colors.white,
+                  icon: const Icon(Icons.picture_as_pdf),
+                  label: const Text('معاينة PDF'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FloatingActionButton.extended(
+                  heroTag: 'shareAssetsPdf',
+                  onPressed: () => _makePdf(context, share: true),
+                  backgroundColor: Colors.green.shade700,
+                  foregroundColor: Colors.white,
+                  icon: const Icon(Icons.share),
+                  label: const Text('مشاركة PDF'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AssetCard extends StatelessWidget {
+  const _AssetCard({required this.data, required this.documentId});
+
+  final Map<String, dynamic> data;
+  final String documentId;
+
+  String _value(String key, {String fallback = 'غير محدد'}) {
+    final value = data[key];
+    if (value == null || value.toString().trim().isEmpty) return fallback;
+    return value.toString();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = _value('name', fallback: 'أصل بدون اسم');
+    final number = _value('number', fallback: 'بدون رقم');
+    final location = _value('location');
+    //  final type = _value('type');
+    final status = _value('status');
+    // final serialNumber = _value('serialNumber');
+    final model = _value('model');
+    final manufacturer = _value('manufacturer');
+
+    return InkWell(
+      onTap: () {
+        Navigator.pop(context, {
+          'site': data['site'] ?? '',
+          'location': data['location'] ?? '',
+          'name': name,
+          'id': documentId,
+        });
+      },
+      child: Card(
+        elevation: 2,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E88E5).withOpacity(.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.precision_manufacturing_outlined,
+                      color: Color(0xFF1E88E5),
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'رقم الأصل: $number',
+                          style: TextStyle(color: Colors.grey.shade700),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (data['status'] != null)
+                    _StatusChip(
+                      status: status == 'active'
+                          ? 'نشط'
+                          : status == 'inactive'
+                          ? 'غير نشط'
+                          : 'تحت الصيانة',
+                    ),
+                ],
+              ),
+              const Divider(height: 24),
+              _InfoRow(
+                icon: Icons.place_outlined,
+                label: 'المكان',
+                value: location,
+              ),
+              /*  _InfoRow(
+                icon: Icons.category_outlined,
+                label: 'النوع',
+                value: type,
+              ),
+                _InfoRow(
+                icon: Icons.confirmation_number_outlined,
+                label: 'الرقم التسلسلي',
+                value: serialNumber,
+              ), */
+              _InfoRow(
+                icon: Icons.settings_outlined,
+                label: 'الموديل',
+                value: model,
+              ),
+              _InfoRow(
+                icon: Icons.business_outlined,
+                label: 'الشركة المصنعة',
+                value: manufacturer,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'معرّف المستند: $documentId',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: Colors.grey.shade600),
+          const SizedBox(width: 8),
+          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.w600)),
+          Expanded(child: Text(value, overflow: TextOverflow.ellipsis)),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      label: Text(status),
+      labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+      backgroundColor: status == 'نشط'
+          ? const Color.fromARGB(255, 122, 238, 132)
+          : status == 'غير نشط'
+          ? const Color.fromARGB(255, 243, 97, 97)
+          : const Color.fromARGB(255, 201, 173, 61),
+      side: BorderSide(color: Colors.green.shade200),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+}
+
+class _MessageState extends StatelessWidget {
+  const _MessageState({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.action,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                subtitle!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+            ],
+            if (action != null) ...[const SizedBox(height: 16), action!],
+          ],
+        ),
+      ),
+    );
   }
 }

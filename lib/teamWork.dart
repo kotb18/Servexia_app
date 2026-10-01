@@ -256,179 +256,186 @@ class _TeamScreenState extends State<TeamScreen> {
         }
 
         return Column(
-          children: confirmedMembers.map((member) {
-            final faceImageUrl = _imageUrl(member['faceImageUrl']);
-            final photoUrl = _imageUrl(member['photoURL']);
-            final avatarUrl = faceImageUrl ?? photoUrl;
-            final canDelete =
-                member['id'] != widget.adminId &&
-                member['id'] != uid &&
-                (admins.contains(uid) || admins.contains(member['id']));
-            return InkWell(
-              onTap: !widget.isAdmin
-                  ? null
-                  : () {
-                      // Handle member tap
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => EmployeeDetailsPage(
-                            employeeData: member,
-                            isConfirmed: member['confirm'],
-                            groupId: widget.groupId,
-                            isAdmin: widget.isAdmin,
-                          ),
-                        ),
-                      );
-                    },
-              child: Card(
-                elevation: 2,
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      /// -------- Top Row (Avatar + Name) --------
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 26,
-                            backgroundColor: Colors.grey.shade300,
-                            child: avatarUrl != null && avatarUrl.isNotEmpty
-                                ? ClipOval(
-                                    child: WebImage(
-                                      src: avatarUrl,
-                                      width: 52, // ضعف الـ radius
-                                      height: 52,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.person,
-                                    size: 30,
-                                    color: Colors.grey,
-                                  ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  member['name']?.toString() ?? '',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  member['job']?.toString() ?? 'عضو',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                              ],
+          children: [
+            ...confirmedMembers.map((member) {
+              final faceImageUrl = _imageUrl(member['faceImageUrl']);
+              final photoUrl = _imageUrl(member['photoURL']);
+              final avatarUrl = faceImageUrl ?? photoUrl;
+              final canDelete =
+                  member['id'] != widget.adminId &&
+                  member['id'] != uid &&
+                  (admins.contains(uid) || admins.contains(member['id']));
+              return InkWell(
+                onTap: !widget.isAdmin
+                    ? null
+                    : () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => EmployeeDetailsPage(
+                              employeeData: member,
+                              isConfirmed: member['confirm'],
+                              groupId: widget.groupId,
+                              isAdmin: widget.isAdmin,
                             ),
                           ),
-                          if (member['id'] == widget.adminId)
-                            Icon(
-                              Icons.star,
-                              color: const Color.fromARGB(255, 164, 172, 12),
-                            ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 10),
-                      Divider(height: 1),
-
-                      /// -------- Actions --------
-                      const SizedBox(height: 6),
-                      SizedBox(
-                        width: double.infinity,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        );
+                      },
+                child: Card(
+                  elevation: 2,
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            _actionButton(
-                              icon: const Icon(
-                                Icons.call_rounded,
-                                color: Colors.blue,
-                              ),
-                              tooltip: 'اتصال',
-                              backgroundColor: Colors.blue.withOpacity(.10),
-                              onPressed: () async {
-                                final phone = member['phone']?.toString();
-
-                                if (phone == null || phone.trim().isEmpty)
-                                  return;
-
-                                final url = Uri(scheme: 'tel', path: phone);
-
-                                if (await canLaunchUrl(url)) {
-                                  await launchUrl(url);
-                                }
-                              },
+                            CircleAvatar(
+                              radius: 26,
+                              backgroundColor: Colors.grey.shade300,
+                              child: avatarUrl != null && avatarUrl.isNotEmpty
+                                  ? ClipOval(
+                                      child: WebImage(
+                                        src: avatarUrl,
+                                        width: 52,
+                                        height: 52,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.person,
+                                      size: 30,
+                                      color: Colors.grey,
+                                    ),
                             ),
-                            _actionButton(
-                              icon: Image.asset(
-                                'images/whatsapp.png',
-                                width: 21,
-                                height: 21,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    member['name']?.toString() ?? '',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    member['job']?.toString() ?? 'عضو',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              tooltip: 'واتساب',
-                              backgroundColor: Colors.green.withOpacity(.10),
-                              onPressed: () {
-                                openWhatsApp(
-                                  '${member['phone']}',
-                                  'مرحباً ${member['name']}',
-                                );
-                              },
                             ),
-                            _actionButton(
-                              icon: const Icon(
-                                Icons.email_rounded,
-                                color: Colors.orange,
-                              ),
-                              tooltip: 'Gmail',
-                              backgroundColor: Colors.orange.withOpacity(.10),
-                              onPressed: () async {
-                                final email = member['userGmail']?.toString();
-
-                                if (email == null || email.trim().isEmpty)
-                                  return;
-
-                                await openGmailComposer(email);
-                              },
-                            ),
-
-                            if (canDelete)
-                              _actionButton(
-                                icon: const Icon(
-                                  Icons.person_remove_alt_1_rounded,
-                                  color: Colors.red,
-                                ),
-                                tooltip: 'حذف',
-                                backgroundColor: Colors.red.withOpacity(.10),
-                                onPressed: () {
-                                  // حذف العضو
-                                },
+                            if (member['id'] == widget.adminId)
+                              Icon(
+                                Icons.star,
+                                color: const Color.fromARGB(255, 164, 172, 12),
                               ),
                           ],
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 10),
+                        const Divider(height: 1),
+                        const SizedBox(height: 6),
+                        SizedBox(
+                          width: double.infinity,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _actionButton(
+                                icon: const Icon(
+                                  Icons.call_rounded,
+                                  color: Colors.blue,
+                                ),
+                                tooltip: 'اتصال',
+                                backgroundColor: Colors.blue.withValues(
+                                  alpha: 0.10,
+                                ),
+                                onPressed: () async {
+                                  final phone = member['phone']?.toString();
+
+                                  if (phone == null || phone.trim().isEmpty) {
+                                    return;
+                                  }
+
+                                  final url = Uri(scheme: 'tel', path: phone);
+
+                                  if (await canLaunchUrl(url)) {
+                                    await launchUrl(url);
+                                  }
+                                },
+                              ),
+                              _actionButton(
+                                icon: Image.asset(
+                                  'images/whatsapp.png',
+                                  width: 21,
+                                  height: 21,
+                                ),
+                                tooltip: 'واتساب',
+                                backgroundColor: Colors.green.withValues(
+                                  alpha: 0.10,
+                                ),
+                                onPressed: () {
+                                  openWhatsApp(
+                                    '${member['phone']}',
+                                    'مرحباً ${member['name']}',
+                                  );
+                                },
+                              ),
+                              _actionButton(
+                                icon: const Icon(
+                                  Icons.email_rounded,
+                                  color: Colors.orange,
+                                ),
+                                tooltip: 'Gmail',
+                                backgroundColor: Colors.orange.withValues(
+                                  alpha: 0.10,
+                                ),
+                                onPressed: () async {
+                                  final email = member['userGmail']?.toString();
+
+                                  if (email == null || email.trim().isEmpty) {
+                                    return;
+                                  }
+
+                                  await openGmailComposer(email);
+                                },
+                              ),
+                              if (canDelete)
+                                _actionButton(
+                                  icon: const Icon(
+                                    Icons.person_remove_alt_1_rounded,
+                                    color: Colors.red,
+                                  ),
+                                  tooltip: 'حذف',
+                                  backgroundColor: Colors.red.withValues(
+                                    alpha: 0.10,
+                                  ),
+                                  onPressed: () {
+                                    // حذف العضو
+                                  },
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          }).toList(),
+              );
+            }),
+            const SizedBox(height: 60),
+          ],
         );
       },
     );
