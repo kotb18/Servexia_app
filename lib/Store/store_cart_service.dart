@@ -170,7 +170,7 @@ class StoreCartService {
 
     final key = '${_cartKey}_$groupId';
 
-    final cartJson = await prefs.getString(key);
+    final cartJson = prefs.getString(key);
 
     // 🧠 لو مفيش بيانات = سلة فاضية
     if (cartJson == null || cartJson.isEmpty) {

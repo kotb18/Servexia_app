@@ -57,7 +57,7 @@ class _LoginState extends State<Login> {
             .authenticate();
 
         // الحصول على الـ idToken (في الإصدار الجديد accessToken لم يعد موجوداً/مطلوباً هنا)
-        final googleAuth = await googleUser.authentication;
+        final googleAuth = googleUser.authentication;
 
         final credential = GoogleAuthProvider.credential(
           idToken: googleAuth.idToken,

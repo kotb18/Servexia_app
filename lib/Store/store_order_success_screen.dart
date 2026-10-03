@@ -96,7 +96,7 @@ class StoreOrderSuccessScreen extends StatelessWidget {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.green.withOpacity(0.2),
+                              color: Colors.green.withValues(alpha: 0.2),
                               blurRadius: 30,
                               spreadRadius: 5,
                             ),
@@ -176,7 +176,7 @@ class StoreOrderSuccessScreen extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              '${order.total.toStringAsFixed(2)}',
+                              order.total.toStringAsFixed(2),
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 18,

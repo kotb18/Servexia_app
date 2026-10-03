@@ -19,12 +19,12 @@ class EmployeeDetailsPage extends StatefulWidget {
   final bool isAdmin;
 
   const EmployeeDetailsPage({
-    Key? key,
+    super.key,
     required this.employeeData,
     required this.isConfirmed,
     required this.groupId,
     required this.isAdmin,
-  }) : super(key: key);
+  });
 
   @override
   State<EmployeeDetailsPage> createState() => _EmployeeDetailsPageState();
@@ -289,7 +289,9 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
                   child: const Text('تعديل'),
                   onPressed: () async {
                     Navigator.pop(context);
+
                     FocusManager.instance.primaryFocus?.unfocus();
+
                     final FaceRegisterResult? result =
                         await Navigator.push<FaceRegisterResult>(
                           context,
@@ -299,67 +301,141 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
                         );
 
                     if (result != null) {
+                      if (!mounted) return;
+
                       setState(() {
                         isLoading = true;
                         faceEmbeddingLive = result.embedding;
                         _isFaceEmbeddingFound = true;
                         _image = result.image;
                       });
-                      final prefs = await SharedPreferences.getInstance();
-                      await prefs.setString(
-                        _localKey('${widget.groupId} $uid'),
-                        jsonEncode(faceEmbeddingLive),
-                      );
 
-                      // إنشاء Batch
-                      final batch = FirebaseFirestore.instance.batch();
-                      final memberRef = FirebaseFirestore.instance
-                          .collection('teams')
-                          .doc(widget.groupId)
-                          .collection('members')
-                          .doc(uid);
-                      final storageRef = FirebaseStorage.instance
-                          .ref()
-                          .child('users')
-                          .child(widget.groupId)
-                          .child(uid);
-                      await storageRef.delete();
-                      await storageRef.putFile(
-                        _image!,
-                        SettableMetadata(contentType: 'image/jpeg'),
-                      );
+                      try {
+                        // =========================
+                        // SharedPreferences
+                        // =========================
 
-                      final imageUrl = await storageRef.getDownloadURL();
-                      batch.update(memberRef, {'faceImageUrl': imageUrl});
-                      await prefs.setString(
-                        _localKey('faceImage${widget.groupId} $uid'),
-                        jsonEncode(imageUrl),
-                      );
-                      print('11111111111');
-                      // faceEmbedding
-                      final faceRef = FirebaseFirestore.instance
-                          .collection('faceEmbedding')
-                          .doc(widget.groupId)
-                          .collection('users')
-                          .doc(uid);
-                      final facePreRef = FirebaseFirestore.instance
-                          .collection('faceEmbedding')
-                          .doc(widget.groupId);
-                      batch.set(facePreRef, {
-                        'lastFaceEmbeddingUpdate': FieldValue.serverTimestamp(),
-                      });
-                      batch.update(faceRef, {
-                        'faceEmbedding': faceEmbeddingLive,
-                        'updatedAt': FieldValue.serverTimestamp(),
-                      });
-                      await batch.commit();
-                      print('2222222222222222');
-                      _showSnackBar('تم تسجيل بصمة الوجه بنجاح.');
-                      if (!mounted) return;
-                      Navigator.of(this.context).pop(true);
+                        final prefs = await SharedPreferences.getInstance();
+
+                        await prefs.setString(
+                          _localKey('${widget.groupId} $uid'),
+                          jsonEncode(faceEmbeddingLive),
+                        );
+
+                        // =========================
+                        // Firestore References
+                        // =========================
+
+                        final firestore = FirebaseFirestore.instance;
+
+                        final memberRef = firestore
+                            .collection('teams')
+                            .doc(widget.groupId)
+                            .collection('members')
+                            .doc(uid);
+
+                        final faceRef = firestore
+                            .collection('faceEmbedding')
+                            .doc(widget.groupId)
+                            .collection('users')
+                            .doc(uid);
+
+                        final facePreRef = firestore
+                            .collection('faceEmbedding')
+                            .doc(widget.groupId);
+
+                        // =========================
+                        // Storage Reference
+                        // =========================
+
+                        final storageRef = FirebaseStorage.instance
+                            .ref()
+                            .child('users')
+                            .child(widget.groupId)
+                            .child(uid);
+
+                        // =========================
+                        // 1. رفع صورة الوجه
+                        // =========================
+
+                        await storageRef.putFile(
+                          _image!,
+                          SettableMetadata(contentType: 'image/jpeg'),
+                        );
+
+                        // =========================
+                        // 2. الحصول على رابط الصورة
+                        // =========================
+
+                        final imageUrl = await storageRef.getDownloadURL();
+
+                        // =========================
+                        // 3. إنشاء Batch واحد فقط
+                        // =========================
+
+                        final batch = firestore.batch();
+
+                        // تحديث صورة العضو
+                        batch.update(memberRef, {'faceImageUrl': imageUrl});
+
+                        // تحديث آخر وقت لتحديث الـ face embedding
+                        batch.set(facePreRef, {
+                          'lastFaceEmbeddingUpdate':
+                              FieldValue.serverTimestamp(),
+                        }, SetOptions(merge: true));
+
+                        // تحديث الـ face embedding للمستخدم
+                        batch.set(faceRef, {
+                          'faceEmbedding': faceEmbeddingLive,
+                          'updatedAt': FieldValue.serverTimestamp(),
+                        }, SetOptions(merge: true));
+
+                        // =========================
+                        // 4. تنفيذ كل عمليات Firestore
+                        //    مرة واحدة
+                        // =========================
+
+                        await batch.commit();
+
+                        // =========================
+                        // 5. حفظ البيانات محليًا
+                        // =========================
+
+                        await prefs.setString(
+                          _localKey('faceImage${widget.groupId} $uid'),
+                          jsonEncode(imageUrl),
+                        );
+
+                        debugPrint('Face data updated successfully');
+
+                        // =========================
+                        // 6. رسالة نجاح
+                        // =========================
+
+                        _showSnackBar('تم تسجيل بصمة الوجه بنجاح.');
+
+                        if (!mounted) return;
+
+                        Navigator.of(context).pop(true);
+                      } catch (e, stackTrace) {
+                        debugPrint('فشل تسجيل بصمة الوجه: $e');
+
+                        debugPrint(stackTrace.toString());
+
+                        if (!mounted) return;
+
+                        setState(() {
+                          isLoading = false;
+                        });
+
+                        _showSnackBar('حدث خطأ أثناء تسجيل بصمة الوجه.');
+                      }
                     } else if (mounted) {
-                      setState(() => isLoading = false);
+                      setState(() {
+                        isLoading = false;
+                      });
                     }
+
                     print('333333333333333333');
                   },
                 ),
@@ -509,7 +585,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -548,7 +624,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
                           border: Border.all(color: Colors.white, width: 4),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.30),
+                              color: Colors.black.withValues(alpha: 0.30),
                               blurRadius: 14,
                               offset: const Offset(0, 5),
                             ),
@@ -602,7 +678,9 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.30),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.30,
+                                      ),
                                       blurRadius: 8,
                                       offset: const Offset(0, 3),
                                     ),
@@ -641,7 +719,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -713,7 +791,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: const Color(0xFF1E3A5F).withOpacity(0.08),
+            color: const Color(0xFF1E3A5F).withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, size: 22, color: const Color(0xFF1E3A5F)),
@@ -794,7 +872,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -860,7 +938,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: value
-              ? const Color(0xFF1E3A5F).withOpacity(0.1)
+              ? const Color(0xFF1E3A5F).withValues(alpha: 0.1)
               : Colors.grey[100],
           borderRadius: BorderRadius.circular(12),
         ),
@@ -893,7 +971,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
           });
         },
         activeColor: const Color(0xFF1E3A5F),
-        activeTrackColor: const Color(0xFF1E3A5F).withOpacity(0.3),
+        activeTrackColor: const Color(0xFF1E3A5F).withValues(alpha: 0.3),
       ),
     );
   }
@@ -922,7 +1000,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
           backgroundColor: const Color(0xFF1E3A5F),
           foregroundColor: Colors.white,
           elevation: 4,
-          shadowColor: const Color(0xFF1E3A5F).withOpacity(0.4),
+          shadowColor: const Color(0xFF1E3A5F).withValues(alpha: 0.4),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),

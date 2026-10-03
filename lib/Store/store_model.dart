@@ -24,6 +24,7 @@ class StoreModel {
   final bool isClothes; // <-- علم الملابس
   final double shippingFee; // <-- رسوم الشحن
   final String deviceToken;
+  final String? activityType; // <-- شروط وأحكام المتجر
 
   StoreModel({
     required this.id,
@@ -49,6 +50,7 @@ class StoreModel {
     this.phoneCode,
     this.whatsCode,
     required this.deviceToken,
+    this.activityType,
   });
 
   factory StoreModel.fromFirestore(DocumentSnapshot doc) {
@@ -77,6 +79,7 @@ class StoreModel {
       isClothes: data['isClothes'] ?? false,
       shippingFee: (data['shippingFee'] ?? 0).toDouble(),
       deviceToken: data['deviceToken'],
+      activityType: data['activityType'],
     );
   }
 
@@ -104,6 +107,7 @@ class StoreModel {
       'isClothes': isClothes,
       'shippingFee': shippingFee,
       'deviceToken': deviceToken,
+      'activityType': activityType,
     };
   }
 

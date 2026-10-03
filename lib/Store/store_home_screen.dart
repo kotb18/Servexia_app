@@ -99,7 +99,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
       ? _hexToColor(_store!.primaryColor)
       : const Color(0xFF2196F3);
 
-  Color get primaryColorLight => primaryColor.withOpacity(0.1);
+  Color get primaryColorLight => primaryColor.withValues(alpha: 0.1);
   Color get primaryColorDark => HSLColor.fromColor(primaryColor)
       .withLightness(
         (HSLColor.fromColor(primaryColor).lightness - 0.15).clamp(0.0, 1.0),
@@ -117,6 +117,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
   bool get isClothes => _store?.isClothes ?? false;
   String? get deviceToken => _store?.deviceToken;
   String? get logoUrl => _store?.logoUrl;
+  String? get activityType => _store?.activityType;
 
   String _generateStoreLink() {
     const baseUrl = 'https://servexia-2498k.web.app';
@@ -272,7 +273,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
           color: hasLogo ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(borderRadius),
           border: hasLogo
-              ? Border.all(color: primaryColor.withOpacity(0.15))
+              ? Border.all(color: primaryColor.withValues(alpha: 0.15))
               : null,
           gradient: hasLogo
               ? null
@@ -283,7 +284,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                 ),
           boxShadow: [
             BoxShadow(
-              color: primaryColor.withOpacity(hasLogo ? 0.15 : 0.3),
+              color: primaryColor.withValues(alpha: hasLogo ? 0.15 : 0.3),
               blurRadius: size * 0.2,
               offset: Offset(0, size * 0.07),
             ),
@@ -400,7 +401,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: primaryColor.withOpacity(0.25),
+            color: primaryColor.withValues(alpha: 0.25),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -418,7 +419,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                 width: 150,
                 height: 150,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.08),
+                  color: Colors.white.withValues(alpha: 0.08),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -430,7 +431,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                 width: 180,
                 height: 180,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
+                  color: Colors.white.withValues(alpha: 0.05),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -464,11 +465,11 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
+                                color: Colors.white.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
-                                isClothes ? '👕 متجر ملابس' : '🛍️ متجر عام',
+                                activityType ?? 'متجر عام',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 12,
@@ -490,7 +491,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                     Text(
                       storeDescription!,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withValues(alpha: 0.9),
                         fontSize: 14,
                         height: 1.5,
                       ),
@@ -552,9 +553,9 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15),
+          color: Colors.white.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(25),
-          border: Border.all(color: Colors.white.withOpacity(0.2)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -758,7 +759,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
             border: Border.all(color: Colors.grey.shade100),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -815,7 +816,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                               borderRadius: BorderRadius.circular(8),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.red.withOpacity(0.3),
+                                  color: Colors.red.withValues(alpha: 0.3),
                                   blurRadius: 6,
                                   offset: const Offset(0, 2),
                                 ),
@@ -840,7 +841,7 @@ class _StoreHomeScreenState extends State<StoreHomeScreen> {
                       IgnorePointer(
                         child: Container(
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.5),
+                            color: Colors.black.withValues(alpha: 0.5),
                             borderRadius: const BorderRadius.vertical(
                               top: Radius.circular(16),
                             ),

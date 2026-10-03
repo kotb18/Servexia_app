@@ -98,7 +98,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
       ? _hexToColor(_store!.primaryColor)
       : const Color(0xFF2196F3);
 
-  Color get primaryColorLight => primaryColor.withOpacity(0.08);
+  Color get primaryColorLight => primaryColor.withValues(alpha: 0.08);
   Color get primaryColorDark => HSLColor.fromColor(primaryColor)
       .withLightness(
         (HSLColor.fromColor(primaryColor).lightness - 0.15).clamp(0.0, 1.0),
@@ -524,7 +524,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: item.imagesList.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              separatorBuilder: (_, _) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
                 //    final isSelected = _currentImage == index;
                 return InkWell(
@@ -611,7 +611,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.6),
+                color: Colors.black.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -626,7 +626,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
           ),
         if (!item.isInStock)
           Container(
-            color: Colors.black.withOpacity(0.5),
+            color: Colors.black.withValues(alpha: 0.5),
             child: Center(
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -686,7 +686,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              '${item.effectiveStorePrice.toStringAsFixed(2)}',
+              item.effectiveStorePrice.toStringAsFixed(2),
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
@@ -696,7 +696,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
             const SizedBox(width: 16),
             if (item.hasDiscount) ...[
               Text(
-                '${item.price.toStringAsFixed(2)}',
+                item.price.toStringAsFixed(2),
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey.shade500,
@@ -829,7 +829,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
                             : null,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha: 0.1),
                             blurRadius: 4,
                           ),
                         ],
@@ -1103,7 +1103,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 20,
             offset: const Offset(0, -4),
           ),
@@ -1198,7 +1198,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
             borderRadius: BorderRadius.circular(16),
           ),
           elevation: 2,
-          shadowColor: primaryColor.withOpacity(0.4),
+          shadowColor: primaryColor.withValues(alpha: 0.4),
         ),
       ),
     );
@@ -1215,7 +1215,7 @@ class _StoreProductDetailScreenState extends State<StoreProductDetailScreen> {
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),

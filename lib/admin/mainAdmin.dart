@@ -126,7 +126,7 @@ class _MainAdminState extends State<MainAdmin> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -176,18 +176,22 @@ class _MainAdminState extends State<MainAdmin> {
     }
     await deleteGroupBatch();
 
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: this.context,
+      builder: (dialogContext) => AlertDialog(
         content: Text('تم مسح $deletedCount سجل حضور منتهي بنجاح'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('حسناً'),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('حسنًا'),
           ),
         ],
       ),
     );
+
+    if (!mounted) return;
     setState(() {
       _isLoading = false;
     });

@@ -104,7 +104,7 @@ class _AssetsScreenState extends State<AssetsScreen>
           bottomRight: Radius.circular(20),
         ),
       ),
-      shadowColor: const Color(0xFF1E88E5).withOpacity(0.3),
+      shadowColor: const Color(0xFF1E88E5).withValues(alpha: 0.3),
     );
   }
 
@@ -181,7 +181,7 @@ class _AssetsScreenState extends State<AssetsScreen>
                       child: ListView.separated(
                         shrinkWrap: true,
                         itemCount: sites.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        separatorBuilder: (_, _) => const Divider(height: 1),
                         itemBuilder: (_, index) {
                           final site = sites[index];
                           return ListTile(
@@ -263,7 +263,7 @@ class _AssetsScreenState extends State<AssetsScreen>
   Widget _buildFiltersCard() {
     return Card(
       elevation: 4,
-      shadowColor: Colors.black.withOpacity(0.1),
+      shadowColor: Colors.black.withValues(alpha: 0.1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
         decoration: BoxDecoration(
@@ -283,7 +283,7 @@ class _AssetsScreenState extends State<AssetsScreen>
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E88E5).withOpacity(0.1),
+                    color: const Color(0xFF1E88E5).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(
@@ -663,7 +663,7 @@ class _AssetsScreenState extends State<AssetsScreen>
       icon: Icon(icon),
       //  label: Text(label),
       style: ElevatedButton.styleFrom(
-        backgroundColor: color.withOpacity(0.1),
+        backgroundColor: color.withValues(alpha: 0.1),
         foregroundColor: color,
         padding: const EdgeInsets.symmetric(vertical: 12),
         shape: RoundedRectangleBorder(
@@ -1096,7 +1096,7 @@ class _AssetsScreenState extends State<AssetsScreen>
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.08),
+      shadowColor: Colors.black.withValues(alpha: 0.08),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Container(
         decoration: BoxDecoration(
@@ -1117,7 +1117,7 @@ class _AssetsScreenState extends State<AssetsScreen>
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E88E5).withOpacity(0.1),
+                      color: const Color(0xFF1E88E5).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(
@@ -1170,7 +1170,7 @@ class _AssetsScreenState extends State<AssetsScreen>
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
+                      color: Colors.green.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: Colors.green.shade300,
@@ -1206,7 +1206,7 @@ class _AssetsScreenState extends State<AssetsScreen>
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.1),
+                    color: Colors.amber.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.amber.shade200, width: 1),
                   ),
@@ -1241,7 +1241,7 @@ class _AssetsScreenState extends State<AssetsScreen>
     return Card(
       margin: const EdgeInsets.only(top: 8),
       elevation: 3,
-      shadowColor: Colors.green.withOpacity(0.2),
+      shadowColor: Colors.green.withValues(alpha: 0.2),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Container(
         decoration: BoxDecoration(
@@ -1283,7 +1283,7 @@ class _AssetsScreenState extends State<AssetsScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.2),
+                color: Colors.green.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
@@ -1387,6 +1387,10 @@ class _AssetsScreenState extends State<AssetsScreen>
     final nameController = TextEditingController(
       text: asset['name']?.toString() ?? '',
     );
+    // ⬇️ كنترولر الموديل الجديد
+    final modelController = TextEditingController(
+      text: asset['model']?.toString() ?? '',
+    );
 
     String selectedStatus = asset['status']?.toString() ?? 'active';
     bool isSaving = false;
@@ -1416,8 +1420,19 @@ class _AssetsScreenState extends State<AssetsScreen>
 
                       const SizedBox(height: 16),
 
+                      // ⬇️ حقل الموديل الجديد
+                      TextField(
+                        controller: modelController,
+                        decoration: const InputDecoration(
+                          labelText: 'الموديل',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
                       DropdownButtonFormField<String>(
-                        value:
+                        initialValue:
                             const [
                               'active',
                               'inactive',
@@ -1463,6 +1478,8 @@ class _AssetsScreenState extends State<AssetsScreen>
                 ElevatedButton(
                   onPressed: () async {
                     final name = nameController.text.trim();
+                    // ⬇️ قراءة قيمة الموديل
+                    final model = modelController.text.trim();
 
                     if (name.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -1477,13 +1494,17 @@ class _AssetsScreenState extends State<AssetsScreen>
                       setDialogState(() {
                         isSaving = true;
                       });
-                      // نفّذ التحديث مباشرة؛ التأخير السابق كان يجعل الزر يبدو معطّلًا.
+                      // ⬇️ حفظ الموديل مع الاسم والحالة
                       await FirebaseFirestore.instance
                           .collection('assets')
                           .doc(widget.groupId)
                           .collection('items')
                           .doc(assetId)
-                          .update({'name': name, 'status': selectedStatus});
+                          .update({
+                            'name': name,
+                            'model': model,
+                            'status': selectedStatus,
+                          });
 
                       if (!mounted) return;
                       setState(() {
@@ -1515,10 +1536,10 @@ class _AssetsScreenState extends State<AssetsScreen>
       },
     );
 
-    // انتظر انتهاء انتقال إغلاق الحوار قبل التخلص من الكنترولر؛
-    // التخلص المبكر كان يسبب: TextEditingController was used after disposed.
+    // انتظر انتهاء انتقال إغلاق الحوار قبل التخلص من الكنترولرات
     await Future<void>.delayed(const Duration(milliseconds: 300));
     nameController.dispose();
+    modelController.dispose(); // ⬇️ لا تنسَ التخلص من الكنترولر الجديد
   }
 
   /// 🗑️ تأكيد الحذف
@@ -2376,7 +2397,7 @@ class ViewAssets extends StatelessWidget {
                   return ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
                     itemCount: docs.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
                     itemBuilder: (context, index) => _AssetCard(
                       data: docs[index].data(),
                       documentId: docs[index].id,
@@ -2495,7 +2516,7 @@ class _AssetCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E88E5).withOpacity(.1),
+                      color: const Color(0xFF1E88E5).withValues(alpha: .1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(

@@ -441,7 +441,7 @@ class _StoreCheckoutScreenState extends State<StoreCheckoutScreen> {
             (method) => Card(
               elevation: 0,
               color: _selectedPayment == method.$1
-                  ? Theme.of(context).colorScheme.primary.withOpacity(.08)
+                  ? Theme.of(context).colorScheme.primary.withValues(alpha: .08)
                   : const Color(0xFFF9FAFB),
               margin: const EdgeInsets.only(bottom: 8),
               shape: RoundedRectangleBorder(
@@ -471,7 +471,7 @@ class _StoreCheckoutScreenState extends State<StoreCheckoutScreen> {
         color: Theme.of(context).scaffoldBackgroundColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(.08),
+            color: Colors.black.withValues(alpha: .08),
             blurRadius: 14,
             offset: const Offset(0, -4),
           ),

@@ -491,7 +491,7 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -515,7 +515,7 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: theme.primaryColor.withOpacity(0.05),
+              color: theme.primaryColor.withValues(alpha: 0.05),
               borderRadius: const BorderRadius.vertical(
                 bottom: Radius.circular(20),
               ),
@@ -651,7 +651,7 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
     required bool isAlreadyInStore,
   }) {
     return _ItemCardWidget(
-      key: ValueKey('${item.sku}_${_initialDataLoaded}'),
+      key: ValueKey('${item.sku}_$_initialDataLoaded'),
       item: item,
       isAlreadyInStore: isAlreadyInStore,
       priceControllers: _priceControllers,
@@ -751,7 +751,7 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -777,7 +777,7 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
         boxShadow: hasChanges
             ? [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 20,
                   offset: const Offset(0, -5),
                 ),
@@ -847,7 +847,7 @@ class _ItemCardWidget extends StatefulWidget {
   final bool isClothes;
 
   const _ItemCardWidget({
-    Key? key,
+    super.key,
     required this.item,
     required this.isAlreadyInStore,
     required this.priceControllers,
@@ -863,7 +863,7 @@ class _ItemCardWidget extends StatefulWidget {
     required this.onNotifyChange,
     required this.pickImages,
     required this.isClothes,
-  }) : super(key: key);
+  });
 
   @override
   State<_ItemCardWidget> createState() => _ItemCardWidgetState();
@@ -1026,7 +1026,7 @@ class _ItemCardWidgetState extends State<_ItemCardWidget> {
                               ),
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? color.withOpacity(0.2)
+                                    ? color.withValues(alpha: 0.2)
                                     : Colors.grey.shade50,
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
@@ -1278,7 +1278,7 @@ class _ItemCardWidgetState extends State<_ItemCardWidget> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -1510,7 +1510,7 @@ class _ItemCardWidgetState extends State<_ItemCardWidget> {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.deepPurple.withOpacity(0.1),
+                    color: Colors.deepPurple.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -1607,10 +1607,10 @@ class _ItemCardWidgetState extends State<_ItemCardWidget> {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: (colorData['color'] as Color).withOpacity(0.15),
+            color: (colorData['color'] as Color).withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: (colorData['color'] as Color).withOpacity(0.4),
+              color: (colorData['color'] as Color).withValues(alpha: 0.4),
             ),
           ),
           child: Row(
@@ -1662,9 +1662,9 @@ class _ItemCardWidgetState extends State<_ItemCardWidget> {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.deepOrange.withOpacity(0.1),
+            color: Colors.deepOrange.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.deepOrange.withOpacity(0.3)),
+            border: Border.all(color: Colors.deepOrange.withValues(alpha: 0.3)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,

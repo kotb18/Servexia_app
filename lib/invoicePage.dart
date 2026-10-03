@@ -808,7 +808,7 @@ class _InvoicePageState extends State<InvoicePage>
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -1747,7 +1747,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: widget.invoiceType.color.withOpacity(0.1),
+            color: widget.invoiceType.color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
@@ -2123,7 +2123,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
             Icon(
               isMaintenance ? Icons.build_outlined : Icons.inventory_2_outlined,
               size: 48,
-              color: AppColors.textSecondary.withOpacity(0.5),
+              color: AppColors.textSecondary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 12),
             Text(
@@ -2152,7 +2152,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: items.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final item = items[index];
         final quantity = (item['quantity'] ?? 0).abs();
@@ -2193,8 +2193,8 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                   height: 40,
                   decoration: BoxDecoration(
                     color: isReturn
-                        ? AppColors.danger.withOpacity(0.1)
-                        : AppColors.primary.withOpacity(0.1),
+                        ? AppColors.danger.withValues(alpha: 0.1)
+                        : AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
@@ -2586,7 +2586,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -3208,7 +3208,7 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
                             padding: const EdgeInsets.all(12),
                             color: item['valuePicked']
                                 ? Colors.transparent
-                                : AppColors.primary.withOpacity(0.05),
+                                : AppColors.primary.withValues(alpha: 0.05),
                             child: Text(
                               item['valuePicked']
                                   ? (item['value'] as double).toStringAsFixed(2)
@@ -3234,7 +3234,7 @@ class _CustomPaymentsTableState extends State<CustomPaymentsTable> {
                             padding: const EdgeInsets.all(12),
                             color: item['datePicked']
                                 ? Colors.transparent
-                                : AppColors.primary.withOpacity(0.05),
+                                : AppColors.primary.withValues(alpha: 0.05),
                             child: Text(
                               item['datePicked']
                                   ? formatDate(item['date'] as DateTime)
@@ -3535,7 +3535,7 @@ class InvoiceGenerator {
     }).toList();
 
     // Helper function for consistent text styling
-    pw.TextStyle _textStyle({
+    pw.TextStyle textStyle({
       double fontSize = 10,
       PdfColor color = PdfTheme.textPrimary,
       pw.FontWeight fontWeight = pw.FontWeight.normal,
@@ -3549,7 +3549,7 @@ class InvoiceGenerator {
       );
     }
 
-    pw.Widget _summaryRow(
+    pw.Widget summaryRow(
       String label,
       double value, {
       bool isTotal = false,
@@ -3562,7 +3562,7 @@ class InvoiceGenerator {
           children: [
             pw.Text(
               label,
-              style: _textStyle(
+              style: textStyle(
                 fontSize: isTotal ? 10 : 9,
                 color: isTotal ? PdfTheme.textPrimary : PdfTheme.textSecondary,
                 fontWeight: isTotal ? pw.FontWeight.bold : pw.FontWeight.normal,
@@ -3570,7 +3570,7 @@ class InvoiceGenerator {
             ),
             pw.Text(
               value.toStringAsFixed(2),
-              style: _textStyle(
+              style: textStyle(
                 fontSize: isTotal ? 12 : 10,
                 color: isDiscount
                     ? PdfTheme.danger
@@ -3645,7 +3645,7 @@ class InvoiceGenerator {
                           children: [
                             pw.Text(
                               style.titleAr,
-                              style: _textStyle(
+                              style: textStyle(
                                 fontSize: 14,
                                 color: PdfColors.white,
                                 fontWeight: pw.FontWeight.bold,
@@ -3653,7 +3653,7 @@ class InvoiceGenerator {
                             ),
                             pw.Text(
                               style.titleEn,
-                              style: _textStyle(
+                              style: textStyle(
                                 fontSize: 8,
                                 color: PdfColors.white,
                               ),
@@ -3669,7 +3669,7 @@ class InvoiceGenerator {
                           children: [
                             pw.Text(
                               companyName ?? 'اسم الشركة',
-                              style: _textStyle(
+                              style: textStyle(
                                 fontSize: 18,
                                 color: PdfColors.white,
                                 fontWeight: pw.FontWeight.bold,
@@ -3682,7 +3682,7 @@ class InvoiceGenerator {
                                 if (companyPhone != null && showPhone != false)
                                   pw.Text(
                                     companyPhone,
-                                    style: _textStyle(
+                                    style: textStyle(
                                       fontSize: 8,
                                       color: PdfColors.grey400,
                                     ),
@@ -3691,7 +3691,7 @@ class InvoiceGenerator {
                                     showAddress != false)
                                   pw.Text(
                                     companyAddress,
-                                    style: _textStyle(
+                                    style: textStyle(
                                       fontSize: 8,
                                       color: PdfColors.grey400,
                                     ),
@@ -3699,7 +3699,7 @@ class InvoiceGenerator {
                                 if (companyEmail != null && showEmail != false)
                                   pw.Text(
                                     companyEmail,
-                                    style: _textStyle(
+                                    style: textStyle(
                                       fontSize: 8,
                                       color: PdfColors.grey400,
                                     ),
@@ -3712,7 +3712,7 @@ class InvoiceGenerator {
                                 if (!isQuote && invoiceType != 'مرتجع')
                                   pw.Text(
                                     'رقم: $invoiceNumber',
-                                    style: _textStyle(
+                                    style: textStyle(
                                       fontSize: 9,
                                       color: PdfColors.white,
                                     ),
@@ -3730,7 +3730,7 @@ class InvoiceGenerator {
                                     ),
                                     child: pw.Text(
                                       paymentStatus,
-                                      style: _textStyle(
+                                      style: textStyle(
                                         fontSize: 8,
                                         color: PdfColors.white,
                                         fontWeight: pw.FontWeight.bold,
@@ -3762,7 +3762,7 @@ class InvoiceGenerator {
                             ),
                             pw.Text(
                               'التاريخ: $formattedDate',
-                              style: _textStyle(
+                              style: textStyle(
                                 fontSize: 9,
                                 color: PdfColors.white,
                               ),
@@ -3796,7 +3796,7 @@ class InvoiceGenerator {
                           ),
                           child: pw.Text(
                             clientLabel,
-                            style: _textStyle(
+                            style: textStyle(
                               fontSize: 9,
                               color: style.primaryColor,
                               fontWeight: pw.FontWeight.bold,
@@ -3806,7 +3806,7 @@ class InvoiceGenerator {
                         pw.SizedBox(width: 12),
                         pw.Text(
                           clientName,
-                          style: _textStyle(
+                          style: textStyle(
                             fontSize: 13,
                             color: PdfTheme.textPrimary,
                             fontWeight: pw.FontWeight.bold,
@@ -3820,7 +3820,7 @@ class InvoiceGenerator {
                               if (clientAddress.isNotEmpty)
                                 pw.Text(
                                   clientAddress,
-                                  style: _textStyle(
+                                  style: textStyle(
                                     fontSize: 8,
                                     color: PdfTheme.textSecondary,
                                   ),
@@ -3828,7 +3828,7 @@ class InvoiceGenerator {
                               if (clientPhone.isNotEmpty)
                                 pw.Text(
                                   clientPhone,
-                                  style: _textStyle(
+                                  style: textStyle(
                                     fontSize: 8,
                                     color: PdfTheme.textSecondary,
                                   ),
@@ -3848,7 +3848,7 @@ class InvoiceGenerator {
                             ),
                             child: pw.Text(
                               'مرتجع من: $originalInvoiceNumber',
-                              style: _textStyle(
+                              style: textStyle(
                                 fontSize: 8,
                                 color: PdfColors.white,
                                 fontWeight: pw.FontWeight.bold,
@@ -3863,7 +3863,7 @@ class InvoiceGenerator {
                 // ═══ ITEMS TABLE ═══
                 pw.TableHelper.fromTextArray(
                   headers: headers,
-                  headerStyle: _textStyle(
+                  headerStyle: textStyle(
                     fontSize: 10,
                     color: PdfColors.white,
                     fontWeight: pw.FontWeight.bold,
@@ -3877,7 +3877,7 @@ class InvoiceGenerator {
                   ),
                   headerHeight: 28,
                   cellHeight: 32,
-                  cellStyle: _textStyle(
+                  cellStyle: textStyle(
                     fontSize: 9,
                     color: PdfTheme.textPrimary,
                   ),
@@ -3911,18 +3911,18 @@ class InvoiceGenerator {
                       children: [
                         pw.Text(
                           'الملخص',
-                          style: _textStyle(
+                          style: textStyle(
                             fontSize: 10,
                             color: PdfTheme.textSecondary,
                             fontWeight: pw.FontWeight.bold,
                           ),
                         ),
                         pw.SizedBox(height: 8),
-                        _summaryRow('المجموع:', subtotal),
+                        summaryRow('المجموع:', subtotal),
                         if (showDiscount != false && discount > 0)
-                          _summaryRow('الخصم:', discount, isDiscount: true),
+                          summaryRow('الخصم:', discount, isDiscount: true),
                         if (showTax != false && tax > 0)
-                          _summaryRow('الضريبة:', tax),
+                          summaryRow('الضريبة:', tax),
                         pw.Divider(
                           color: PdfTheme.border,
                           height: 10,
@@ -3934,7 +3934,7 @@ class InvoiceGenerator {
                             color: style.lightColor,
                             borderRadius: pw.BorderRadius.circular(6),
                           ),
-                          child: _summaryRow('الإجمالي:', total, isTotal: true),
+                          child: summaryRow('الإجمالي:', total, isTotal: true),
                         ),
                       ],
                     ),
@@ -3961,7 +3961,7 @@ class InvoiceGenerator {
                         ),
                         child: pw.Text(
                           'المدفوعات',
-                          style: _textStyle(
+                          style: textStyle(
                             fontSize: 9,
                             color: style.primaryColor,
                             fontWeight: pw.FontWeight.bold,
@@ -3971,7 +3971,7 @@ class InvoiceGenerator {
                       pw.SizedBox(height: 6),
                       pw.TableHelper.fromTextArray(
                         headers: ['الحالة', 'التاريخ', 'القيمة', 'النوع'],
-                        headerStyle: _textStyle(
+                        headerStyle: textStyle(
                           fontSize: 9,
                           color: PdfColors.white,
                           fontWeight: pw.FontWeight.bold,
@@ -3988,7 +3988,7 @@ class InvoiceGenerator {
                           3: pw.Alignment.center,
                         },
                         cellAlignment: pw.Alignment.center,
-                        cellStyle: _textStyle(
+                        cellStyle: textStyle(
                           fontSize: 8,
                           color: PdfTheme.textPrimary,
                         ),
@@ -4024,7 +4024,7 @@ class InvoiceGenerator {
                               ),
                               child: pw.Text(
                                 status,
-                                style: _textStyle(
+                                style: textStyle(
                                   fontSize: 8,
                                   color: PdfColors.white,
                                   fontWeight: pw.FontWeight.bold,
@@ -4062,7 +4062,7 @@ class InvoiceGenerator {
                           children: [
                             pw.Text(
                               'ملاحظات',
-                              style: _textStyle(
+                              style: textStyle(
                                 fontSize: 10,
                                 color: PdfTheme.textSecondary,
                                 fontWeight: pw.FontWeight.bold,
@@ -4071,7 +4071,7 @@ class InvoiceGenerator {
                             pw.SizedBox(height: 4),
                             pw.Text(
                               notes,
-                              style: _textStyle(
+                              style: textStyle(
                                 fontSize: 9,
                                 color: PdfTheme.textPrimary,
                               ),
@@ -4099,7 +4099,7 @@ class InvoiceGenerator {
                           children: [
                             pw.Text(
                               'شكراً لتعاملكم معنا',
-                              style: _textStyle(
+                              style: textStyle(
                                 fontSize: 10,
                                 color: PdfTheme.textPrimary,
                                 fontWeight: pw.FontWeight.bold,
@@ -4108,7 +4108,7 @@ class InvoiceGenerator {
                             pw.SizedBox(height: 2),
                             pw.Text(
                               footerText,
-                              style: _textStyle(
+                              style: textStyle(
                                 fontSize: 7,
                                 color: PdfTheme.textSecondary,
                               ),
@@ -4184,7 +4184,7 @@ class ThermalPrinterService {
     String paymentStatus = isQuote ? 'عرض سعر' : 'مدفوع';
 
     // Helper for text style
-    pw.TextStyle _style({
+    pw.TextStyle style({
       double fontSize = 10,
       PdfColor color = PdfColors.black,
       pw.FontWeight weight = pw.FontWeight.normal,
@@ -4215,7 +4215,7 @@ class ThermalPrinterService {
                 pw.Center(
                   child: pw.Text(
                     companyName ?? 'اسم الشركة',
-                    style: _style(fontSize: 16, weight: pw.FontWeight.bold),
+                    style: style(fontSize: 16, weight: pw.FontWeight.bold),
                     textAlign: pw.TextAlign.center,
                   ),
                 ),
@@ -4223,21 +4223,21 @@ class ThermalPrinterService {
                 pw.Center(
                   child: pw.Text(
                     '$invoiceType - $paymentStatus',
-                    style: _style(fontSize: 12, weight: pw.FontWeight.bold),
+                    style: style(fontSize: 12, weight: pw.FontWeight.bold),
                     textAlign: pw.TextAlign.center,
                   ),
                 ),
                 pw.Center(
                   child: pw.Text(
                     'رقم: $invoiceNumber',
-                    style: _style(fontSize: 9),
+                    style: style(fontSize: 9),
                     textAlign: pw.TextAlign.center,
                   ),
                 ),
                 pw.Center(
                   child: pw.Text(
                     'التاريخ: $formattedDate',
-                    style: _style(fontSize: 9),
+                    style: style(fontSize: 9),
                     textAlign: pw.TextAlign.center,
                   ),
                 ),
@@ -4248,7 +4248,7 @@ class ThermalPrinterService {
                 if (clientName.isNotEmpty) ...[
                   pw.Text(
                     'العميل: $clientName',
-                    style: _style(fontSize: 10),
+                    style: style(fontSize: 10),
                     textAlign: pw.TextAlign.right,
                   ),
                   pw.SizedBox(height: 8),
@@ -4282,7 +4282,7 @@ class ThermalPrinterService {
                         // Name on top
                         pw.Text(
                           name,
-                          style: _style(fontSize: 10),
+                          style: style(fontSize: 10),
                           textAlign: pw.TextAlign.right,
                         ),
                         pw.SizedBox(height: 2),
@@ -4292,14 +4292,14 @@ class ThermalPrinterService {
                           children: [
                             pw.Text(
                               '${qty.toString()} × ${price.toStringAsFixed(2)}',
-                              style: _style(
+                              style: style(
                                 fontSize: 9,
                                 color: PdfColors.grey700,
                               ),
                             ),
                             pw.Text(
                               itemTotal.toStringAsFixed(2),
-                              style: _style(
+                              style: style(
                                 fontSize: 10,
                                 weight: pw.FontWeight.bold,
                               ),
@@ -4309,21 +4309,16 @@ class ThermalPrinterService {
                       ],
                     ),
                   );
-                }).toList(),
+                }),
 
                 pw.Divider(thickness: 1),
                 pw.SizedBox(height: 4),
 
                 // ═══ SUMMARY - FIXED: Right aligned ═══
-                _summaryRow('المجموع:', subtotal, _style),
+                _summaryRow('المجموع:', subtotal, style),
                 if (discount > 0)
-                  _summaryRow(
-                    'الخصم:',
-                    -discount,
-                    _style,
-                    color: PdfColors.red,
-                  ),
-                if (tax > 0) _summaryRow('الضريبة:', tax, _style),
+                  _summaryRow('الخصم:', -discount, style, color: PdfColors.red),
+                if (tax > 0) _summaryRow('الضريبة:', tax, style),
 
                 pw.Divider(thickness: 1),
                 pw.SizedBox(height: 4),
@@ -4334,11 +4329,11 @@ class ThermalPrinterService {
                   children: [
                     pw.Text(
                       'الإجمالي:',
-                      style: _style(fontSize: 12, weight: pw.FontWeight.bold),
+                      style: style(fontSize: 12, weight: pw.FontWeight.bold),
                     ),
                     pw.Text(
                       total.toStringAsFixed(2),
-                      style: _style(fontSize: 12, weight: pw.FontWeight.bold),
+                      style: style(fontSize: 12, weight: pw.FontWeight.bold),
                     ),
                   ],
                 ),
@@ -4349,9 +4344,9 @@ class ThermalPrinterService {
                   pw.Divider(thickness: 0.5),
                   pw.Text(
                     'ملاحظات:',
-                    style: _style(fontSize: 9, weight: pw.FontWeight.bold),
+                    style: style(fontSize: 9, weight: pw.FontWeight.bold),
                   ),
-                  pw.Text(notes, style: _style(fontSize: 8)),
+                  pw.Text(notes, style: style(fontSize: 8)),
                   pw.SizedBox(height: 8),
                 ],
 
@@ -4360,7 +4355,7 @@ class ThermalPrinterService {
                 pw.Center(
                   child: pw.Text(
                     'شكراً لتعاملكم معنا',
-                    style: _style(fontSize: 11, weight: pw.FontWeight.bold),
+                    style: style(fontSize: 11, weight: pw.FontWeight.bold),
                     textAlign: pw.TextAlign.center,
                   ),
                 ),

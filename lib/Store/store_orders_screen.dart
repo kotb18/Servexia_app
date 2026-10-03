@@ -74,9 +74,9 @@ class StoreOrdersScreen extends StatelessWidget {
                 tileColor: colorScheme.surface,
 
                 // هذه الخصائص مدعومة في ListTile
-                splashColor: colorScheme.primary.withOpacity(0.15),
-                focusColor: colorScheme.primary.withOpacity(0.08),
-                hoverColor: colorScheme.primary.withOpacity(0.05),
+                splashColor: colorScheme.primary.withValues(alpha: 0.15),
+                focusColor: colorScheme.primary.withValues(alpha: 0.08),
+                hoverColor: colorScheme.primary.withValues(alpha: 0.05),
 
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,

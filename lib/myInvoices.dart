@@ -98,8 +98,8 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('حذف'),
               style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('حذف'),
             ),
           ],
         );
@@ -622,7 +622,7 @@ class InvoiceCard extends StatelessWidget {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: color.withOpacity(0.12),
+      color: color.withValues(alpha: 0.12),
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -651,7 +651,7 @@ class InvoiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final InvoiceService _invoiceService = InvoiceService();
+    final InvoiceService invoiceService = InvoiceService();
     print('lllllllllllllllllllllllllllll${invoice.thereIsReturn}');
     Color typeColor;
     String typeLabel;
@@ -712,7 +712,7 @@ class InvoiceCard extends StatelessWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: typeColor.withOpacity(0.1),
+                      color: typeColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -900,7 +900,7 @@ class InvoiceCard extends StatelessWidget {
               if (invoice.thereIsReturn)
                 TextButton(
                   onPressed: () async {
-                    final returnedInvoice = await _invoiceService.getInvoice(
+                    final returnedInvoice = await invoiceService.getInvoice(
                       groupId,
                       invoice.reInvoiceId,
                     );
@@ -926,7 +926,7 @@ class InvoiceCard extends StatelessWidget {
                       139,
                       26,
                       156,
-                    ).withOpacity(0.1),
+                    ).withValues(alpha: 0.1),
                   ),
                   child: const Text(
                     'هذه الفاتورة مرتبطة بفاتورة مرتجعة',
@@ -940,7 +940,7 @@ class InvoiceCard extends StatelessWidget {
               if (invoice.type == 'مرتجع')
                 TextButton(
                   onPressed: () async {
-                    final originalInvoiceId = await _invoiceService.getInvoice(
+                    final originalInvoiceId = await invoiceService.getInvoice(
                       groupId,
                       invoice.originalInvoiceId,
                     );
@@ -966,7 +966,7 @@ class InvoiceCard extends StatelessWidget {
                       17,
                       220,
                       48,
-                    ).withOpacity(0.1),
+                    ).withValues(alpha: 0.1),
                   ),
                   child: const Text(
                     'الفاتورة الأصليــــة',
@@ -987,7 +987,7 @@ class InvoiceCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
@@ -1534,7 +1534,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                           ).format(_currentInvoice.date),
                           style: TextStyle(
                             fontSize: 14,
-                            color: Colors.white.withOpacity(0.8),
+                            color: Colors.white.withValues(alpha: 0.8),
                           ),
                         ),
                       ],
@@ -1656,8 +1656,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: _currentInvoice.items.length,
-                          separatorBuilder: (_, __) =>
-                              const Divider(height: 24),
+                          separatorBuilder: (_, _) => const Divider(height: 24),
                           itemBuilder: (context, index) {
                             final item = _currentInvoice.items[index];
                             return _buildItemRow(item);
@@ -1683,8 +1682,8 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                         const SizedBox(height: 16),
                         _buildSummaryRow(
                           label: 'الإجمالي الفرعي',
-                          value:
-                              '${_currentInvoice.summary.subTotal.toStringAsFixed(2)}',
+                          value: _currentInvoice.summary.subTotal
+                              .toStringAsFixed(2),
                         ),
                         if (_currentInvoice.summary.discountValue > 0) ...[
                           const SizedBox(height: 8),
@@ -1701,8 +1700,8 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                           _buildSummaryRow(
                             label:
                                 'الضريبة (${_currentInvoice.summary.taxPercent.toStringAsFixed(1)}%)',
-                            value:
-                                '${_currentInvoice.summary.taxValue.toStringAsFixed(2)}',
+                            value: _currentInvoice.summary.taxValue
+                                .toStringAsFixed(2),
                           ),
                         ],
                         const Padding(
@@ -1711,8 +1710,9 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                         ),
                         _buildTotalRow(
                           label: 'الإجمالي',
-                          value:
-                              '${_currentInvoice.summary.total.toStringAsFixed(2)}',
+                          value: _currentInvoice.summary.total.toStringAsFixed(
+                            2,
+                          ),
                           color: typeColor,
                         ),
                       ],
@@ -1746,10 +1746,12 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: _currentInvoice.allInstallmentsPaid
-                                      ? const Color(0xFF10B981).withOpacity(0.1)
+                                      ? const Color(
+                                          0xFF10B981,
+                                        ).withValues(alpha: 0.1)
                                       : const Color(
                                           0xFFF59E0B,
-                                        ).withOpacity(0.1),
+                                        ).withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(
@@ -1779,7 +1781,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             itemCount: _currentInvoice.installments.length,
-                            separatorBuilder: (_, __) =>
+                            separatorBuilder: (_, _) =>
                                 const SizedBox(height: 12),
                             itemBuilder: (context, index) {
                               final installment =
@@ -1808,7 +1810,12 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '${_currentInvoice.installments.fold<double>(0, (sum, inst) => sum + inst.value).toStringAsFixed(2)}',
+                                    _currentInvoice.installments
+                                        .fold<double>(
+                                          0,
+                                          (sum, inst) => sum + inst.value,
+                                        )
+                                        .toStringAsFixed(2),
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -1875,7 +1882,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -1886,7 +1893,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: typeColor.withOpacity(0.1),
+              color: typeColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
@@ -1919,7 +1926,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: typeColor.withOpacity(0.1),
+              color: typeColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -1943,7 +1950,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -1959,7 +1966,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: const Color(0xFF1E3A8A).withOpacity(0.1),
+            color: const Color(0xFF1E3A8A).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, size: 20, color: const Color(0xFF1E3A8A)),
@@ -2026,7 +2033,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: const Color(0xFF1E3A8A).withOpacity(0.1),
+            color: const Color(0xFF1E3A8A).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
           child: const Center(
@@ -2061,7 +2068,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: const Color(0xFF1E3A8A).withOpacity(0.1),
+            color: const Color(0xFF1E3A8A).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
@@ -2108,9 +2115,9 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
+        color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2201,16 +2208,16 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: statusColor.withOpacity(0.05),
+          color: statusColor.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: statusColor.withOpacity(0.2)),
+          border: Border.all(color: statusColor.withValues(alpha: 0.2)),
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
+                color: statusColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(statusIcon, color: statusColor, size: 20),
@@ -2230,7 +2237,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${installment.value.toStringAsFixed(2)}',
+                    installment.value.toStringAsFixed(2),
                     style: TextStyle(
                       fontSize: 13,
                       color: Colors.grey[600],
@@ -2248,7 +2255,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
+                color: statusColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -2279,7 +2286,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1E3A8A).withOpacity(0.1),
+                  color: const Color(0xFF1E3A8A).withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -2393,9 +2400,9 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.05),
+          color: color.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Row(
           children: [
@@ -2413,7 +2420,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
             Icon(
               Icons.arrow_forward_ios,
               size: 16,
-              color: color.withOpacity(0.5),
+              color: color.withValues(alpha: 0.5),
             ),
           ],
         ),
@@ -2465,7 +2472,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                 ),
                 TableRow(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withOpacity(0.1),
+                    color: const Color(0xFF10B981).withValues(alpha: 0.1),
                   ),
                   children: [
                     _tableCell('الصافي بعد المرتجع', isBold: true),

@@ -313,9 +313,9 @@ class _HomepageState extends State<Homepage>
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
+          color: color.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: color.withOpacity(0.3), width: 1.5),
+          border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
         ),
         child: Column(
           children: [
@@ -357,7 +357,7 @@ class _HomepageState extends State<Homepage>
               },
               child: Text(
                 'main admin',
-                style: TextStyle(color: Colors.white.withOpacity(0.5)),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
               ),
             ),
         ],
@@ -389,12 +389,16 @@ class _HomepageState extends State<Homepage>
                 children: [
                   Text(
                     "لا توجد مجموعات حالياً",
-                    style: TextStyle(color: Colors.white.withOpacity(0.4)),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.4),
+                    ),
                   ),
                   const SizedBox(height: 10),
                   Text(
                     'إنشيء مجموعة الاّن وابدأ التجربة.',
-                    style: TextStyle(color: Colors.white.withOpacity(0.65)),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.65),
+                    ),
                   ),
                 ],
               ),
@@ -655,16 +659,16 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
+            color: Colors.white.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.1)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
           ),
           child: ListTile(
             contentPadding: const EdgeInsets.all(16),
             leading: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.2),
+                color: AppColors.primary.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -689,24 +693,24 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
                   Text(
                     group['purpose'],
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.8),
                       fontSize: 12,
                     ),
                   ),
                 Text(
                   group['area'] ?? '',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
+                    color: Colors.white.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),
-                Divider(color: Colors.white.withOpacity(0.4)),
+                Divider(color: Colors.white.withValues(alpha: 0.4)),
                 Text(
                   isGroupAdmin
                       ? 'لمسح المجموعة اضغط مطولاً'
                       : 'لمغادرة المجموعة اضغط مطولاً',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.4),
+                    color: Colors.white.withValues(alpha: 0.4),
                     fontSize: 10,
                   ),
                 ),
@@ -886,7 +890,7 @@ class HexagonImage extends StatelessWidget {
       decoration: BoxDecoration(
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.3),
+            color: AppColors.primary.withValues(alpha: 0.3),
             blurRadius: 30,
             spreadRadius: 10,
           ),
@@ -1076,7 +1080,7 @@ void _showAboutDialog(BuildContext context) {
     context: context,
     barrierDismissible: true,
     barrierLabel: 'AboutApp',
-    barrierColor: Colors.black.withOpacity(0.5),
+    barrierColor: Colors.black.withValues(alpha: 0.5),
     transitionDuration: const Duration(milliseconds: 300),
     pageBuilder: (_, _, _) {
       return Scaffold(
@@ -1107,7 +1111,7 @@ void _showAboutDialog(BuildContext context) {
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E88E5).withOpacity(0.1),
+                      color: const Color(0xFF1E88E5).withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(

@@ -462,8 +462,8 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                                   icon: Icon(Icons.picture_as_pdf),
                                   label: const Text('تقرير PDF'),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blue.withOpacity(
-                                      0.1,
+                                    backgroundColor: Colors.blue.withValues(
+                                      alpha: 0.1,
                                     ),
                                     foregroundColor: Colors.blue,
                                     padding: const EdgeInsets.symmetric(
@@ -545,7 +545,7 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -573,7 +573,9 @@ class _DailyAttendanceScreenState extends State<DailyAttendanceScreen> {
                         children: [
                           CircleAvatar(
                             radius: 28,
-                            backgroundColor: primaryColor.withOpacity(0.1),
+                            backgroundColor: primaryColor.withValues(
+                              alpha: 0.1,
+                            ),
                             child:
                                 member['faceImageUrl'] != null &&
                                     member['faceImageUrl'].toString().isNotEmpty

@@ -256,7 +256,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1565C0).withOpacity(0.3),
+            color: const Color(0xFF1565C0).withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -332,7 +332,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.greenAccent.withOpacity(0.2),
+                  color: Colors.greenAccent.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.greenAccent, width: 1),
                 ),
@@ -479,7 +479,12 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSectionHeader('إدارة المخازن والمبيعات'),
+              if (permissions['المخازن'] == true ||
+                  permissions['إضافة صنف مخزني'] == true ||
+                  permissions['الفواتير والمشتريات'] == true ||
+                  permissions['العملاء والموردين'] == true ||
+                  permissions['المتجر الإليكتروني'] == true)
+                _buildSectionHeader('إدارة المخازن والمبيعات'),
               GridView(
                 shrinkWrap:
                     true, // Important for GridView inside SingleChildScrollView
@@ -543,7 +548,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.blue.withOpacity(0.25),
+                        color: Colors.blue.withValues(alpha: 0.25),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -703,13 +708,13 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
   }) {
     return Card(
       elevation: 6,
-      shadowColor: color.withOpacity(0.25),
+      shadowColor: color.withValues(alpha: 0.25),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),
-        splashColor: color.withOpacity(0.1),
-        highlightColor: color.withOpacity(0.05),
+        splashColor: color.withValues(alpha: 0.1),
+        highlightColor: color.withValues(alpha: 0.05),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -721,7 +726,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.15),
+                      color: color.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(icon, size: 32, color: color),
@@ -743,7 +748,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                           border: Border.all(color: Colors.white, width: 2),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.red.withOpacity(0.3),
+                              color: Colors.red.withValues(alpha: 0.3),
                               blurRadius: 4,
                               offset: const Offset(0, 2),
                             ),

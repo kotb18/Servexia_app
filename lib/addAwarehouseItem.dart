@@ -80,7 +80,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
         border: Border.all(color: Colors.grey.shade300),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -114,7 +114,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                 ),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? const Color(0xFF1E88E5).withOpacity(0.08)
+                      ? const Color(0xFF1E88E5).withValues(alpha: 0.08)
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -163,7 +163,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
         border: Border.all(color: Colors.grey.shade300),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -197,7 +197,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                 ),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? const Color(0xFF1E88E5).withOpacity(0.08)
+                      ? const Color(0xFF1E88E5).withValues(alpha: 0.08)
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -554,7 +554,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
               style: ElevatedButton.styleFrom(
                 foregroundColor: Colors.black,
                 elevation: 6,
-                shadowColor: Colors.black.withOpacity(0.3),
+                shadowColor: Colors.black.withValues(alpha: 0.3),
                 padding: const EdgeInsets.symmetric(
                   vertical: 16,
                   horizontal: 20,

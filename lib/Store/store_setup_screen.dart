@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -44,6 +45,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
   String _whatsCode = '';
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _activityTypeController = TextEditingController();
   final _phoneController = TextEditingController();
   final _whatsappController = TextEditingController();
   final _emailController = TextEditingController();
@@ -70,7 +72,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
     return '$baseUrl/shop/${widget.groupId}';
   }
 
-  getDeviceToken() async {
+  Future<void> getDeviceToken() async {
     _deviceToken = await FirebaseMessaging.instance.getToken();
   }
 
@@ -87,6 +89,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
       setState(() {
         _nameController.text = store.name;
         _descriptionController.text = store.description ?? '';
+        _activityTypeController.text = store.activityType ?? '';
         _phoneController.text =
             store.phone?.replaceFirst(store.phoneCode ?? '', '') ?? '';
         _whatsappController.text =
@@ -106,6 +109,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
+    _activityTypeController.dispose();
     _phoneController.dispose();
     _whatsappController.dispose();
     _emailController.dispose();
@@ -305,9 +309,10 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
                   icon: Icons.description_outlined,
                   hint: 'وصف قصير يظهر للعملاء...',
                 ),
+                _buildActivityTypeField(),
                 _buildShippingFeeField(),
                 const SizedBox(height: 8),
-                _buildClothesToggle(),
+                //  _buildClothesToggle(),
               ],
             ),
 
@@ -445,7 +450,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
                   boxShadow: hasLogo
                       ? [
                           BoxShadow(
-                            color: primaryColor.withOpacity(0.25),
+                            color: primaryColor.withValues(alpha: 0.25),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -494,7 +499,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
                       border: Border.all(color: Colors.white, width: 2.5),
                       boxShadow: [
                         BoxShadow(
-                          color: primaryColor.withOpacity(0.4),
+                          color: primaryColor.withValues(alpha: 0.4),
                           blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),
@@ -565,7 +570,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
         gradient: LinearGradient(
           colors: [
             _hexToColor(_primaryColor),
-            _hexToColor(_primaryColor).withOpacity(0.8),
+            _hexToColor(_primaryColor).withValues(alpha: 0.8),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -622,7 +627,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
                     Text(
                       _isClothes == true ? 'متجر ملابس' : 'متجر عام',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withValues(alpha: 0.9),
                         fontSize: 14,
                       ),
                     ),
@@ -635,7 +640,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -805,6 +810,102 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
   // ───────────────────────────────────────────────
   // 💰 حقل رسوم الشحن
   // ───────────────────────────────────────────────
+  Widget _buildActivityTypeField() {
+    const defaultActivities = <String>[
+      'ملابس وأزياء',
+      'أحذية وحقائب',
+      'إكسسوارات',
+      'مستحضرات تجميل',
+      'أجهزة إلكترونية',
+      'أثاث وديكور',
+      'مطاعم ومأكولات',
+      'بقالة ومواد غذائية',
+      'أدوات منزلية',
+      'خدمات عامة',
+    ];
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance.collection('stores').snapshots(),
+      builder: (context, snapshot) {
+        final activities = <String>{...defaultActivities};
+        if (snapshot.hasData) {
+          for (final doc in snapshot.data!.docs) {
+            final value = doc.data()['activityType'];
+            if (value is String && value.trim().isNotEmpty) {
+              activities.add(value.trim());
+            }
+          }
+        }
+
+        final options = activities.toList()
+          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Autocomplete<String>(
+            optionsBuilder: (textValue) {
+              final query = textValue.text.trim().toLowerCase();
+              if (query.isEmpty) return options;
+              return options.where(
+                (item) => item.toLowerCase().contains(query),
+              );
+            },
+            onSelected: (value) {
+              _activityTypeController.text = value;
+            },
+            fieldViewBuilder:
+                (context, textController, focusNode, onFieldSubmitted) {
+                  if (textController.text != _activityTypeController.text &&
+                      !focusNode.hasFocus) {
+                    textController.text = _activityTypeController.text;
+                  }
+                  return TextFormField(
+                    controller: textController,
+                    focusNode: focusNode,
+                    textInputAction: TextInputAction.next,
+                    decoration: InputDecoration(
+                      labelText: 'نوع النشاط',
+                      hintText: 'مثال: ملابس وأزياء',
+                      prefixIcon: const Icon(Icons.category_outlined, size: 20),
+                      suffixIcon: const Icon(Icons.keyboard_arrow_down_rounded),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: _hexToColor(_primaryColor),
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'أدخل نوع النشاط'
+                        : null,
+                    onChanged: (value) {
+                      _activityTypeController.text = value;
+                      if (_activityTypeController.text == 'ملابس وأزياء') {
+                        _isClothes = true;
+                      } else {
+                        _isClothes = false;
+                      }
+                    },
+                    onFieldSubmitted: (_) => onFieldSubmitted(),
+                  );
+                },
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildShippingFeeField() {
     return Container(
       decoration: BoxDecoration(
@@ -817,7 +918,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             decoration: BoxDecoration(
-              color: _hexToColor(_primaryColor).withOpacity(0.1),
+              color: _hexToColor(_primaryColor).withValues(alpha: 0.1),
               borderRadius: const BorderRadius.horizontal(
                 right: Radius.circular(12),
               ),
@@ -865,7 +966,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
   // ───────────────────────────────────────────────
   // 👕 تبديل متجر الملابس
   // ───────────────────────────────────────────────
-  Widget _buildClothesToggle() {
+  /*   Widget _buildClothesToggle() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -904,7 +1005,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
         ],
       ),
     );
-  }
+  } */
 
   // ───────────────────────────────────────────────
   // 🎨 منتقي الألوان
@@ -937,7 +1038,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: color.withOpacity(0.4),
+                          color: color.withValues(alpha: 0.4),
                           blurRadius: 8,
                           offset: const Offset(0, 4),
                         ),
@@ -994,6 +1095,7 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
         description: _descriptionController.text.trim().isEmpty
             ? null
             : _descriptionController.text.trim(),
+        activityType: _activityTypeController.text.trim(),
         storeSlug: _generateStoreLink(),
         phone: _fullPhone.trim().isEmpty
             ? '$_phoneCode${_phoneController.text}'

@@ -266,7 +266,7 @@ class _MovementHistoryScreenState extends State<MovementHistoryScreen> {
                 vertical: 8,
               ),
               leading: CircleAvatar(
-                backgroundColor: color.withOpacity(0.1),
+                backgroundColor: color.withValues(alpha: 0.1),
                 child: Icon(icon, color: color),
               ),
               title: Text(
@@ -295,7 +295,7 @@ class _MovementHistoryScreenState extends State<MovementHistoryScreen> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -559,15 +559,12 @@ class _InventoryItemDetailsScreenRefactoredState
                                                       in snapshot.docs) {
                                                     batch.delete(doc.reference);
                                                   }
-                                                  final ref =
-                                                      await FirebaseFirestore
-                                                          .instance
-                                                          .collection(
-                                                            'inventory',
-                                                          )
-                                                          .doc(widget.groupId)
-                                                          .collection('items')
-                                                          .doc(widget.itemId);
+                                                  final ref = FirebaseFirestore
+                                                      .instance
+                                                      .collection('inventory')
+                                                      .doc(widget.groupId)
+                                                      .collection('items')
+                                                      .doc(widget.itemId);
                                                   batch.delete(ref);
                                                   await batch.commit();
 
@@ -724,9 +721,7 @@ class _InventoryItemDetailsScreenRefactoredState
     final priceController = TextEditingController(
       text: item['price'] != null ? item['price'].toString() : '',
     );
-    final nameController = TextEditingController(
-      text: item['name'] != null ? item['name'] : '',
-    );
+    final nameController = TextEditingController(text: item['name'] ?? '');
 
     showDialog(
       context: context,

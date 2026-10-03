@@ -154,7 +154,7 @@ class _TeamScreenState extends State<TeamScreen> {
                       icon: Icon(Icons.picture_as_pdf),
                       label: const Text('تقرير PDF'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.withOpacity(0.1),
+                        backgroundColor: Colors.green.withValues(alpha: 0.1),
                         foregroundColor: Colors.green,
                         padding: const EdgeInsets.symmetric(
                           vertical: 8,

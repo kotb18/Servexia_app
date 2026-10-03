@@ -154,8 +154,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     icon: const Icon(Icons.receipt_long),
                     label: const Text('الفاتورة المرتبطة'),
                     onPressed: () async {
-                      final InvoiceService _invoiceService = InvoiceService();
-                      final invoice = await _invoiceService.getInvoice(
+                      final InvoiceService invoiceService = InvoiceService();
+                      final invoice = await invoiceService.getInvoice(
                         widget.order.storeId,
                         widget.order.linkedInvoiceId!,
                       );
@@ -382,7 +382,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: widget.order.items.length,
-        separatorBuilder: (_, __) => const Divider(),
+        separatorBuilder: (_, _) => const Divider(),
         itemBuilder: (context, index) {
           final item = widget.order.items[index];
           return Padding(
@@ -472,12 +472,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color:
-                (colorData?['color'] as Color?)?.withOpacity(0.15) ??
+                (colorData?['color'] as Color?)?.withValues(alpha: 0.15) ??
                 Colors.grey.shade100,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color:
-                  (colorData?['color'] as Color?)?.withOpacity(0.4) ??
+                  (colorData?['color'] as Color?)?.withValues(alpha: 0.4) ??
                   Colors.grey.shade300,
             ),
           ),
@@ -515,9 +515,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.deepOrange.withOpacity(0.1),
+            color: Colors.deepOrange.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.deepOrange.withOpacity(0.3)),
+            border: Border.all(color: Colors.deepOrange.withValues(alpha: 0.3)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -633,12 +633,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: widget.order.statusHistory.length,
-        separatorBuilder: (_, __) => const Divider(),
+        separatorBuilder: (_, _) => const Divider(),
         itemBuilder: (context, index) {
           final update = widget.order.statusHistory[index];
           return ListTile(
             leading: CircleAvatar(
-              backgroundColor: _getStatusColor(update.status).withOpacity(0.2),
+              backgroundColor: _getStatusColor(
+                update.status,
+              ).withValues(alpha: 0.2),
               child: Icon(
                 _getStatusIcon(update.status),
                 color: _getStatusColor(update.status),
@@ -933,8 +935,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     return Chip(
       avatar: Icon(icon, color: color, size: 18),
       label: Text(label, style: TextStyle(color: color, fontSize: 13)),
-      backgroundColor: color.withOpacity(0.1),
-      side: BorderSide(color: color.withOpacity(0.3)),
+      backgroundColor: color.withValues(alpha: 0.1),
+      side: BorderSide(color: color.withValues(alpha: 0.3)),
     );
   }
 

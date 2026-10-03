@@ -473,11 +473,11 @@ class _CreategroupState extends State<Creategroup> {
 
     batch.set(attendanceRef, {'groupId': groupId});
 
-    final permissionRef0 = await FirebaseFirestore.instance
+    final permissionRef0 = FirebaseFirestore.instance
         .collection('employees_permissions')
         .doc(groupId);
     batch.set(permissionRef0, {'groupId': groupId});
-    final permissionRef1 = await FirebaseFirestore.instance
+    final permissionRef1 = FirebaseFirestore.instance
         .collection('employees_permissions')
         .doc(groupId)
         .collection('items')
@@ -490,11 +490,11 @@ class _CreategroupState extends State<Creategroup> {
       'updatedAt': FieldValue.serverTimestamp(),
     });
 
-    final inventoryRef = await FirebaseFirestore.instance
+    final inventoryRef = FirebaseFirestore.instance
         .collection('inventory')
         .doc(groupId);
     batch.set(inventoryRef, {'groupId': groupId});
-    final tasksRef = await FirebaseFirestore.instance
+    final tasksRef = FirebaseFirestore.instance
         .collection('tasks')
         .doc(groupId);
     batch.set(tasksRef, {'groupId': groupId});
@@ -533,8 +533,8 @@ class _CreategroupState extends State<Creategroup> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    Colors.black.withOpacity(0.7),
-                    Colors.black.withOpacity(0.4),
+                    Colors.black.withValues(alpha: 0.7),
+                    Colors.black.withValues(alpha: 0.4),
                   ],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
@@ -783,7 +783,7 @@ class _CreategroupState extends State<Creategroup> {
           if (_loading)
             Positioned.fill(
               child: Container(
-                color: Colors.black.withOpacity(0.4),
+                color: Colors.black.withValues(alpha: 0.4),
                 child: const Center(
                   child: CircularProgressIndicator(color: Colors.white),
                 ),

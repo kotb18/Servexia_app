@@ -295,7 +295,9 @@ class _StoreScreenState extends State<StoreScreen> {
                             ),
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white.withOpacity(0.2),
+                                backgroundColor: Colors.white.withValues(
+                                  alpha: 0.2,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -365,7 +367,7 @@ class _StoreScreenState extends State<StoreScreen> {
                         color: cardColor,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.03),
+                            color: Colors.black.withValues(alpha: 0.03),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -579,7 +581,7 @@ class _StoreScreenState extends State<StoreScreen> {
         selected: isSelected,
         showCheckmark: false,
         backgroundColor: bgColor,
-        selectedColor: primaryColor.withOpacity(0.1),
+        selectedColor: primaryColor.withValues(alpha: 0.1),
         side: BorderSide(
           color: isSelected ? primaryColor : Colors.grey.shade300,
           width: 1.5,
@@ -621,13 +623,13 @@ class _StoreScreenState extends State<StoreScreen> {
         color: cardColor,
         borderRadius: BorderRadius.circular(20),
         border: itemSelected
-            ? Border.all(color: primaryColor.withOpacity(0.5), width: 2)
+            ? Border.all(color: primaryColor.withValues(alpha: 0.5), width: 2)
             : null,
         boxShadow: [
           BoxShadow(
             color: itemSelected
-                ? primaryColor.withOpacity(0.1)
-                : Colors.black.withOpacity(0.04),
+                ? primaryColor.withValues(alpha: 0.1)
+                : Colors.black.withValues(alpha: 0.04),
             blurRadius: itemSelected ? 12 : 8,
             offset: const Offset(0, 4),
           ),
@@ -682,8 +684,8 @@ class _StoreScreenState extends State<StoreScreen> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          primaryColor.withOpacity(0.1),
-                          secondaryColor.withOpacity(0.1),
+                          primaryColor.withValues(alpha: 0.1),
+                          secondaryColor.withValues(alpha: 0.1),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -721,7 +723,7 @@ class _StoreScreenState extends State<StoreScreen> {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: dangerColor.withOpacity(0.1),
+                                color: dangerColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
@@ -776,7 +778,7 @@ class _StoreScreenState extends State<StoreScreen> {
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: primaryColor.withOpacity(0.3),
+                                color: primaryColor.withValues(alpha: 0.3),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),
@@ -794,7 +796,12 @@ class _StoreScreenState extends State<StoreScreen> {
                               Text(
                                 isWeightedItem
                                     ? '${currentQty.toStringAsFixed(3)} ${unitText.isNotEmpty ? unitText : 'كجم'}'
-                                    : '${currentQty.toStringAsFixed(currentQty.truncateToDouble() == currentQty ? 0 : 2)}',
+                                    : currentQty.toStringAsFixed(
+                                        currentQty.truncateToDouble() ==
+                                                currentQty
+                                            ? 0
+                                            : 2,
+                                      ),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
@@ -984,7 +991,7 @@ class _StoreScreenState extends State<StoreScreen> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: primaryColor.withOpacity(0.1),
+                      color: primaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(Icons.add_shopping_cart, color: primaryColor),
@@ -1054,12 +1061,14 @@ class _StoreScreenState extends State<StoreScreen> {
                 },
                 validator: (value) {
                   if (widget.invoiceType == 'بيع') {
-                    if (value == null || value.isEmpty)
+                    if (value == null || value.isEmpty) {
                       return 'من فضلك أدخل الكمية';
+                    }
                     final enteredQuantity = double.tryParse(value);
                     if (enteredQuantity == null) return 'أدخل قيمة رقمية صحيحة';
-                    if (enteredQuantity > (data['quantity'] ?? 0))
+                    if (enteredQuantity > (data['quantity'] ?? 0)) {
                       return 'لا يمكن بيع كمية أكبر من الكمية المخزنية';
+                    }
                   }
                   return null;
                 },
@@ -1241,7 +1250,7 @@ class _StoreScreenState extends State<StoreScreen> {
         color: cardColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 20,
             offset: const Offset(0, -4),
           ),
@@ -1353,7 +1362,7 @@ class _StoreScreenState extends State<StoreScreen> {
         color: cardColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 20,
             offset: const Offset(0, -4),
           ),
@@ -1370,7 +1379,7 @@ class _StoreScreenState extends State<StoreScreen> {
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor.withOpacity(0.1),
+                backgroundColor: primaryColor.withValues(alpha: 0.1),
                 foregroundColor: primaryColor,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(
@@ -1600,7 +1609,7 @@ class _StoreScreenState extends State<StoreScreen> {
             width: 120,
             height: 120,
             decoration: BoxDecoration(
-              color: primaryColor.withOpacity(0.1),
+              color: primaryColor.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(Icons.filter_list, size: 48, color: primaryColor),

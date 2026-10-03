@@ -362,7 +362,7 @@ class _StoreCartScreenState extends State<StoreCartScreen> {
             ),
           ),
           Text(
-            '${amount.toStringAsFixed(2)}',
+            amount.toStringAsFixed(2),
             style: TextStyle(
               fontSize: isTotal ? 18 : 14,
               fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,

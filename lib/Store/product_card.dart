@@ -41,7 +41,7 @@ class ProductCard extends StatelessWidget {
                             item.imagesList.first,
                             width: double.infinity,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _buildPlaceholder(),
+                            errorBuilder: (_, _, _) => _buildPlaceholder(),
                           )
                         : _buildPlaceholder(),
                   ),
@@ -72,7 +72,7 @@ class ProductCard extends StatelessWidget {
                     Positioned.fill(
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.5),
+                          color: Colors.black.withValues(alpha: 0.5),
                           borderRadius: const BorderRadius.vertical(
                             top: Radius.circular(12),
                           ),

@@ -35,15 +35,15 @@ class InventoryStoreService {
     String groupId, {
     String? searchQuery,
   }) {
-    Query<Map<String, dynamic>> query = _itemsCollection(groupId)
-        .where('isInStore', isEqualTo: true)
-        .where('quantity', isGreaterThan: 0.0);
+    Query<Map<String, dynamic>> query = _itemsCollection(
+      groupId,
+    ).where('isInStore', isEqualTo: true).where('quantity', isGreaterThan: 0.0);
 
     if (searchQuery != null && searchQuery.isNotEmpty) {
       query = query.where(
         'name',
         isGreaterThanOrEqualTo: searchQuery,
-        isLessThan: '${searchQuery}\uf8ff',
+        isLessThan: '$searchQuery\uf8ff',
       );
     }
 
