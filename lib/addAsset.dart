@@ -1,5 +1,18 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:characters/characters.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+
+/// مرّر هذا المفتاح إلى MaterialApp أو CupertinoApp.
+/// استخدامه يمنع مشاكل اختلاف BuildContext بعد عمليات الحفظ والتنقل.
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 class AddAssetScreen extends StatefulWidget {
   const AddAssetScreen({super.key, required this.groupId});
@@ -25,6 +38,8 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
   int? _currentAssetNumber;
   String? _selectedSite;
   String? _selectedLocation;
+  int _suggestionRequestId = 0;
+  bool _assetNumberManuallyEdited = false;
 
   CollectionReference<Map<String, dynamic>> get _itemsRef => FirebaseFirestore
       .instance
@@ -131,6 +146,109 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
     return result;
   }
 
+  String _englishPrefix(String value) {
+    // تحويل الحروف العربية إلى كتابة لاتينية تقريبية، مع الاحتفاظ
+    // بالحروف والأرقام الإنجليزية الموجودة أصلًا.
+    const arabicToLatin = <String, String>{
+      'ا': 'A',
+      'أ': 'A',
+      'إ': 'I',
+      'آ': 'AA',
+      'ب': 'B',
+      'ت': 'T',
+      'ث': 'TH',
+      'ج': 'J',
+      'ح': 'H',
+      'خ': 'KH',
+      'د': 'D',
+      'ذ': 'DH',
+      'ر': 'R',
+      'ز': 'Z',
+      'س': 'S',
+      'ش': 'SH',
+      'ص': 'S',
+      'ض': 'D',
+      'ط': 'T',
+      'ظ': 'Z',
+      'ع': 'A',
+      'غ': 'GH',
+      'ف': 'F',
+      'ق': 'Q',
+      'ك': 'K',
+      'ل': 'L',
+      'م': 'M',
+      'ن': 'N',
+      'ه': 'H',
+      'ة': 'H',
+      'و': 'W',
+      'ؤ': 'W',
+      'ي': 'Y',
+      'ى': 'A',
+      'ئ': 'Y',
+      'ء': 'A',
+    };
+
+    final buffer = StringBuffer();
+    for (final character in value.trim().toUpperCase().characters) {
+      if (arabicToLatin.containsKey(character)) {
+        buffer.write(arabicToLatin[character]);
+      } else {
+        buffer.write(character);
+      }
+    }
+
+    final normalized = buffer
+        .toString()
+        .replaceAll(RegExp(r'[^A-Z0-9]+'), '-')
+        .replaceAll(RegExp(r'-+'), '-')
+        .replaceAll(RegExp(r'^-|-$'), '');
+
+    return normalized.isEmpty ? 'ASSET' : normalized;
+  }
+
+  Future<void> _suggestAssetNumber() async {
+    final site = _siteController.text.trim();
+    final location = _locationController.text.trim();
+    final name = _assetNameController.text.trim();
+
+    if (site.isEmpty || location.isEmpty || name.isEmpty) return;
+
+    final requestId = ++_suggestionRequestId;
+
+    try {
+      final snapshot = await _itemsRef
+          .where('site', isEqualTo: site)
+          .where('location', isEqualTo: location)
+          .where('name', isEqualTo: name)
+          .get();
+
+      if (!mounted || requestId != _suggestionRequestId) return;
+
+      int maxNumber = 0;
+      final numberPattern = RegExp(r'-(\d+)$');
+
+      for (final doc in snapshot.docs) {
+        final value = (doc.data()['number'] as String? ?? '').trim();
+        final match = numberPattern.firstMatch(value);
+        if (match == null) continue;
+
+        final parsedNumber = int.tryParse(match.group(1)!);
+        if (parsedNumber != null && parsedNumber > maxNumber) {
+          maxNumber = parsedNumber;
+        }
+      }
+
+      if (_assetNumberManuallyEdited) return;
+
+      final nextNumber = maxNumber + 1;
+      final prefix = _englishPrefix(name);
+      _assetNumberController.text =
+          '$prefix-${nextNumber.toString().padLeft(3, '0')}';
+    } catch (_) {
+      // لا نوقف إدخال الأصل إذا تعذر اقتراح الرقم.
+    }
+  }
+
   Future<void> _saveAsset() async {
     FocusManager.instance.primaryFocus?.unfocus();
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -149,24 +267,411 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
           .doc(widget.groupId)
           .set({'groupId': widget.groupId}, SetOptions(merge: true));
 
-      final assetRef = _itemsRef.doc();
-      await assetRef.set({
+      final assetRef = await _saveAssetAtomically();
+
+      if (!mounted) return;
+
+      final savedAsset = <String, String>{
         'id': assetRef.id,
         'site': _siteController.text.trim(),
         'location': _locationController.text.trim(),
         'name': _assetNameController.text.trim(),
         'model': _modelController.text.trim(),
         'number': _assetNumberController.text.trim(),
-        'createdAt': FieldValue.serverTimestamp(),
-        'status': 'active',
-      });
+      };
+
+      setState(() => _loading = false);
+      await _showQrAfterSave(savedAsset);
 
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) return;
       setState(() => _loading = false);
-      _showMessage('تعذر حفظ الأصل، حاول مرة أخرى.');
+      if (error is _DuplicateAssetNumberException) {
+        _showMessage('رقم الأصل موجود بالفعل. أدخل رقمًا آخر.');
+      } else {
+        _showMessage('تعذر حفظ الأصل، حاول مرة أخرى.');
+      }
+    }
+  }
+
+  Future<DocumentReference<Map<String, dynamic>>> _saveAssetAtomically() async {
+    final site = _siteController.text.trim();
+    final location = _locationController.text.trim();
+    final name = _assetNameController.text.trim();
+    final model = _modelController.text.trim();
+    var candidate = _assetNumberController.text.trim().toUpperCase();
+
+    if (candidate.isEmpty) {
+      throw _DuplicateAssetNumberException();
+    }
+
+    for (var attempt = 0; attempt < 20; attempt++) {
+      final duplicate = await _itemsRef
+          .where('number', isEqualTo: candidate)
+          .limit(1)
+          .get();
+
+      // الرقم المكتوب يدويًا يجب رفضه، أما الرقم المقترح تلقائيًا
+      // فينتقل للرقم التالي إذا حدث سباق بين مستخدمين.
+      if (duplicate.docs.isNotEmpty && _assetNumberManuallyEdited) {
+        throw _DuplicateAssetNumberException();
+      }
+      if (duplicate.docs.isNotEmpty) {
+        candidate = _incrementAssetNumber(candidate);
+        continue;
+      }
+
+      final assetRef = _itemsRef.doc();
+      final indexId = base64Url.encode(utf8.encode(candidate));
+      final indexRef = FirebaseFirestore.instance
+          .collection('assets')
+          .doc(widget.groupId)
+          .collection('numberIndex')
+          .doc(indexId);
+
+      try {
+        await FirebaseFirestore.instance.runTransaction((transaction) async {
+          final indexSnapshot = await transaction.get(indexRef);
+          if (indexSnapshot.exists) {
+            throw _DuplicateAssetNumberException();
+          }
+
+          transaction.set(indexRef, {
+            'number': candidate,
+            'assetId': assetRef.id,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+
+          transaction.set(assetRef, {
+            'id': assetRef.id,
+            'site': site,
+            'location': location,
+            'name': name,
+            'model': model,
+            'number': candidate,
+            'createdAt': FieldValue.serverTimestamp(),
+            'status': 'active',
+          });
+        });
+
+        _assetNumberController.text = candidate;
+        return assetRef;
+      } on _DuplicateAssetNumberException {
+        if (_assetNumberManuallyEdited) rethrow;
+        candidate = _incrementAssetNumber(candidate);
+      }
+    }
+
+    throw StateError('Could not reserve a unique asset number.');
+  }
+
+  String _incrementAssetNumber(String value) {
+    final match = RegExp(r'^(.*?)-(\d+)$').firstMatch(value);
+    if (match == null) {
+      return '$value-001';
+    }
+
+    final prefix = match.group(1)!;
+    final number = int.tryParse(match.group(2)!) ?? 0;
+    final width = match.group(2)!.length < 3 ? 3 : match.group(2)!.length;
+    return '$prefix-${(number + 1).toString().padLeft(width, '0')}';
+  }
+
+  String _qrPayload(Map<String, String> asset) {
+    return jsonEncode({
+      'type': 'asset',
+      'id': asset['id'],
+      'number': asset['number'],
+      'site': asset['site'],
+      'location': asset['location'],
+      'name': asset['name'],
+      'model': asset['model'],
+    });
+  }
+
+  /// انتظار قصير حتى تنتهي animation إغلاق الحوار السابق؛
+  /// إظهار حوار جديد فور إغلاق آخر قد يبتلعه Flutter ولا يظهر.
+  Future<void> _waitForDialogTransition() =>
+      Future<void>.delayed(const Duration(milliseconds: 120));
+
+  Future<void> _showQrAfterSave(Map<String, String> asset) async {
+    // ننتظر دورة واجهة واحدة بعد انتهاء الحفظ حتى لا يتعارض الحوار
+    // مع إغلاق لوحة المفاتيح أو إعادة بناء الشاشة.
+    await Future<void>.delayed(Duration.zero);
+    final navigator =
+        appNavigatorKey.currentState ??
+        (mounted ? Navigator.of(context, rootNavigator: true) : null);
+    final overlayContext = navigator?.overlay?.context;
+    if (overlayContext == null) return;
+
+    final action = await showDialog<String>(
+      context: overlayContext,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('تم حفظ الأصل بنجاح'),
+          content: const Text('هل تريد إنشاء رمز QR لهذا الأصل أو طباعته؟'),
+          // وضع الأزرار رأسيًا يمنع اختفاء زر إنشاء QR بسبب ضيق العرض
+          // أو اتجاه RTL على الشاشات الصغيرة.
+          actions: [
+            SizedBox(
+              // لا تستخدم double.infinity داخل AlertDialog؛ فهو يعتمد على
+              // IntrinsicWidth ويسبب خطأ LayoutBuilder أثناء القياس.
+              width: 280,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.qr_code_2),
+                    label: const Text('إنشاء QR'),
+                    onPressed: () => Navigator.of(dialogContext).pop('create'),
+                  ),
+                  const SizedBox(height: 8),
+                  /*  OutlinedButton.icon(
+                    icon: const Icon(Icons.print_outlined),
+                    label: const Text('طباعة'),
+                    onPressed: () => Navigator.of(dialogContext).pop('print'),
+                  ), */
+                  const SizedBox(height: 4),
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop('later'),
+                    child: const Text('لاحقًا'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (action == null) return;
+
+    final rootNavigator =
+        appNavigatorKey.currentState ??
+        (mounted ? Navigator.of(context, rootNavigator: true) : null);
+    if (rootNavigator == null) return;
+
+    final payload = _qrPayload(asset);
+
+    if (action == 'create') {
+      await _showQrDialog(asset, payload);
+    } else if (action == 'print') {
+      await _printAssetQr(asset, payload);
+      await _waitForDialogTransition();
+      await _showQrDialog(asset, payload);
+    }
+  }
+
+  Future<void> _showQrDialog(Map<String, String> asset, String payload) async {
+    // ننتظر انتهاء animation إغلاق الحوار السابق حتى لا يبتلع
+    // Flutter هذا الحوار ويختفي دون أن يظهر.
+    await _waitForDialogTransition();
+
+    if (!mounted && appNavigatorKey.currentState == null) return;
+
+    final navigator =
+        appNavigatorKey.currentState ??
+        (mounted ? Navigator.of(context, rootNavigator: true) : null);
+    final dialogContext = navigator?.overlay?.context;
+    if (dialogContext == null) return;
+
+    // نستخدم Dialog بدل AlertDialog: AlertDialog يلف محتواه بـ IntrinsicWidth،
+    // وأي LayoutBuilder بداخله (مثل QrImageView) ينهار معه بخطأ
+    // "LayoutBuilder does not support returning intrinsic dimensions".
+    await showDialog<void>(
+      context: dialogContext,
+      useRootNavigator: true,
+      builder: (_) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: SizedBox(
+            width: 330,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+                  child: Text(
+                    'QR - ${asset['number']}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          color: Colors.white,
+                          // رسم QR مباشرة عبر QrPainter دون LayoutBuilder.
+                          child: CustomPaint(
+                            size: const Size.square(230),
+                            painter: QrPainter(
+                              data: payload,
+                              version: QrVersions.auto,
+                              errorCorrectionLevel: QrErrorCorrectLevel.M,
+                              color: Colors.black,
+                              // ignore: deprecated_member_use
+                              //  color: Colors.white,
+                              eyeStyle: const QrEyeStyle(
+                                eyeShape: QrEyeShape.square,
+                                color: Colors.black,
+                              ),
+                              dataModuleStyle: const QrDataModuleStyle(
+                                dataModuleShape: QrDataModuleShape.square,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          asset['number'] ?? '',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 17,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          asset['name'] ?? '',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey.shade700),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+                  child: OverflowBar(
+                    alignment: MainAxisAlignment.end,
+                    spacing: 8,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        child: const Text('إغلاق'),
+                      ),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.ios_share_outlined),
+                        label: const Text('تصدير / مشاركة'),
+                        onPressed: () => _shareAssetQr(asset, payload),
+                      ),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.print_outlined),
+                        label: const Text('طباعة QR'),
+                        onPressed: () => _printAssetQr(asset, payload),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<Uint8List> _assetQrPdf(
+    Map<String, String> asset,
+    String payload,
+  ) async {
+    // خط النظام الافتراضي في package:pdf لا يحتوي على الحروف العربية.
+    final regular = pw.Font.ttf(
+      await rootBundle.load('assets/fonts/Cairo-Regular.ttf'),
+    );
+    final bold = pw.Font.ttf(
+      await rootBundle.load('assets/fonts/ElMessiri-Bold.ttf'),
+    );
+    final pdf = pw.Document(
+      theme: pw.ThemeData.withFont(base: regular, bold: bold),
+    );
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (_) => pw.Directionality(
+          textDirection: pw.TextDirection.rtl,
+          child: pw.Center(
+            child: pw.Container(
+              width: 300,
+              padding: const pw.EdgeInsets.all(20),
+              child: pw.Column(
+                mainAxisSize: pw.MainAxisSize.min,
+                children: [
+                  pw.Text(
+                    asset['number'] ?? '',
+                    textAlign: pw.TextAlign.center,
+                    style: pw.TextStyle(
+                      fontSize: 20,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.SizedBox(height: 12),
+                  pw.BarcodeWidget(
+                    barcode: pw.Barcode.qrCode(),
+                    data: payload,
+                    width: 230,
+                    height: 230,
+                  ),
+                  pw.SizedBox(height: 12),
+                  pw.Text(asset['name'] ?? '', textAlign: pw.TextAlign.center),
+                  pw.SizedBox(height: 4),
+                  pw.Text(
+                    asset['location'] ?? '',
+                    textAlign: pw.TextAlign.center,
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Text(asset['site'] ?? '', textAlign: pw.TextAlign.center),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    return pdf.save();
+  }
+
+  Future<void> _shareAssetQr(Map<String, String> asset, String payload) async {
+    try {
+      final bytes = await _assetQrPdf(asset, payload);
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: 'asset_${asset['number'] ?? 'qr'}.pdf',
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage('تعذر تصدير أو مشاركة QR: $error');
+    }
+  }
+
+  Future<void> _printAssetQr(Map<String, String> asset, String payload) async {
+    try {
+      final bytes = await _assetQrPdf(asset, payload);
+      await Printing.layoutPdf(
+        name: 'asset_${asset['number'] ?? 'qr'}.pdf',
+        onLayout: (_) async => bytes,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage('تعذرت طباعة QR: $error');
     }
   }
 
@@ -182,6 +687,8 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
     _locationController.clear();
     _assetNameController.clear();
     _modelController.clear();
+    _assetNumberController.clear();
+    _assetNumberManuallyEdited = false;
     setState(() {});
   }
 
@@ -189,6 +696,8 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
     _selectedLocation = _locationController.text.trim();
     _assetNameController.clear();
     _modelController.clear();
+    _assetNumberController.clear();
+    _assetNumberManuallyEdited = false;
     setState(() {});
   }
 
@@ -448,7 +957,7 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
     required String hint,
     required IconData icon,
     required ValueChanged<String> onChanged,
-    required FormFieldValidator<String> validator,
+    FormFieldValidator<String>? validator,
     List<String> Function(QuerySnapshot<Map<String, dynamic>> snapshot)?
     valuesBuilder,
   }) {
@@ -518,7 +1027,10 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
     label: 'المكان داخل الموقع',
     hint: 'الدور الأول - غرفة المولدات',
     icon: Icons.place_rounded,
-    onChanged: (_) => _resetFromLocation(),
+    onChanged: (_) {
+      _resetFromLocation();
+      _suggestAssetNumber();
+    },
     validator: (value) => value == null || value.trim().isEmpty
         ? 'أدخل المكان داخل الموقع'
         : null,
@@ -536,7 +1048,10 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
     icon: Icons.precision_manufacturing_rounded,
     onChanged: (_) {
       _modelController.clear();
+      _assetNumberController.clear();
+      _assetNumberManuallyEdited = false;
       setState(() {});
+      _suggestAssetNumber();
     },
     validator: (value) =>
         value == null || value.trim().isEmpty ? 'أدخل اسم المعدة' : null,
@@ -552,8 +1067,8 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
     hint: 'اختر موديلًا سابقًا أو اكتب موديلًا جديدًا',
     icon: Icons.settings_suggest_rounded,
     onChanged: (_) {},
-    validator: (value) =>
-        value == null || value.trim().isEmpty ? 'أدخل موديل المعدة' : null,
+    /* validator: (value) =>
+        value == null || value.trim().isEmpty ? 'أدخل موديل المعدة' : null, */
     valuesBuilder: _modelValues,
   );
 
@@ -563,13 +1078,23 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
       textInputAction: TextInputAction.done,
       textDirection: TextDirection.ltr,
       keyboardType: TextInputType.text,
-      decoration: _inputDecoration(
-        label: 'رقم المعدة',
-        hint: 'GEN-001',
-        icon: Icons.tag_rounded,
-      ).copyWith(suffixIcon: null),
+      decoration:
+          _inputDecoration(
+            label: 'رقم المعدة',
+            hint: 'GENERATOR-001',
+            icon: Icons.tag_rounded,
+          ).copyWith(
+            suffixIcon: IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              tooltip: 'إعادة اقتراح الرقم',
+              onPressed: _suggestAssetNumber,
+            ),
+          ),
       validator: (value) =>
           value == null || value.trim().isEmpty ? 'أدخل رقم المعدة' : null,
+      onChanged: (_) {
+        _assetNumberManuallyEdited = true;
+      },
       onFieldSubmitted: (_) => _saveAsset(),
     );
   }
@@ -620,3 +1145,5 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
     );
   }
 }
+
+class _DuplicateAssetNumberException implements Exception {}

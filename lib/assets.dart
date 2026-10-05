@@ -292,12 +292,14 @@ class _AssetsScreenState extends State<AssetsScreen>
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Text(
-                  'الفلاتر',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                Expanded(
+                  child: const Text(
+                    'اختر الاصل او الموقع لإظهار الأعمال والصيانات',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
                   ),
                 ),
               ],

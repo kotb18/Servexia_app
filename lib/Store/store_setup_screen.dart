@@ -1076,6 +1076,34 @@ class _StoreSetupScreenState extends State<StoreSetupScreen> {
       ).showSnackBar(const SnackBar(content: Text('يرجى تحديد نوع المتجر')));
       return;
     } */
+    if (_primaryColor.isEmpty) {
+      _showError('اختر لون المتجر الأساسي');
+      return;
+    }
+    if (_shippingFeeController.text.trim().isEmpty) {
+      _showError('أدخل رسوم الشحن');
+      return;
+    }
+    if (_shippingFeeController.text.trim().contains('-')) {
+      _showError('رسوم الشحن لا يمكن أن تكون سالبة');
+      return;
+    }
+    if (_shippingFeeController.text.trim().contains(',')) {
+      _showError('استخدم النقطة للفصل بين الأعداد العشرية');
+      return;
+    }
+    if (_shippingFeeController.text.trim().contains(' ')) {
+      _showError('لا تستخدم مسافات في رسوم الشحن');
+      return;
+    }
+    if (_shippingFeeController.text.trim().contains(RegExp(r'[^\d.]'))) {
+      _showError('رسوم الشحن يجب أن تكون رقمًا صالحًا');
+      return;
+    }
+    if (_activityTypeController.text.trim().isEmpty) {
+      _showError('أدخل نوع النشاط');
+      return;
+    }
     if (_phoneController.text.startsWith('0')) {
       _showError('لا تبدأ الرقم بـ 0 بعد كود الدولة');
       return;

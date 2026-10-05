@@ -339,6 +339,7 @@ class MyApp extends StatelessWidget {
 bool _showSplashOnStartup = true;
 
 final GoRouter _router = GoRouter(
+  navigatorKey: appNavigatorKey,
   initialLocation: '/',
   redirect: (context, state) {
     // Keep the original startup flow: the app always starts at SplashScreen.
