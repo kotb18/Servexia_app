@@ -345,6 +345,7 @@ class _CreategroupState extends State<Creategroup> {
         setState(() => _loading = true);
         await FirebaseFirestore.instance.collection('users').doc(uid).set({
           'users': FieldValue.arrayUnion([uid]),
+          'phone': _completePhoneNumber,
           'expiredAt': DateTime.now().add(const Duration(days: 30)),
           'status': '0',
         }, SetOptions(merge: true));

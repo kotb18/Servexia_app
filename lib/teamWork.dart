@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:maintenance/employeeDetailsPage.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -136,8 +137,6 @@ class _TeamScreenState extends State<TeamScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          /*  widget.isXadmin ? _adminTile(widget.adminId) : SizedBox.shrink(),
-          const SizedBox(height: 20), */
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -150,7 +149,6 @@ class _TeamScreenState extends State<TeamScreen> {
                       onPressed: () async {
                         await generateTeamMembersPdf(membersList);
                       },
-
                       icon: Icon(Icons.picture_as_pdf),
                       label: const Text('تقرير PDF'),
                       style: ElevatedButton.styleFrom(
@@ -337,11 +335,34 @@ class _TeamScreenState extends State<TeamScreen> {
                                 ],
                               ),
                             ),
-                            if (member['id'] == widget.adminId)
-                              Icon(
-                                Icons.star,
-                                color: const Color.fromARGB(255, 164, 172, 12),
-                              ),
+                            Column(
+                              children: [
+                                if (member['id'] == widget.adminId)
+                                  Icon(
+                                    Icons.star,
+                                    color: const Color.fromARGB(
+                                      255,
+                                      164,
+                                      172,
+                                      12,
+                                    ),
+                                  ),
+                                IconButton(
+                                  // ✅ كارت العضوية
+                                  onPressed: () => _showMemberIdCard(member),
+                                  icon: Icon(
+                                    Icons.card_membership,
+                                    color: const Color.fromARGB(
+                                      255,
+                                      49,
+                                      30,
+                                      215,
+                                    ),
+                                    size: 20,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                         const SizedBox(height: 10),
@@ -469,11 +490,6 @@ class _TeamScreenState extends State<TeamScreen> {
       builder: (_) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          /*   ListTile(
-            leading: const Icon(Icons.link),
-            title: const Text('إنشاء رابط دعوة'),
-            onTap: _generateInviteLink,
-          ), */
           ListTile(
             leading: const Icon(Icons.qr_code),
             title: const Text('إنشاء QR Code'),
@@ -484,14 +500,6 @@ class _TeamScreenState extends State<TeamScreen> {
       ),
     );
   }
-
-  /*  void _generateInviteLink() {
-    Navigator.pop(context);
-    final link = 'https://yourapp.com/join/${widget.groupId}';
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Invite Link: $link')));
-  } */
 
   void _generateQRCode() {
     Navigator.pop(context);
@@ -521,7 +529,7 @@ class _TeamScreenState extends State<TeamScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 QrImageView(
-                  data: qrString, // ✅ QR مؤقت
+                  data: qrString,
                   version: QrVersions.auto,
                   size: 200,
                 ),
@@ -542,6 +550,592 @@ class _TeamScreenState extends State<TeamScreen> {
           ],
         );
       },
+    );
+  }
+
+  // ==========================================================================
+  // 🪪 منطق كارت العضوية (ID Card)
+  // ==========================================================================
+
+  /// فتح كارت العضوية في Dialog احترافي
+  void _showMemberIdCard(Map<String, dynamic> member) {
+    final faceImageUrl = _imageUrl(member['faceImageUrl']);
+    final photoUrl = _imageUrl(member['photoURL']);
+    final avatarUrl = faceImageUrl ?? photoUrl;
+    final avatarUrlPdf = faceImageUrl;
+
+    final joinedAt = member['joinedAt'];
+    String joinedDate = '---';
+    if (joinedAt is Timestamp) {
+      joinedDate = DateFormat('dd/MM/yyyy').format(joinedAt.toDate());
+    } else if (joinedAt is int) {
+      joinedDate = DateFormat(
+        'dd/MM/yyyy',
+      ).format(DateTime.fromMillisecondsSinceEpoch(joinedAt));
+    }
+
+    // بيانات الـ QR الخاصة بالعضو
+    final memberQrData = jsonEncode({
+      "type": "member_id",
+      "groupId": widget.groupId,
+      "memberId": member['id'],
+      "name": member['name'],
+    });
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(16),
+          child: SingleChildScrollView(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                gradient: const LinearGradient(
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                  colors: [Color(0xFF1E1E64), Color(0xFF31219E)],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF31219E).withValues(alpha: 0.4),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ─── الهيدر ───
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.badge_rounded,
+                                color: Colors.amber,
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'بطاقة عضوية',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        // زر إغلاق
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // ─── الجسم الأبيض ───
+                  Container(
+                    margin: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Column(
+                      children: [
+                        // الصورة + الاسم + الوظيفة
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: const Color(0xFF31219E),
+                                  width: 2.5,
+                                ),
+                              ),
+                              child: CircleAvatar(
+                                radius: 34,
+                                backgroundColor: Colors.grey.shade200,
+                                child: avatarUrl != null && avatarUrl.isNotEmpty
+                                    ? ClipOval(
+                                        child: WebImage(
+                                          src: avatarUrl,
+                                          width: 68,
+                                          height: 68,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.person,
+                                        size: 38,
+                                        color: Colors.grey,
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    member['name']?.toString() ?? 'بدون اسم',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF1E1E64),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(
+                                        0xFF31219E,
+                                      ).withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      member['job']?.toString() ?? 'عضو',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF31219E),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 16),
+                        const Divider(height: 1),
+                        const SizedBox(height: 12),
+
+                        // بيانات التواصل
+                        _idCardInfoRow(
+                          Icons.phone_rounded,
+                          Colors.green,
+                          'رقم الهاتف',
+                          member['phone']?.toString() ?? '---',
+                        ),
+                        const SizedBox(height: 10),
+                        _idCardInfoRow(
+                          Icons.email_rounded,
+                          Colors.orange,
+                          'البريد الإلكتروني',
+                          member['userGmail']?.toString() ?? '---',
+                        ),
+                        const SizedBox(height: 10),
+                        _idCardInfoRow(
+                          Icons.calendar_month_rounded,
+                          Colors.blue,
+                          'تاريخ الانضمام',
+                          joinedDate,
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // ─── QR + رقم العضو ───
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
+                                  ),
+                                ),
+                                child: QrImageView(
+                                  data: memberQrData,
+                                  version: QrVersions.auto,
+                                  size: 74,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'رقم العضو',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${member['id']}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF1E1E64),
+                                        fontFamily: 'monospace',
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'امسح الرمز للتحقق من العضوية',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey.shade500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // ─── أزرار الأسفل ───
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    child: Row(
+                      children: [
+                        // زرار طباعة / مشاركة PDF
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              await _printMemberIdCard(
+                                member,
+                                avatarUrlPdf,
+                                joinedDate,
+                              );
+                            },
+                            icon: const Icon(Icons.print_rounded, size: 18),
+                            label: const Text('طباعة PDF'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.amber,
+                              foregroundColor: const Color(0xFF1E1E64),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        // زرار إغلاق
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              side: const BorderSide(color: Colors.white54),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: const Text('إغلاق'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// صف بيانات داخل الكارت
+  Widget _idCardInfoRow(
+    IconData icon,
+    Color iconColor,
+    String label,
+    String value,
+  ) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: iconColor, size: 17),
+        ),
+        const SizedBox(width: 10),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+            ),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// طباعة كارت العضوية PDF
+  Future<void> _printMemberIdCard(
+    Map<String, dynamic> member,
+    String? avatarUrlPdf,
+    String joinedDate,
+  ) async {
+    final pdf = pw.Document();
+
+    final arabicFont = await PdfGoogleFonts.cairoRegular();
+    final arabicFontBold = await PdfGoogleFonts.cairoBold();
+
+    // تحميل صورة العضو إن وجدت
+    pw.ImageProvider? avatarImage;
+    if (avatarUrlPdf != null && avatarUrlPdf.isNotEmpty) {
+      try {
+        avatarImage = await networkImage(avatarUrlPdf);
+      } catch (_) {
+        avatarImage = null;
+      }
+    } else {
+      // تحميل صورة افتراضية من الأصول
+      final defaultImage = await rootBundle.load('images/person_icon.png');
+      avatarImage = pw.MemoryImage(defaultImage.buffer.asUint8List());
+    }
+
+    final memberQrData = jsonEncode({
+      "type": "member_id",
+      "groupId": widget.groupId,
+      "memberId": member['id'],
+      "name": member['name'],
+    });
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a5,
+        theme: pw.ThemeData.withFont(base: arabicFont, bold: arabicFontBold),
+        build: (context) {
+          return pw.Directionality(
+            textDirection: pw.TextDirection.rtl,
+            child: pw.Container(
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(
+                  color: PdfColor.fromHex('#31219E'),
+                  width: 2,
+                ),
+                borderRadius: pw.BorderRadius.circular(16),
+              ),
+              child: pw.Column(
+                children: [
+                  // الهيدر
+                  pw.Container(
+                    width: double.infinity,
+                    padding: const pw.EdgeInsets.all(14),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColor.fromHex('#1E1E64'),
+                      borderRadius: const pw.BorderRadius.vertical(
+                        top: pw.Radius.circular(14),
+                      ),
+                    ),
+                    child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text(
+                          'بطاقة عضوية',
+                          style: pw.TextStyle(
+                            fontSize: 18,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.white,
+                          ),
+                        ),
+                        pw.Text(
+                          'فريق العمل',
+                          style: const pw.TextStyle(
+                            fontSize: 11,
+                            color: PdfColors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  pw.SizedBox(height: 16),
+
+                  // الصورة والاسم
+                  pw.Row(
+                    children: [
+                      pw.SizedBox(width: 16),
+                      pw.Container(
+                        width: 70,
+                        height: 70,
+                        decoration: pw.BoxDecoration(
+                          shape: pw.BoxShape.circle,
+                          border: pw.Border.all(
+                            color: PdfColor.fromHex('#31219E'),
+                            width: 2,
+                          ),
+                          image: avatarImage != null
+                              ? pw.DecorationImage(
+                                  image: avatarImage,
+                                  fit: pw.BoxFit.cover,
+                                )
+                              : null,
+                          color: PdfColors.grey200,
+                        ),
+                      ),
+                      pw.SizedBox(width: 12),
+                      pw.Expanded(
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              member['name']?.toString() ?? 'بدون اسم',
+                              style: pw.TextStyle(
+                                fontSize: 15,
+                                fontWeight: pw.FontWeight.bold,
+                                color: PdfColor.fromHex('#1E1E64'),
+                              ),
+                            ),
+                            pw.SizedBox(height: 4),
+                            pw.Text(
+                              member['job']?.toString() ?? 'عضو',
+                              style: pw.TextStyle(
+                                fontSize: 11,
+                                color: PdfColor.fromHex('#31219E'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  pw.SizedBox(height: 14),
+                  pw.Divider(color: PdfColors.grey300),
+                  pw.SizedBox(height: 10),
+
+                  // البيانات
+                  _pdfInfoRow(
+                    'رقم الهاتف',
+                    member['phone']?.toString() ?? '---',
+                  ),
+                  _pdfInfoRow(
+                    'البريد الإلكتروني',
+                    member['userGmail']?.toString() ?? '---',
+                  ),
+                  _pdfInfoRow('تاريخ الانضمام', joinedDate),
+                  _pdfInfoRow('رقم العضو', '${member['id']}'),
+
+                  pw.SizedBox(height: 12),
+
+                  // QR
+                  pw.Center(
+                    child: pw.BarcodeWidget(
+                      barcode: pw.Barcode.qrCode(),
+                      data: memberQrData,
+                      width: 80,
+                      height: 80,
+                    ),
+                  ),
+
+                  pw.SizedBox(height: 12),
+
+                  pw.Text(
+                    'تاريخ الإصدار: ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
+                    style: const pw.TextStyle(
+                      fontSize: 9,
+                      color: PdfColors.grey600,
+                    ),
+                  ),
+
+                  pw.SizedBox(height: 10),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+      name: 'بطاقة_عضو_${member['name']}.pdf',
+    );
+  }
+
+  pw.Widget _pdfInfoRow(String label, String value) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(
+            label,
+            style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+          ),
+          pw.Text(
+            value,
+            style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -582,7 +1176,6 @@ Future<void> removeMemberFromGroupAndTeam({
       .doc(memberId);
   batch.delete(faceEmbeddingRef);
 
-  //  await FirebaseMessaging.instance.unsubscribeFromTopic(groupId);
   // 🔹 جلب بيانات الجروب
   final groupSnap = await groupRef.get();
   if (groupSnap.exists) {
@@ -602,17 +1195,14 @@ Future<void> generateTeamMembersPdf(
 ) async {
   final pdf = pw.Document();
 
-  // تحميل الخطوط العربية
   final arabicFont = await PdfGoogleFonts.cairoRegular();
   final arabicFontBold = await PdfGoogleFonts.cairoBold();
 
-  // تاريخ اليوم للتقرير
   String todayDate = DateFormat('dd-MM-yyyy').format(DateTime.now());
 
   pdf.addPage(
     pw.MultiPage(
-      pageFormat:
-          PdfPageFormat.a4, // وضعية طولية (Portrait) مناسبة لعدد أعمدة أقل
+      pageFormat: PdfPageFormat.a4,
       theme: pw.ThemeData.withFont(base: arabicFont, bold: arabicFontBold),
       build: (context) {
         return [
@@ -621,7 +1211,6 @@ Future<void> generateTeamMembersPdf(
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                // الهيدر: العنوان وتاريخ اليوم
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
@@ -653,20 +1242,17 @@ Future<void> generateTeamMembersPdf(
                   ],
                 ),
                 pw.SizedBox(height: 30),
-
-                // جدول الأعضاء (الاسم، الوظيفة، الهاتف)
                 pw.Table(
                   border: pw.TableBorder.all(
                     color: PdfColors.grey400,
                     width: 0.5,
                   ),
                   columnWidths: {
-                    0: const pw.FlexColumnWidth(2), // الاسم (أقصى اليمين)
-                    1: const pw.FlexColumnWidth(2), // الوظيفة
-                    2: const pw.FlexColumnWidth(3), // رقم الهاتف (أقصى اليسار)
+                    0: const pw.FlexColumnWidth(2),
+                    1: const pw.FlexColumnWidth(2),
+                    2: const pw.FlexColumnWidth(3),
                   },
                   children: [
-                    // صف العناوين
                     pw.TableRow(
                       decoration: const pw.BoxDecoration(
                         color: PdfColors.blueGrey100,
@@ -677,7 +1263,6 @@ Future<void> generateTeamMembersPdf(
                         _buildCell("الاسم", isHeader: true),
                       ],
                     ),
-                    // صفوف البيانات
                     ...membersList.map((member) {
                       return pw.TableRow(
                         children: [
@@ -694,7 +1279,6 @@ Future<void> generateTeamMembersPdf(
           ),
         ];
       },
-      // تذييل الصفحة بالعربية
       footer: (context) => pw.Directionality(
         textDirection: pw.TextDirection.rtl,
         child: pw.Container(
@@ -709,7 +1293,6 @@ Future<void> generateTeamMembersPdf(
     ),
   );
 
-  // عرض للطباعة أو الحفظ
   await Printing.layoutPdf(
     onLayout: (PdfPageFormat format) async => pdf.save(),
     name: 'تقرير_أعضاء_الفريق_$todayDate.pdf',
@@ -720,7 +1303,6 @@ Future<void> generateTeamMembersPdf(
   );
 }
 
-// دالة مساعدة لبناء الخلية
 pw.Widget _buildCell(String text, {bool isHeader = false}) {
   return pw.Padding(
     padding: const pw.EdgeInsets.symmetric(vertical: 10, horizontal: 8),

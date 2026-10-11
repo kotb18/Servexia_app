@@ -532,6 +532,7 @@ class _StoreScreenState extends State<StoreScreen> {
                             currentQty,
                             isWeightedItem,
                             unitText,
+                            index,
                           );
                         },
                       ),
@@ -615,6 +616,7 @@ class _StoreScreenState extends State<StoreScreen> {
     double currentQty,
     bool isWeightedItem,
     String unitText,
+    int index,
   ) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -679,23 +681,40 @@ class _StoreScreenState extends State<StoreScreen> {
                   )
                 else
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          primaryColor.withValues(alpha: 0.1),
-                          secondaryColor.withValues(alpha: 0.1),
+                          primaryColor.withValues(alpha: 0.15),
+                          secondaryColor.withValues(alpha: 0.10),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: primaryColor.withValues(alpha: 0.18),
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withValues(alpha: 0.07),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
                     ),
-                    child: Icon(
-                      Icons.inventory_2_rounded,
-                      color: primaryColor,
-                      size: 24,
+                    child: Text(
+                      '${index + 1}',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: primaryColor,
+                        height: 1,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
                   ),
                 const SizedBox(width: 16),
