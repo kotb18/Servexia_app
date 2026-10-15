@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:maintenance/admin/admin_plans_page.dart';
 import 'package:maintenance/admin/feedBack.dart';
 import 'package:maintenance/admin/groups.dart';
 import 'package:maintenance/admin/notificationPage.dart';
@@ -57,6 +58,16 @@ class _MainAdminState extends State<MainAdmin> {
                         },
                       ),
                       _adminButton(
+                        icon: Iconsax.message_question,
+                        title: 'متابعة الإشتراكات',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => AdminPlansPage()),
+                          );
+                        },
+                      ),
+                      _adminButton(
                         icon: Icons.group,
                         title: 'متابعة المجموعات',
                         onTap: () {
@@ -97,12 +108,6 @@ class _MainAdminState extends State<MainAdmin> {
                             MaterialPageRoute(builder: (_) => SettingsGroups()),
                           );
                         },
-                      ),
-
-                      _adminButton(
-                        icon: Iconsax.logout,
-                        title: 'تسجيل الخروج',
-                        onTap: () {},
                       ),
                     ],
                   );

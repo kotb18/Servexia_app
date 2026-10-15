@@ -641,7 +641,11 @@ final GoRouter _router = GoRouter(
         storeLink: state.uri.queryParameters['storeLink'] ?? '',
       ),
     ),
-
+    /*   GoRoute(
+      path: '/planSelectionPage',
+      name: '/plan-selection',
+      builder: (context, state) => PlanSelectionPage(),
+    ), */
     GoRoute(
       path: '/add-inventory/:groupId',
       name: 'addInventory',

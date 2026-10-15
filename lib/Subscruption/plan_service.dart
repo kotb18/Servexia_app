@@ -1,0 +1,78 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'plan_model.dart';
+
+class PlanService {
+  PlanService({FirebaseFirestore? firestore})
+    : _col = (firestore ?? FirebaseFirestore.instance).collection('plans');
+
+  final CollectionReference<Map<String, dynamic>> _col;
+
+  Stream<List<PlanModel>> get plansStream {
+    return _col.snapshots().map((snapshot) {
+      final plans = snapshot.docs
+          .map((doc) => PlanModel.fromFirestore(doc))
+          .where((plan) => plan.isActive)
+          .toList();
+      plans.sort((a, b) => a.order.compareTo(b.order));
+      return plans;
+    });
+  }
+
+  // للاستخدام في لوحة الأدمن: يعرض النشطة وغير النشطة.
+  Stream<List<PlanModel>> get allPlansStream {
+    return _col
+        .orderBy('order')
+        .snapshots()
+        .map(
+          (snapshot) =>
+              snapshot.docs.map((doc) => PlanModel.fromFirestore(doc)).toList(),
+        );
+  }
+
+  Future<List<PlanModel>> getActivePlans() async {
+    final snapshot = await _col.get();
+    final plans = snapshot.docs
+        .map(PlanModel.fromFirestore)
+        .where((plan) => plan.isActive)
+        .toList();
+    plans.sort((a, b) => a.order.compareTo(b.order));
+    return plans;
+  }
+
+  Future<List<PlanModel>> getActiveIDPlans(String id) async {
+    final snapshot = await _col.get();
+    final plans = snapshot.docs
+        .map(PlanModel.fromFirestore)
+        .where((plan) => plan.isActive && plan.id == id)
+        .toList();
+    plans.sort((a, b) => a.order.compareTo(b.order));
+    return plans;
+  }
+
+  Future<void> updatePlan(PlanModel plan) {
+    return _col.doc(plan.id).update(plan.toMap());
+  }
+
+  Future<void> addPlan(PlanModel plan) {
+    return _col.doc(plan.id).set(plan.toMap());
+  }
+
+  Future<void> deletePlan(String id) {
+    return _col.doc(id).delete();
+  }
+
+  Future<void> toggleActive(PlanModel plan) {
+    return _col.doc(plan.id).update({'isActive': !plan.isActive});
+  }
+
+  Future<void> seedDefaultPlans() async {
+    final existing = await _col.limit(1).get();
+    if (existing.docs.isNotEmpty) return;
+
+    final batch = _col.firestore.batch();
+    for (final plan in PlanModel.defaultPlans) {
+      batch.set(_col.doc(plan.id), plan.toMap());
+    }
+    await batch.commit();
+  }
+}

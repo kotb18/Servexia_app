@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class UserDetails extends StatefulWidget {
   const UserDetails({super.key, required this.groupId});
@@ -152,6 +153,8 @@ class _UserDetailsState extends State<UserDetails> {
 
   Widget _buildContent(_GroupOverview overview) {
     final group = overview.group;
+    final result =
+        overview.sections['الأعضاء']?.map((doc) => doc.data()).toList() ?? [];
     final activeSections = overview.sections.entries
         .where((entry) => entry.value.isNotEmpty)
         .toList();
@@ -170,7 +173,7 @@ class _UserDetailsState extends State<UserDetails> {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          _buildGroupFields(group),
+          _buildGroupFields(group, result),
           const SizedBox(height: 20),
           const Text(
             'المحتوى المرتبط',
@@ -521,13 +524,17 @@ class _UserDetailsState extends State<UserDetails> {
     );
   }
 
-  Widget _buildGroupFields(Map<String, dynamic> group) {
+  Widget _buildGroupFields(
+    Map<String, dynamic> group,
+    List<Map<String, dynamic>> result,
+  ) {
     final fields = <String, dynamic>{
       'المسؤول': group['adminName'],
       'منطقة العمل': group['area'],
       'الغرض': group['purpose'],
       'تاريخ الإنشاء': group['createdAt'],
       'موعد الحذف': group['willDeleteAt'],
+      'الهاتف': result[0]['phone'],
     };
     return Card(
       elevation: 0,
@@ -538,8 +545,10 @@ class _UserDetailsState extends State<UserDetails> {
               (entry) =>
                   entry.value != null && entry.value.toString().isNotEmpty,
             )
-            .map(
-              (entry) => ListTile(
+            .map((entry) {
+              final isPhone = entry.key == 'الهاتف';
+
+              final tile = ListTile(
                 dense: true,
                 leading: const Icon(
                   Icons.info_outline,
@@ -551,8 +560,39 @@ class _UserDetailsState extends State<UserDetails> {
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 subtitle: Text(_displayValue(entry.value)),
-              ),
-            )
+              );
+
+              if (!isPhone) return tile;
+
+              return Dismissible(
+                key: const ValueKey('phone_tile'),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  color: Colors.green,
+                  child: const Row(
+                    children: [
+                      Icon(Icons.call, color: Colors.white),
+                      SizedBox(width: 8),
+                      Text('اتصال', style: TextStyle(color: Colors.white)),
+                    ],
+                  ),
+                ),
+                confirmDismiss: (_) async {
+                  final phone = entry.value.toString().trim();
+
+                  final uri = Uri(scheme: 'tel', path: phone);
+
+                  if (phone.isNotEmpty && await canLaunchUrl(uri)) {
+                    await launchUrl(uri);
+                  }
+
+                  return false; // إبقاء عنصر الهاتف في مكانه
+                },
+                child: tile,
+              );
+            })
             .toList(),
       ),
     );

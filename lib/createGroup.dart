@@ -13,6 +13,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:maintenance/JoinGroup.dart';
+import 'package:maintenance/Subscruption/plan_service.dart';
 import 'package:maintenance/homePage.dart';
 import 'package:maintenance/services/billing_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -327,7 +328,7 @@ class _CreategroupState extends State<Creategroup> {
       btnOkText: 'الاشتراك الآن',
       btnCancelOnPress: () {},
       btnOkOnPress: () {
-        billingService.buySubscription();
+        billingService.buySubscription('servexia_monthly');
       },
     ).show();
   }
@@ -343,13 +344,25 @@ class _CreategroupState extends State<Creategroup> {
       btnOkText: 'ابدأ التجربة',
       btnOkOnPress: () async {
         setState(() => _loading = true);
-        await FirebaseFirestore.instance.collection('users').doc(uid).set({
-          'users': FieldValue.arrayUnion([uid]),
-          'phone': _completePhoneNumber,
-          'expiredAt': DateTime.now().add(const Duration(days: 30)),
-          'status': '0',
-        }, SetOptions(merge: true));
-
+        final now = DateTime.now().toUtc();
+        final expiredAt = now.add(const Duration(days: 30));
+        PlanService planService = PlanService();
+        planService.getActiveIDPlans('servexia_monthly').then((plans) async {
+          if (plans.isNotEmpty) {
+            final plan = plans.first;
+            await FirebaseFirestore.instance.collection('users').doc(uid).set({
+              'expiredAt': Timestamp.fromDate(expiredAt),
+              'status': '0',
+              'subscriptionProductId': 'servexia_monthly',
+              'subscriptionUpdatedAt': FieldValue.serverTimestamp(),
+              'maxGroups': plan.maxGroups,
+              'maxInventoryItems': plan.maxInventoryItems,
+              'maxInvoicesPerMonth': plan.maxInvoicesPerMonth,
+              'maxAssets': plan.maxAssets,
+              'maxMembers': plan.maxMembers,
+            }, SetOptions(merge: true));
+          }
+        });
         await _executeCreationLogic();
         setState(() => _loading = false);
       },

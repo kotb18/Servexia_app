@@ -7,6 +7,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:maintenance/Subscruption/plan_selection_page.dart';
+
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -104,13 +106,22 @@ class _HomepageState extends State<Homepage>
     if (!doc.exists) {
       return;
     }
-
     final data = doc.data();
-
-    maxGroup = data!['maxGroup'];
-    youTubeUrl = data['youTubeUrl'];
+    youTubeUrl = data!['youTubeUrl'];
     websiteUrl = data['websiteUrl'];
     whatsNumber = data['whatsNumber'];
+    final doc2 = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
+
+    if (!doc.exists) {
+      return;
+    }
+
+    final data2 = doc2.data();
+
+    maxGroup = data2!['maxGroups'] ?? 3;
   }
 
   @override
@@ -441,6 +452,17 @@ class _HomepageState extends State<Homepage>
             ),
             accountName: Text(user?.displayName ?? 'مستخدم Servexia'),
             accountEmail: Text(user?.email ?? ''),
+          ),
+          _buildDrawerItem(
+            Icons.workspace_premium_outlined,
+            'الاشتراكات والباقات',
+            () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const FirestoreDynamicPlansPage(),
+                ),
+              );
+            },
           ),
           _buildDrawerItem(Icons.feedback_outlined, 'الاقتراحات والشكاوى', () {
             _showFeedbackDialog(context);
@@ -827,7 +849,7 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
           btnCancelText: isAdmin ? 'إلغاء' : null,
           btnOkText: isAdmin ? 'تجديد الاشتراك' : 'حسنا',
           btnOkOnPress: isAdmin
-              ? () => widget.billingService.buySubscription()
+              ? () => widget.billingService.buySubscription('servexia_monthly')
               : () {},
           btnCancelOnPress: isAdmin ? () {} : null,
         ).show();
