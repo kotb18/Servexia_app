@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:maintenance/Subscruption/plan_model.dart';
 import 'package:maintenance/Subscruption/plan_service.dart';
 import 'package:maintenance/services/billing_service.dart';
@@ -508,11 +509,11 @@ class _FirestoreDynamicPlansPageState extends State<FirestoreDynamicPlansPage> {
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton(
-                      onPressed:
-                          kIsWeb ||
-                              product == null ||
-                              productId.isEmpty ||
-                              _billingService.isPurchasePending
+                      onPressed: kIsWeb
+                          ? _openPlayStore
+                          : product == null ||
+                                productId.isEmpty ||
+                                _billingService.isPurchasePending
                           ? null
                           : () => _buy(productId, plan.name),
                       style: ElevatedButton.styleFrom(
@@ -529,7 +530,7 @@ class _FirestoreDynamicPlansPageState extends State<FirestoreDynamicPlansPage> {
                       ),
                       child: Text(
                         kIsWeb
-                            ? 'الشراء عبر تطبيق Android'
+                            ? 'تحميل التطبيق وإتمام الاشتراك'
                             : _billingService.isPurchasePending
                             ? 'جاري تنفيذ العملية...'
                             : product == null
@@ -645,28 +646,37 @@ class _FirestoreDynamicPlansPageState extends State<FirestoreDynamicPlansPage> {
     required String period,
     required TextStyle style,
   }) {
-    // Android: السعر الرسمي المعروض في Google Play Billing.
+    // Android: اعرض السعر الذي يرجعه Google Play Billing.
     if (!kIsWeb) {
       return Text(_formatPrice(product), style: style);
     }
 
-    // Web: نقرأ السعر الإقليمي المضبوط في Play Console من Firebase Function.
-    final regionCode =
-        (widget.countryCode ??
-                Localizations.localeOf(context).countryCode ??
-                '')
-            .trim()
-            .toUpperCase();
-    if (productId.isEmpty || regionCode.isEmpty) {
-      return Text('حدد بلد المستخدم لعرض السعر', style: style);
+    if (productId.isEmpty) {
+      return Text('السعر غير متاح', style: style);
     }
 
-    final key = '$productId|$period|$regionCode';
-    final future = _regionalPriceFutures.putIfAbsent(
-      key,
-      () =>
-          _regionalPriceService.getPrice(productId: productId, period: period),
-    );
+    // نخزن الطلب حسب المنتج والفترة لتجنب استدعائه مجددًا أثناء إعادة البناء.
+    final key = '$productId|$period';
+
+    final future = _regionalPriceFutures.putIfAbsent(key, () async {
+      try {
+        final price = await _regionalPriceService.getPrice(
+          productId: productId,
+          period: period,
+        );
+
+        debugPrint(
+          'البلد: ${price.regionCode}، '
+          'السعر: ${price.amount} ${price.currencyCode}',
+        );
+
+        return price;
+      } catch (error, stackTrace) {
+        debugPrint('خطأ جلب سعر Google Play: $error');
+        debugPrintStack(stackTrace: stackTrace);
+        rethrow;
+      }
+    });
 
     return FutureBuilder<PlayRegionalPrice>(
       future: future,
@@ -677,9 +687,11 @@ class _FirestoreDynamicPlansPageState extends State<FirestoreDynamicPlansPage> {
             style: style.copyWith(fontSize: 14),
           );
         }
+
         if (snapshot.hasError || !snapshot.hasData) {
           return Text('السعر غير متاح', style: style.copyWith(fontSize: 16));
         }
+
         return Text(
           snapshot.data!.format(locale: 'ar', decimalDigits: 0),
           style: style,
@@ -784,6 +796,34 @@ class _FirestoreDynamicPlansPageState extends State<FirestoreDynamicPlansPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _openPlayStore() async {
+    final uri = Uri.parse(
+      'https://play.google.com/store/apps/details?id=com.masry.maintenance',
+    );
+
+    try {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تعذر فتح صفحة التطبيق في Google Play.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Open Google Play page error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تعذر فتح صفحة التطبيق في Google Play.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> _buy(String productId, String planName) async {

@@ -18,8 +18,8 @@ const PLAY_SERVICE_ACCOUNT_JSON = defineSecret("PLAY_SERVICE_ACCOUNT_JSON");
 const IPINFO_TOKEN = defineSecret("IPINFO_TOKEN");
 
 // ضع هنا Android applicationId الفعلي.
-const PLAY_PACKAGE_NAME = "com.example.maintenance";
-const IPINFO_URL = "https://ipinfo.io";
+const PLAY_PACKAGE_NAME = "com.masry.maintenance";
+const IPINFO_URL = "https://api.ipinfo.io/lite";
 const PRICE_CACHE_TTL_MS = 15 * 60 * 1000;
 const regionalPriceCache = new Map();
 const countryCache = new Map();
@@ -95,7 +95,7 @@ async function resolveCountryFromIp(ip) {
   const cached = countryCache.get(ip);
   if (cached && cached.expiresAt > Date.now()) return cached.country;
 
-  const url = `${IPINFO_URL}/${encodeURIComponent(ip)}/country` +
+  const url = `${IPINFO_URL}/${encodeURIComponent(ip)}` +
     `?token=${encodeURIComponent(IPINFO_TOKEN.value())}`;
   const response = await fetch(url, {method: "GET"});
 
@@ -109,7 +109,8 @@ async function resolveCountryFromIp(ip) {
     );
   }
 
-  const country = (await response.text()).trim().toUpperCase();
+  const location = await response.json();
+  const country = String(location.country_code || "").trim().toUpperCase();
   if (!/^[A-Z]{2}$/.test(country)) {
     throw new HttpsError(
         "not-found",
@@ -137,6 +138,31 @@ function getCachedPrice(key) {
     return null;
   }
   return entry.value;
+}
+
+/**
+ * يقرأ بيانات حساب الخدمة من Secret سواء خُزنت JSON أو Base64.
+ * @param {string} secretValue قيمة Firebase Secret.
+ * @return {Object} بيانات اعتماد Google Service Account.
+ */
+function parseServiceAccountSecret(secretValue) {
+  const value = String(secretValue || "").trim();
+  if (!value) {
+    throw new Error("PLAY_SERVICE_ACCOUNT_JSON is empty.");
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    const decoded = Buffer.from(value, "base64").toString("utf8").trim();
+    try {
+      return JSON.parse(decoded);
+    } catch {
+      throw new Error(
+          "PLAY_SERVICE_ACCOUNT_JSON is neither valid JSON nor valid Base64 JSON.",
+      );
+    }
+  }
 }
 
 exports.getPlayRegionalPrice = onCall(
@@ -169,7 +195,9 @@ exports.getPlayRegionalPrice = onCall(
         const cached = getCachedPrice(cacheKey);
         if (cached) return cached;
 
-        const credentials = JSON.parse(PLAY_SERVICE_ACCOUNT_JSON.value());
+        const credentials = parseServiceAccountSecret(
+            PLAY_SERVICE_ACCOUNT_JSON.value(),
+        );
         const auth = new GoogleAuth({
           credentials,
           scopes: ["https://www.googleapis.com/auth/androidpublisher"],
@@ -241,14 +269,21 @@ exports.getPlayRegionalPrice = onCall(
         return result;
       } catch (error) {
         if (error instanceof HttpsError) throw error;
-        logger.error("Google Play regional price request failed", {
-          message: error.message,
-          code: error.code,
-          response: error.response && error.response.data,
+        const responseData = error.response && error.response.data;
+        const apiError = responseData && responseData.error;
+        const diagnosticMessage = apiError && apiError.message ?
+          apiError.message : error.message || String(error);
+        logger.error("Google Play API diagnostic", {
+          apiStatus: error.response && error.response.status ?
+            error.response.status : error.code || "unknown",
+          apiCode: error.code || "unknown",
+          apiName: error.name || "Error",
+          apiMessage: typeof diagnosticMessage === "string" ?
+            diagnosticMessage : JSON.stringify(diagnosticMessage),
         });
         throw new HttpsError(
             "unavailable",
-            "تعذر جلب السعر. تحقق من إعداد Google Play API وحساب الخدمة.",
+            "تعذر جلب السعر من Google Play. راجع سجل التشخيص.",
         );
       }
     },
