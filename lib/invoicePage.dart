@@ -4,8 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:maintenance/Subscruption/plan_selection_page.dart';
 import 'package:maintenance/addAwarehouseItem.dart';
 import 'package:maintenance/customersSuppliers.dart';
+import 'package:maintenance/homePage.dart';
 import 'package:maintenance/invoiceSettings.dart';
 import 'package:maintenance/models.dart';
 import 'package:maintenance/myInvoices.dart';
@@ -353,10 +355,121 @@ class _InvoicePageState extends State<InvoicePage>
   ];
   Invoice? result;
   late InvoiceState state;
+  int maxInvoicesPerMonth = 0;
+
+  Future<void> getMaxInvoicesItems() async {
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
+
+    final data = doc.data();
+
+    if (!mounted) return;
+
+    setState(() {
+      maxInvoicesPerMonth =
+          (data?['maxInvoicesPerMonth'] as num?)?.toInt() ?? 0;
+    });
+
+    debugPrint('Max invoices: $maxInvoicesPerMonth');
+  }
+
+  int invoicesPerMonthCount = 0;
+  Future<void> getInventoryItemsCount() async {
+    try {
+      final now = DateTime.now();
+
+      // بداية الشهر الحالي
+      final startOfMonth = DateTime(now.year, now.month, 1);
+
+      // بداية الشهر التالي
+      final startOfNextMonth = DateTime(now.year, now.month + 1, 1);
+
+      final query = FirebaseFirestore.instance
+          .collection('invoices')
+          .doc(widget.groupId)
+          .collection('items')
+          .where(
+            'createdAt',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth),
+          )
+          .where('createdAt', isLessThan: Timestamp.fromDate(startOfNextMonth));
+
+      // عدّ الفواتير دون تحميل مستنداتها كاملة
+      final result = await query.count().get();
+
+      if (!mounted) return;
+
+      setState(() {
+        invoicesPerMonthCount = result.count ?? 0;
+      });
+      debugPrint('Invoices this month: $invoicesPerMonthCount');
+    } catch (e) {
+      debugPrint('Error counting monthly invoices: $e');
+    }
+  }
+
+  Future<bool> _checkInvoicesLimit() async {
+    try {
+      // انتظر تحميل الحد الأقصى والعدد الحالي
+      await Future.wait([getMaxInvoicesItems(), getInventoryItemsCount()]);
+      debugPrint('Checking invoice limit...');
+      debugPrint('Maximum: $maxInvoicesPerMonth');
+      debugPrint('Current: $invoicesPerMonthCount');
+      if (!mounted) return false;
+
+      // لو الحد الأقصى صفر أو أقل، امنع الإنشاء
+      // إذا كان الصفر يعني عدم السماح بأي فواتير في نظامك
+      if (maxInvoicesPerMonth <= 0 ||
+          invoicesPerMonthCount >= maxInvoicesPerMonth) {
+        AwesomeDialog(
+          context: context,
+          dismissOnTouchOutside: false,
+          dialogType: DialogType.warning,
+          title: 'حد أقصى لعدد الفواتير',
+          desc:
+              'لقد وصلت إلى الحد الأقصى لعدد الفواتير في هذا الشهر. '
+              'يرجى ترقية الخطة للمتابعة.',
+          btnOkText: 'ترقية الباقة',
+          btnOkOnPress: () async {
+            if (!mounted) return;
+            Navigator.pop(context);
+            await Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const FirestoreDynamicPlansPage(),
+              ),
+            );
+          },
+        ).show();
+
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Invoice limit check error: $e');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تعذر التحقق من حد الفواتير. حاول مرة أخرى.'),
+          ),
+        );
+      }
+
+      return false;
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _checkInvoicesLimit();
+    });
+
     selectedFilter = widget.type;
     state = InvoiceState();
     isEditMode = widget.isEditMode;
@@ -1419,6 +1532,113 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
 
     // تنفيذ كل العمليات مرة واحدة
     await batch.commit();
+  }
+
+  int maxInvoicesPerMonth = 0;
+
+  Future<void> getMaxInvoicesItems() async {
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
+
+    final data = doc.data();
+
+    if (!mounted) return;
+
+    setState(() {
+      maxInvoicesPerMonth =
+          (data?['maxInvoicesPerMonth'] as num?)?.toInt() ?? 0;
+    });
+
+    debugPrint('Max invoices: $maxInvoicesPerMonth');
+  }
+
+  int invoicesPerMonthCount = 0;
+  Future<void> getInventoryItemsCount() async {
+    try {
+      final now = DateTime.now();
+
+      // بداية الشهر الحالي
+      final startOfMonth = DateTime(now.year, now.month, 1);
+
+      // بداية الشهر التالي
+      final startOfNextMonth = DateTime(now.year, now.month + 1, 1);
+
+      final query = FirebaseFirestore.instance
+          .collection('invoices')
+          .doc(widget.groupId)
+          .collection('items')
+          .where(
+            'createdAt',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth),
+          )
+          .where('createdAt', isLessThan: Timestamp.fromDate(startOfNextMonth));
+
+      // عدّ الفواتير دون تحميل مستنداتها كاملة
+      final result = await query.count().get();
+
+      if (!mounted) return;
+
+      setState(() {
+        invoicesPerMonthCount = result.count ?? 0;
+      });
+      debugPrint('Invoices this month: $invoicesPerMonthCount');
+    } catch (e) {
+      debugPrint('Error counting monthly invoices: $e');
+    }
+  }
+
+  Future<bool> _checkInvoicesLimit() async {
+    try {
+      // انتظر تحميل الحد الأقصى والعدد الحالي
+      await Future.wait([getMaxInvoicesItems(), getInventoryItemsCount()]);
+      debugPrint('Checking invoice limit...');
+      debugPrint('Maximum: $maxInvoicesPerMonth');
+      debugPrint('Current: $invoicesPerMonthCount');
+      if (!mounted) return false;
+
+      // لو الحد الأقصى صفر أو أقل، امنع الإنشاء
+      // إذا كان الصفر يعني عدم السماح بأي فواتير في نظامك
+      if (maxInvoicesPerMonth <= 0 ||
+          invoicesPerMonthCount >= maxInvoicesPerMonth) {
+        AwesomeDialog(
+          context: context,
+          dismissOnTouchOutside: false,
+          dialogType: DialogType.warning,
+          title: 'حد أقصى لعدد الفواتير',
+          desc:
+              'لقد وصلت إلى الحد الأقصى لعدد الفواتير في هذا الشهر. '
+              'يرجى ترقية الخطة للمتابعة.',
+          btnOkText: 'ترقية الباقة',
+          btnOkOnPress: () async {
+            if (!mounted) return;
+            //  Navigator.pop(context);
+            await Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const FirestoreDynamicPlansPage(),
+              ),
+            );
+          },
+        ).show();
+
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Invoice limit check error: $e');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تعذر التحقق من حد الفواتير. حاول مرة أخرى.'),
+          ),
+        );
+      }
+
+      return false;
+    }
   }
 
   /// Update stock for sale/purchase invoices
@@ -2669,6 +2889,11 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
             ? () async {
                 try {
                   setState(() => widget.state.loading = true);
+                  final canProceed = await _checkInvoicesLimit();
+                  if (!canProceed) {
+                    setState(() => widget.state.loading = false);
+                    return;
+                  }
                   int toCents(double value) => (value * 100).round();
 
                   // Validate payment schedule sums

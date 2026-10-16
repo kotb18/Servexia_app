@@ -1,10 +1,14 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:characters/characters.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:maintenance/Subscruption/plan_selection_page.dart';
+import 'package:maintenance/homePage.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -50,7 +54,6 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
   @override
   void initState() {
     super.initState();
-    _loadLimits();
   }
 
   @override
@@ -67,7 +70,7 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
   Future<void> _loadLimits() async {
     try {
       final results = await Future.wait([
-        FirebaseFirestore.instance.collection('variables').doc('kotb').get(),
+        FirebaseFirestore.instance.collection('users').doc(uid).get(),
         _itemsRef.count().get(),
       ]);
 
@@ -250,15 +253,30 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
   }
 
   Future<void> _saveAsset() async {
-    FocusManager.instance.primaryFocus?.unfocus();
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-
+    await _loadLimits();
     if (_maxAssets != null &&
         _currentAssetNumber != null &&
         _currentAssetNumber! >= _maxAssets!) {
-      _showMessage('لقد وصلت إلى الحد الأقصى للأصول المسموح بها.');
+      await AwesomeDialog(
+        context: context,
+        dialogType: DialogType.warning,
+        title: 'حد أقصى لعدد الأصول',
+        desc:
+            'لقد وصلت إلى الحد الأقصى لعدد الأصول المسموح بها. يمكنك ترقية خطتك لإضافة المزيد.',
+        btnOkText: 'حسنًا',
+        btnOkOnPress: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const FirestoreDynamicPlansPage(),
+            ),
+          );
+        },
+      ).show();
       return;
     }
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() => _loading = true);
     try {

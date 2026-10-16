@@ -115,7 +115,7 @@ class _HomepageState extends State<Homepage>
         .doc(uid)
         .get();
 
-    if (!doc.exists) {
+    if (!doc2.exists) {
       return;
     }
 
@@ -266,16 +266,26 @@ class _HomepageState extends State<Homepage>
               title: "إنشاء مجموعة",
               icon: Icons.add_business_rounded,
               color: AppColors.primary,
-              onTap: () {
+              onTap: () async {
+                await getVariables();
                 if (currentGroupsCount != null &&
-                    currentGroupsCount! >= maxGroup!) {
+                    currentGroupsCount! >= (maxGroup ?? 3)) {
                   AwesomeDialog(
                     context: context,
                     dialogType: DialogType.warning,
                     animType: AnimType.bottomSlide,
                     title: 'لقد وصلت إلى الحد الأقصى للمجموعات',
-                    /*  desc:
-              'لا يمكنك إنشاء مجموعات جديدة. يرجى الترقية للاستمتاع بخدمات إضافية.', */
+                    desc:
+                        'لا يمكنك إنشاء مجموعات جديدة. يرجى الترقية للاستمتاع بخدمات إضافية.',
+                    btnOkText: 'الترقية الآن',
+                    btnOkOnPress: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const FirestoreDynamicPlansPage(),
+                        ),
+                      );
+                    },
                   ).show();
                   return;
                 } else {
@@ -291,20 +301,7 @@ class _HomepageState extends State<Homepage>
               icon: Icons.group_add_rounded,
               color: AppColors.accentColor,
               onTap: () {
-                if (currentGroupsCount != null &&
-                    currentGroupsCount! >= maxGroup!) {
-                  AwesomeDialog(
-                    context: context,
-                    dialogType: DialogType.warning,
-                    animType: AnimType.bottomSlide,
-                    title: 'لقد وصلت إلى الحد الأقصى للمجموعات',
-                    /*  desc:
-              'لا يمكنك إنشاء مجموعات جديدة. يرجى الترقية للاستمتاع بخدمات إضافية.', */
-                  ).show();
-                  return;
-                } else {
-                  joinGroup();
-                }
+                joinGroup();
               },
             ),
           ),
@@ -849,7 +846,11 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
           btnCancelText: isAdmin ? 'إلغاء' : null,
           btnOkText: isAdmin ? 'تجديد الاشتراك' : 'حسنا',
           btnOkOnPress: isAdmin
-              ? () => widget.billingService.buySubscription('servexia_monthly')
+              ? () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const FirestoreDynamicPlansPage(),
+                  ),
+                )
               : () {},
           btnCancelOnPress: isAdmin ? () {} : null,
         ).show();

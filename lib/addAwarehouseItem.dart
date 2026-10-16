@@ -5,6 +5,8 @@ import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:maintenance/Subscruption/plan_selection_page.dart';
+import 'package:maintenance/homePage.dart';
 import 'package:maintenance/invoicePage.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
@@ -170,7 +172,47 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
     return double.tryParse(normalized) ?? 0.0;
   }
 
+  int maxInventoryItems = 0;
+  Future<void> getMaxInventoryItems() async {
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
+    final data = doc.data();
+    setState(() {
+      maxInventoryItems = data!['maxInventoryItems'] ?? 0;
+    });
+  }
+
+  int inventoryItemsCount = 0;
+  Future<void> getInventoryItemsCount() async {
+    final snapshot = await _itemsRef.get();
+    setState(() {
+      inventoryItemsCount = snapshot.docs.length;
+    });
+  }
+
   Future<void> saveItem() async {
+    await getMaxInventoryItems();
+    await getInventoryItemsCount();
+    if (inventoryItemsCount >= maxInventoryItems) {
+      await AwesomeDialog(
+        context: context,
+        dialogType: DialogType.warning,
+        title: 'حد أقصى لعدد الأصناف',
+        desc:
+            'لقد وصلت إلى الحد الأقصى لعدد الأصناف المسموح به في خطتك الحالية ($maxInventoryItems صنف). الرجاء ترقية خطتك لإضافة المزيد من الأصناف.',
+        btnOkText: 'حسنًا',
+        btnOkOnPress: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const FirestoreDynamicPlansPage(),
+            ),
+          );
+        },
+      ).show();
+      return;
+    }
     FocusScope.of(context).unfocus();
     setState(() {
       showUnits = false;

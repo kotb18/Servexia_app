@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:maintenance/Subscruption/plan_selection_page.dart';
 import 'package:maintenance/employeeDetailsPage.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -107,7 +108,8 @@ class _TeamScreenState extends State<TeamScreen> {
             IconButton(
               icon: const Icon(Icons.person_add),
               color: const Color.fromARGB(255, 5, 106, 9),
-              onPressed: () {
+              onPressed: () async {
+                await getMaxMembers();
                 if (maxMembers != null &&
                     currentTeamNumber != null &&
                     currentTeamNumber! >= maxMembers!) {
@@ -120,8 +122,16 @@ class _TeamScreenState extends State<TeamScreen> {
                       ),
                       actions: [
                         TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('إغلاق'),
+                          onPressed: () async {
+                            Navigator.pop(context);
+                            await Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const FirestoreDynamicPlansPage(),
+                              ),
+                            );
+                          },
+                          child: const Text('حسنًا'),
                         ),
                       ],
                     ),
@@ -178,10 +188,10 @@ class _TeamScreenState extends State<TeamScreen> {
     );
   }
 
-  Future<void> getVariables() async {
+  Future<void> getMaxMembers() async {
     final doc = await FirebaseFirestore.instance
-        .collection('variables')
-        .doc('kotb')
+        .collection('users')
+        .doc(uid)
         .get();
 
     if (!doc.exists) {
@@ -213,7 +223,6 @@ class _TeamScreenState extends State<TeamScreen> {
   @override
   initState() {
     super.initState();
-    getVariables();
     getAdmins();
     membersList.clear();
   }

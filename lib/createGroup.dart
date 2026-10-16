@@ -13,6 +13,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:maintenance/JoinGroup.dart';
+import 'package:maintenance/Subscruption/plan_selection_page.dart';
 import 'package:maintenance/Subscruption/plan_service.dart';
 import 'package:maintenance/homePage.dart';
 import 'package:maintenance/services/billing_service.dart';
@@ -49,6 +50,7 @@ class _CreategroupState extends State<Creategroup> {
   String? status;
   List? faceEmbeddingAdmin = [];
   String? _imageUrl;
+
   // الحصول على معرف المستخدم الحالي بسهولة
   String get uid => FirebaseAuth.instance.currentUser!.uid;
 
@@ -94,6 +96,15 @@ class _CreategroupState extends State<Creategroup> {
     'طلبات الانضمام': true,
     'الحضور والانصراف': true,
   };
+  int? maxGroup;
+  getMaxGroups() {
+    FirebaseFirestore.instance.collection('users').doc(uid).get().then((doc2) {
+      final data2 = doc2.data();
+      setState(() {
+        maxGroup = data2!['maxGroups'] ?? 3;
+      });
+    });
+  }
 
   Future<String?> getGooglePhoneNumber() async {
     try {
@@ -173,6 +184,7 @@ class _CreategroupState extends State<Creategroup> {
   void initState() {
     print(FirebaseAuth.instance.currentUser!.phoneNumber);
     _checkSubscriptionStatus();
+    getMaxGroups();
     super.initState();
     faceEmbeddingAdmin!.clear();
     billingService.init();
@@ -204,8 +216,9 @@ class _CreategroupState extends State<Creategroup> {
   }
 
   /// 🔹 التحقق من حالة الاشتراك
-  void _checkSubscriptionStatus() {
-    FirebaseFirestore.instance
+  void _checkSubscriptionStatus() async {
+    print('1111111111111111111111');
+    await FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
         .get()
@@ -232,6 +245,7 @@ class _CreategroupState extends State<Creategroup> {
         .catchError((e) {
           debugPrint("Error fetching subscription: $e");
         });
+    print('2222222222222222222222222');
   }
 
   /// 🔹 عرض نافذة المراجعة قبل الإنشاء
@@ -289,8 +303,16 @@ class _CreategroupState extends State<Creategroup> {
           dialogType: DialogType.warning,
           animType: AnimType.bottomSlide,
           title: 'لقد وصلت إلى الحد الأقصى للمجموعات',
-          /*  desc:
-              'لا يمكنك إنشاء مجموعات جديدة. يرجى الترقية للاستمتاع بخدمات إضافية.', */
+          desc:
+              'لا يمكنك إنشاء مجموعات جديدة. يرجى الترقية للاستمتاع بخدمات إضافية.',
+          btnOkText: 'الترقية الآن',
+          btnOkOnPress: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const FirestoreDynamicPlansPage(),
+              ),
+            );
+          },
         ).show();
         return;
       }
@@ -327,8 +349,12 @@ class _CreategroupState extends State<Creategroup> {
       btnCancelText: 'إلغاء',
       btnOkText: 'الاشتراك الآن',
       btnCancelOnPress: () {},
-      btnOkOnPress: () {
-        billingService.buySubscription('servexia_monthly');
+      btnOkOnPress: () async {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => const FirestoreDynamicPlansPage(),
+          ),
+        );
       },
     ).show();
   }
@@ -336,35 +362,62 @@ class _CreategroupState extends State<Creategroup> {
   void _showFreeTrialDialog() {
     AwesomeDialog(
       context: context,
-      title: 'جرب لمدة شهر مجانا',
-      desc: 'يمكنك تجربة التطبيق لمدة شهر مجانا.',
-
-      /// variableText
       dialogType: DialogType.info,
+      title: 'جرب لمدة شهر مجانًا',
+      desc: 'استمتع بجميع مزايا Servexia لمدة 30 يومًا مجانًا.',
       btnOkText: 'ابدأ التجربة',
+      btnCancelText: 'إلغاء',
+      btnCancelOnPress: () {},
       btnOkOnPress: () async {
+        if (_loading) return;
+
         setState(() => _loading = true);
-        final now = DateTime.now().toUtc();
-        final expiredAt = now.add(const Duration(days: 30));
-        PlanService planService = PlanService();
-        planService.getActiveIDPlans('servexia_monthly').then((plans) async {
-          if (plans.isNotEmpty) {
-            final plan = plans.first;
-            await FirebaseFirestore.instance.collection('users').doc(uid).set({
-              'expiredAt': Timestamp.fromDate(expiredAt),
-              'status': '0',
-              'subscriptionProductId': 'servexia_monthly',
-              'subscriptionUpdatedAt': FieldValue.serverTimestamp(),
-              'maxGroups': plan.maxGroups,
-              'maxInventoryItems': plan.maxInventoryItems,
-              'maxInvoicesPerMonth': plan.maxInvoicesPerMonth,
-              'maxAssets': plan.maxAssets,
-              'maxMembers': plan.maxMembers,
-            }, SetOptions(merge: true));
+
+        try {
+          final now = DateTime.now().toUtc();
+          final expiredAt = now.add(const Duration(days: 30));
+
+          final planService = PlanService();
+
+          // جلب الباقة وانتظار النتيجة
+          final plans = await planService.getActiveIDPlansMonthly(
+            'servexia_monthly',
+          );
+
+          if (plans.isEmpty) {
+            throw Exception('الباقة غير متاحة حاليًا، حاول مرة أخرى.');
           }
-        });
-        await _executeCreationLogic();
-        setState(() => _loading = false);
+
+          final plan = plans.first;
+
+          // تسجيل بيانات التجربة المجانية
+          await FirebaseFirestore.instance.collection('users').doc(uid).set({
+            'expiredAt': Timestamp.fromDate(expiredAt),
+            'status': '0',
+            'subscriptionProductId': 'servexia_monthly',
+            'subscriptionUpdatedAt': FieldValue.serverTimestamp(),
+            'maxGroups': plan.maxGroups,
+            'maxInventoryItems': plan.maxInventoryItems,
+            'maxInvoicesPerMonth': plan.maxInvoicesPerMonth,
+            'maxAssets': plan.maxAssets,
+            'maxMembers': plan.maxMembers,
+            'users': [uid],
+          }, SetOptions(merge: true));
+
+          // التنفيذ بعد نجاح التسجيل فقط
+          await _executeCreationLogic();
+        } catch (e, stackTrace) {
+          debugPrint('Free trial error: $e');
+          debugPrintStack(stackTrace: stackTrace);
+
+          if (!mounted) return;
+
+          _showError(e.toString().replaceFirst('Exception: ', ''));
+        } finally {
+          if (mounted) {
+            setState(() => _loading = false);
+          }
+        }
       },
     ).show();
   }
@@ -373,8 +426,9 @@ class _CreategroupState extends State<Creategroup> {
     AwesomeDialog(
       context: context,
       dialogType: DialogType.error,
-      title: "خطأ",
+      title: 'خطأ',
       desc: msg,
+      btnOkText: 'حسنًا',
       btnOkOnPress: () {},
     ).show();
   }

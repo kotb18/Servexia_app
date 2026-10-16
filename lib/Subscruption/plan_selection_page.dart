@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -32,6 +34,13 @@ class _FirestoreDynamicPlansPageState extends State<FirestoreDynamicPlansPage> {
   final Map<String, Future<PlayRegionalPrice>> _regionalPriceFutures = {};
   late final BillingService _billingService;
   StreamSubscription<List<PlanModel>>? _plansSubscription;
+  StreamSubscription<User?>? _authStateSubscription;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+  _userDocumentSubscription;
+  Timer? _renewalExpiryTimer;
+
+  String? _currentSubscriptionProductId;
+  DateTime? _currentSubscriptionExpiry;
 
   List<PlanModel> _plans = const [];
   bool _loading = true;
@@ -44,6 +53,12 @@ class _FirestoreDynamicPlansPageState extends State<FirestoreDynamicPlansPage> {
     super.initState();
     _billingService = BillingService();
     if (!kIsWeb) _billingService.addListener(_onBillingChanged);
+    _authStateSubscription = FirebaseAuth.instance.authStateChanges().listen(
+      _watchUserSubscription,
+      onError: (Object error) {
+        debugPrint('Auth state listener error: $error');
+      },
+    );
     _start();
   }
 
@@ -110,6 +125,9 @@ class _FirestoreDynamicPlansPageState extends State<FirestoreDynamicPlansPage> {
   @override
   void dispose() {
     _plansSubscription?.cancel();
+    _authStateSubscription?.cancel();
+    _userDocumentSubscription?.cancel();
+    _renewalExpiryTimer?.cancel();
     if (!kIsWeb) {
       _billingService.removeListener(_onBillingChanged);
       _billingService.dispose();
@@ -509,13 +527,15 @@ class _FirestoreDynamicPlansPageState extends State<FirestoreDynamicPlansPage> {
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton(
-                      onPressed: kIsWeb
+                      onPressed: _isSamePlanStillActive(productId)
+                          ? null
+                          : kIsWeb
                           ? _openPlayStore
                           : product == null ||
                                 productId.isEmpty ||
                                 _billingService.isPurchasePending
                           ? null
-                          : () => _buy(productId, plan.name),
+                          : () => _buy(productId, plan.name, _yearlySelected),
                       style: ElevatedButton.styleFrom(
                         elevation: 0,
                         backgroundColor: isRecommended
@@ -529,10 +549,16 @@ class _FirestoreDynamicPlansPageState extends State<FirestoreDynamicPlansPage> {
                         ),
                       ),
                       child: Text(
-                        kIsWeb
-                            ? 'تحميل التطبيق وإتمام الاشتراك'
-                            : _billingService.isPurchasePending
+                        _billingService.isPurchasePending && !kIsWeb
                             ? 'جاري تنفيذ العملية...'
+                            : _isRenewalDueFor(productId)
+                            ? kIsWeb
+                                  ? 'افتح التطبيق لتجديد الاشتراك'
+                                  : 'جدّد الاشتراك الآن'
+                            : _isSamePlanStillActive(productId)
+                            ? 'اشتراكك الحالي فعال'
+                            : kIsWeb
+                            ? 'تحميل التطبيق وإتمام الاشتراك'
                             : product == null
                             ? 'السعر غير متاح'
                             : 'اشترك في ${plan.name}',
@@ -798,6 +824,81 @@ class _FirestoreDynamicPlansPageState extends State<FirestoreDynamicPlansPage> {
     );
   }
 
+  void _watchUserSubscription(User? user) {
+    _userDocumentSubscription?.cancel();
+    _renewalExpiryTimer?.cancel();
+
+    if (mounted) {
+      setState(() {
+        _currentSubscriptionProductId = null;
+        _currentSubscriptionExpiry = null;
+      });
+    }
+
+    if (user == null) return;
+
+    _userDocumentSubscription = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .snapshots()
+        .listen(
+          (snapshot) {
+            final data = snapshot.data();
+            final productId = (data?['subscriptionProductId'] ?? '')
+                .toString()
+                .trim();
+            final expiry = _readDateTime(data?['expiredAt']);
+            if (!mounted) return;
+
+            setState(() {
+              _currentSubscriptionProductId = productId.isEmpty
+                  ? null
+                  : productId;
+              _currentSubscriptionExpiry = expiry;
+            });
+            _scheduleRenewalExpiryRefresh(expiry);
+          },
+          onError: (Object error) {
+            debugPrint('User subscription listener error: $error');
+          },
+        );
+  }
+
+  DateTime? _readDateTime(Object? value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
+    return null;
+  }
+
+  void _scheduleRenewalExpiryRefresh(DateTime? expiry) {
+    _renewalExpiryTimer?.cancel();
+    if (expiry == null) return;
+
+    final remaining = expiry.toLocal().difference(DateTime.now());
+    if (remaining.isNegative || remaining == Duration.zero) return;
+
+    _renewalExpiryTimer = Timer(remaining + const Duration(seconds: 1), () {
+      if (mounted) setState(() {});
+    });
+  }
+
+  bool _isRenewalDueFor(String productId) {
+    final expiry = _currentSubscriptionExpiry;
+    return productId.isNotEmpty &&
+        productId == _currentSubscriptionProductId &&
+        expiry != null &&
+        !expiry.isAfter(DateTime.now());
+  }
+
+  bool _isSamePlanStillActive(String productId) {
+    final expiry = _currentSubscriptionExpiry;
+    return productId.isNotEmpty &&
+        productId == _currentSubscriptionProductId &&
+        expiry != null &&
+        expiry.isAfter(DateTime.now());
+  }
+
   Future<void> _openPlayStore() async {
     final uri = Uri.parse(
       'https://play.google.com/store/apps/details?id=com.masry.maintenance',
@@ -826,9 +927,12 @@ class _FirestoreDynamicPlansPageState extends State<FirestoreDynamicPlansPage> {
     }
   }
 
-  Future<void> _buy(String productId, String planName) async {
+  Future<void> _buy(String productId, String planName, bool isYearly) async {
     try {
-      final started = await _billingService.buySubscription(productId);
+      final started = await _billingService.buySubscription(
+        productId,
+        isYearly,
+      );
       if (!mounted || !started) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

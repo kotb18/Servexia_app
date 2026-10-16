@@ -39,11 +39,21 @@ class PlanService {
     return plans;
   }
 
-  Future<List<PlanModel>> getActiveIDPlans(String id) async {
+  Future<List<PlanModel>> getActiveIDPlansMonthly(String id) async {
     final snapshot = await _col.get();
     final plans = snapshot.docs
         .map(PlanModel.fromFirestore)
-        .where((plan) => plan.isActive && plan.id == id)
+        .where((plan) => plan.isActive && plan.monthlyProductId == id)
+        .toList();
+    plans.sort((a, b) => a.order.compareTo(b.order));
+    return plans;
+  }
+
+  Future<List<PlanModel>> getActiveIDPlansYearly(String id) async {
+    final snapshot = await _col.get();
+    final plans = snapshot.docs
+        .map(PlanModel.fromFirestore)
+        .where((plan) => plan.isActive && plan.yearlyProductId == id)
         .toList();
     plans.sort((a, b) => a.order.compareTo(b.order));
     return plans;
