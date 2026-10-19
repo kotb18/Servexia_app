@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:maintenance/Subscruption/plan_service.dart';
+import 'package:maintenance/homePage.dart';
 
 class BillingService extends ChangeNotifier {
   BillingService({
@@ -284,6 +285,7 @@ class BillingService extends ChangeNotifier {
         'maxInvoicesPerMonth': plan.maxInvoicesPerMonth,
         'maxAssets': plan.maxAssets,
         'maxMembers': plan.maxMembers,
+        'id': plan.id,
       },
       expiredAt: expiredAt,
       willDeleteAt: willDeleteAt,
@@ -342,6 +344,16 @@ class BillingService extends ChangeNotifier {
       }
 
       await batch.commit();
+      final doc2 = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+
+      if (!doc2.exists) {
+        return;
+      }
+      final data2 = doc2.data();
+      planId = data2!['id'];
       if (end == groupRefs.length) break;
     }
   }

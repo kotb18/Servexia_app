@@ -175,8 +175,8 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
   int maxInventoryItems = 0;
   Future<void> getMaxInventoryItems() async {
     final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
+        .collection('plans')
+        .doc(planId)
         .get();
     final data = doc.data();
     setState(() {

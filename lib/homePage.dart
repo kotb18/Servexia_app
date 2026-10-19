@@ -17,7 +17,6 @@ import 'package:in_app_review/in_app_review.dart';
 
 List<QueryDocumentSnapshot<Object?>> groups = [];
 final BillingService billingService = BillingService();
-bool isLoading = false;
 
 final InAppReview inAppReview = InAppReview.instance;
 Future<void> showRateDialog(BuildContext context) async {
@@ -61,6 +60,7 @@ Future<void> showRateDialog(BuildContext context) async {
 }
 
 String uid = FirebaseAuth.instance.currentUser!.uid;
+String? planId;
 int? maxGroup;
 int? maxMembers;
 int? maxAssets;
@@ -97,6 +97,7 @@ class _HomepageState extends State<Homepage>
   String? youTubeUrl;
   String? websiteUrl;
   String? whatsNumber;
+  bool isLoading = false;
   Future<void> getVariables() async {
     final doc = await FirebaseFirestore.instance
         .collection('variables')
@@ -118,10 +119,18 @@ class _HomepageState extends State<Homepage>
     if (!doc2.exists) {
       return;
     }
-
     final data2 = doc2.data();
+    planId = data2!['id'];
+    final doc3 = await FirebaseFirestore.instance
+        .collection('plans')
+        .doc(planId)
+        .get();
 
-    maxGroup = data2!['maxGroups'] ?? 3;
+    if (!doc3.exists) {
+      return;
+    }
+    final data3 = doc3.data();
+    maxGroup = data3!['maxGroups'] ?? 3;
   }
 
   @override
@@ -267,9 +276,15 @@ class _HomepageState extends State<Homepage>
               icon: Icons.add_business_rounded,
               color: AppColors.primary,
               onTap: () async {
+                setState(() {
+                  isLoading = true;
+                });
                 await getVariables();
                 if (currentGroupsCount != null &&
                     currentGroupsCount! >= (maxGroup ?? 3)) {
+                  setState(() {
+                    isLoading = false;
+                  });
                   AwesomeDialog(
                     context: context,
                     dialogType: DialogType.warning,
@@ -290,6 +305,9 @@ class _HomepageState extends State<Homepage>
                   return;
                 } else {
                   createGroup();
+                  setState(() {
+                    isLoading = false;
+                  });
                 }
               },
             ),

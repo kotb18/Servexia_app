@@ -359,8 +359,8 @@ class _InvoicePageState extends State<InvoicePage>
 
   Future<void> getMaxInvoicesItems() async {
     final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
+        .collection('plans')
+        .doc(planId)
         .get();
 
     final data = doc.data();
@@ -1538,8 +1538,8 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
 
   Future<void> getMaxInvoicesItems() async {
     final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
+        .collection('plans')
+        .doc(planId)
         .get();
 
     final data = doc.data();

@@ -1,18 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:maintenance/Subscruption/plan_model.dart';
 import 'package:maintenance/Subscruption/plan_service.dart';
 
-/// ضع هنا معرّفات المنتجات المطابقة تمامًا لما أنشأته في Google Play Console.
-/// Google Play Billing لا يوفّر API لاسترجاع جميع المنتجات المسجلة تلقائيًا.
-/// هذه القائمة هي مصدر الخيارات في شاشة إدارة الباقات، وليست حقول إدخال حر.
-const List<String> kGooglePlaySubscriptionProductIds = <String>[
-  'servexia_basic_monthly',
-  'servexia_basic_yearly',
-  'servexia_pro_monthly',
-  'servexia_pro_yearly',
-  'servexia_business_monthly',
-  'servexia_business_yearly',
+/// اقتراحات اختيارية فقط؛ يمكن كتابة أي معرّف آخر يدويًا.
+const List<String> kSuggestedProductIds = <String>[
+  'servexia_monthly',
+  'servexia_yearly_main',
+  'servexia_monthly_pro',
+  'servexia_yearly_pro',
+  'servexia_monthly_enterprice',
+  'servexia_yearly_enterprice',
 ];
 
 class AdminPlansPage extends StatefulWidget {
@@ -27,61 +24,6 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
   static const Color _background = Color(0xFFF5F7FB);
 
   final PlanService _service = PlanService();
-  final InAppPurchase _store = InAppPurchase.instance;
-
-  List<ProductDetails> _storeProducts = const [];
-  Set<String> _notFoundProductIds = const {};
-  bool _loadingProducts = true;
-  String? _productLoadError;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadStoreProducts();
-  }
-
-  Future<void> _loadStoreProducts() async {
-    if (kGooglePlaySubscriptionProductIds.isEmpty) {
-      if (!mounted) return;
-      setState(() {
-        _loadingProducts = false;
-        _productLoadError =
-            'أضف معرّفات منتجات Google Play في القائمة أعلى الملف.';
-      });
-      return;
-    }
-
-    try {
-      final available = await _store.isAvailable();
-      if (!available) {
-        if (!mounted) return;
-        setState(() {
-          _loadingProducts = false;
-          _productLoadError =
-              'Google Play Billing غير متاح على هذا الجهاز حاليًا.';
-        });
-        return;
-      }
-
-      final response = await _store.queryProductDetails(
-        kGooglePlaySubscriptionProductIds.toSet(),
-      );
-      if (!mounted) return;
-      setState(() {
-        _storeProducts = response.productDetails
-          ..sort((a, b) => a.id.compareTo(b.id));
-        _notFoundProductIds = response.notFoundIDs.toSet();
-        _loadingProducts = false;
-        _productLoadError = response.error?.message;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _loadingProducts = false;
-        _productLoadError = 'تعذر تحميل منتجات Google Play: $error';
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -100,11 +42,6 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
           elevation: 0,
           actions: [
             IconButton(
-              tooltip: 'تحديث منتجات Google Play',
-              onPressed: _loadingProducts ? null : _loadStoreProducts,
-              icon: const Icon(Icons.sync_rounded),
-            ),
-            IconButton(
               tooltip: 'تهيئة الباقات الافتراضية',
               onPressed: () => _seedPlans(context),
               icon: const Icon(Icons.cloud_upload_outlined),
@@ -113,7 +50,6 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
         ),
         body: Column(
           children: [
-            _buildProductStatus(),
             Expanded(
               child: StreamBuilder<List<PlanModel>>(
                 stream: _service.allPlansStream,
@@ -164,60 +100,6 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
     );
   }
 
-  Widget _buildProductStatus() {
-    final isError = _productLoadError != null;
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        color: isError ? const Color(0xFFFFF4E5) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isError ? const Color(0xFFFFD79A) : const Color(0xFFE8EAF1),
-        ),
-      ),
-      child: Row(
-        children: [
-          if (_loadingProducts)
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          else
-            Icon(
-              isError ? Icons.warning_amber_rounded : Icons.shop_rounded,
-              color: isError ? Colors.orange.shade800 : _primary,
-            ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              _loadingProducts
-                  ? 'جاري تحميل منتجات Google Play...'
-                  : isError
-                  ? _productLoadError!
-                  : 'منتجات Google Play المتاحة: ${_storeProducts.length}',
-              style: TextStyle(
-                color: isError
-                    ? Colors.orange.shade900
-                    : const Color(0xFF4C5263),
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          if (!_loadingProducts)
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              tooltip: 'إعادة التحميل',
-              onPressed: _loadStoreProducts,
-              icon: const Icon(Icons.refresh_rounded),
-            ),
-        ],
-      ),
-    );
-  }
-
   Widget _sectionTitle(String title, String subtitle) {
     return Row(
       children: [
@@ -249,14 +131,6 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey.shade700, height: 1.5),
             ),
-            if (_productLoadError != null) ...[
-              const SizedBox(height: 14),
-              OutlinedButton.icon(
-                onPressed: _loadStoreProducts,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('إعادة تحميل منتجات المتجر'),
-              ),
-            ],
           ],
         ),
       ),
@@ -275,9 +149,6 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
   }
 
   Widget _planCard(BuildContext context, PlanModel plan) {
-    final monthly = _productForId(plan.monthlyProductId);
-    final yearly = _productForId(plan.yearlyProductId);
-
     return Container(
       margin: const EdgeInsets.only(bottom: 13),
       decoration: BoxDecoration(
@@ -360,9 +231,9 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
               ],
             ),
             const SizedBox(height: 13),
-            _productLine('شهري', monthly, plan.monthlyProductId),
+            _productLine('معرّف المنتج الشهري', plan.monthlyProductId),
             const SizedBox(height: 7),
-            _productLine('سنوي', yearly, plan.yearlyProductId),
+            _productLine('معرّف المنتج السنوي', plan.yearlyProductId),
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 13),
               child: Divider(height: 1),
@@ -413,65 +284,27 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
     );
   }
 
-  ProductDetails? _productForId(String id) {
-    for (final product in _storeProducts) {
-      if (product.id == id) return product;
-    }
-    return null;
-  }
-
-  Widget _productLine(String period, ProductDetails? product, String id) {
-    final exists = product != null;
-    final title = exists ? product.title : id;
-    final subtitle = exists
-        ? '${product.price}  •  ${product.id}'
-        : (id.isEmpty
-              ? 'لم يتم تعيين منتج'
-              : 'المعرّف غير موجود في المتجر أو لم يُحمّل');
+  Widget _productLine(String label, String value) {
     return Row(
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-          decoration: BoxDecoration(
-            color: _primary.withOpacity(.07),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            period,
-            style: const TextStyle(
-              color: _primary,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-        const SizedBox(width: 9),
         Icon(
-          exists ? Icons.check_circle : Icons.warning_amber_rounded,
+          value.trim().isEmpty
+              ? Icons.warning_amber_rounded
+              : Icons.tag_rounded,
           size: 16,
-          color: exists ? Colors.green : Colors.orange,
+          color: value.trim().isEmpty ? Colors.orange : _primary,
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 7),
+        Text(
+          '$label: ',
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+        ),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
-              ),
-            ],
+          child: Text(
+            value.trim().isEmpty ? 'غير محدد' : value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
           ),
         ),
       ],
@@ -540,6 +373,7 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
   ) async {
     final isEdit = existing != null;
     final nameCtrl = TextEditingController(text: existing?.name ?? '');
+    final idCtrl = TextEditingController(text: existing?.id ?? '');
     final groupsCtrl = TextEditingController(
       text: '${existing?.maxGroups ?? 0}',
     );
@@ -556,15 +390,19 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
       text: '${existing?.maxMembers ?? 0}',
     );
     final orderCtrl = TextEditingController(text: '${existing?.order ?? 99}');
-
-    var monthlyId = existing?.monthlyProductId ?? '';
-    var yearlyId = existing?.yearlyProductId ?? '';
+    final monthlyProductCtrl = TextEditingController(
+      text: existing?.monthlyProductId ?? '',
+    );
+    final yearlyProductCtrl = TextEditingController(
+      text: existing?.yearlyProductId ?? '',
+    );
     var isSaving = false;
 
     try {
       await showDialog<void>(
         context: context,
-        barrierDismissible: !isSaving,
+        // امنع إغلاق النافذة بالنقر خارجها أثناء الحفظ.
+        barrierDismissible: false,
         builder: (dialogContext) => StatefulBuilder(
           builder: (dialogContext, setDialogState) {
             return AlertDialog(
@@ -589,32 +427,13 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _formSection('منتجات Google Play', Icons.shop_rounded),
+                      _formSection('معرّفات المنتجات', Icons.tag_rounded),
                       const SizedBox(height: 10),
-                      _productDropdown(
-                        label: 'المنتج الشهري',
-                        selectedId: monthlyId,
-                        onChanged: (value) =>
-                            setDialogState(() => monthlyId = value ?? ''),
-                        existingId: existing?.monthlyProductId,
+                      _productIdField(
+                        monthlyProductCtrl,
+                        'معرّف المنتج الشهري',
                       ),
-                      const SizedBox(height: 10),
-                      _productDropdown(
-                        label: 'المنتج السنوي',
-                        selectedId: yearlyId,
-                        onChanged: (value) =>
-                            setDialogState(() => yearlyId = value ?? ''),
-                        existingId: existing?.yearlyProductId,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'المعرّفات ثابتة من كتالوج التطبيق؛ اختر المنتج فقط. لا يتم تعديل معرّف Play Billing هنا.',
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 11,
-                          height: 1.4,
-                        ),
-                      ),
+                      _productIdField(yearlyProductCtrl, 'معرّف المنتج السنوي'),
                       const SizedBox(height: 18),
                       _formSection(
                         'بيانات الباقة وحدودها',
@@ -626,6 +445,12 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
                         'اسم الباقة',
                         text: true,
                         hint: 'مثال: الاحترافية',
+                      ),
+                      _textField(
+                        idCtrl,
+                        'معرف الباقة',
+                        text: true,
+                        hint: 'مثال: main',
                       ),
                       Row(
                         children: [
@@ -657,25 +482,6 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
                           Expanded(child: _textField(membersCtrl, 'الأعضاء')),
                         ],
                       ),
-                      if (_loadingProducts) ...[
-                        const SizedBox(height: 8),
-                        const LinearProgressIndicator(),
-                        const SizedBox(height: 5),
-                        const Text(
-                          'جاري تحميل خيارات المنتجات...',
-                          style: TextStyle(fontSize: 11),
-                        ),
-                      ],
-                      if (_productLoadError != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          _productLoadError!,
-                          style: TextStyle(
-                            color: Colors.orange.shade900,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -700,6 +506,25 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
                             );
                             return;
                           }
+                          final id = idCtrl.text.trim();
+                          if (id.isEmpty) {
+                            _showMessage(
+                              context,
+                              'أدخل اسم الباقة.',
+                              isError: true,
+                            );
+                            return;
+                          }
+                          if (id.contains('/')) {
+                            _showMessage(
+                              context,
+                              'معرّف الباقة لا يجوز أن يحتوي على /.',
+                              isError: true,
+                            );
+                            return;
+                          }
+                          final monthlyId = monthlyProductCtrl.text.trim();
+                          final yearlyId = yearlyProductCtrl.text.trim();
                           if (monthlyId.isEmpty || yearlyId.isEmpty) {
                             _showMessage(
                               context,
@@ -737,10 +562,7 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
 
                           setDialogState(() => isSaving = true);
                           final plan = PlanModel(
-                            id: isEdit
-                                ? existing.id
-                                : DateTime.now().millisecondsSinceEpoch
-                                      .toString(),
+                            id: id,
                             name: name,
                             monthlyProductId: monthlyId,
                             yearlyProductId: yearlyId,
@@ -754,16 +576,23 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
                           );
                           try {
                             if (isEdit) {
-                              await _service.updatePlan(plan);
+                              await _service.updatePlan(
+                                plan,
+                                oldId: existing.id,
+                              );
                             } else {
                               await _service.addPlan(plan);
                             }
-                            if (dialogContext.mounted)
+                            if (dialogContext.mounted) {
                               Navigator.pop(dialogContext);
-                            if (context.mounted)
+                            }
+                            if (context.mounted) {
                               _showMessage(context, 'تم حفظ الباقة.');
+                            }
                           } catch (error) {
-                            setDialogState(() => isSaving = false);
+                            if (dialogContext.mounted) {
+                              setDialogState(() => isSaving = false);
+                            }
                             if (context.mounted) {
                               _showMessage(
                                 context,
@@ -792,12 +621,15 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
       );
     } finally {
       nameCtrl.dispose();
+      idCtrl.dispose();
       groupsCtrl.dispose();
       itemsCtrl.dispose();
       invoicesCtrl.dispose();
       assetsCtrl.dispose();
       membersCtrl.dispose();
       orderCtrl.dispose();
+      monthlyProductCtrl.dispose();
+      yearlyProductCtrl.dispose();
     }
   }
 
@@ -811,51 +643,6 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
         ),
       ],
-    );
-  }
-
-  Widget _productDropdown({
-    required String label,
-    required String selectedId,
-    required ValueChanged<String?> onChanged,
-    String? existingId,
-  }) {
-    final ids = <String>{..._storeProducts.map((product) => product.id)};
-    // إن كان المنتج القديم غير موجود حاليًا في Play، نعرضه كي لا يتغير ضمنيًا.
-    if (existingId != null && existingId.isNotEmpty) ids.add(existingId);
-    final items = ids.toList()..sort();
-    final safeValue = items.contains(selectedId) ? selectedId : null;
-
-    return DropdownButtonFormField<String>(
-      value: safeValue,
-      isExpanded: true,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: const Icon(Icons.shopping_bag_outlined),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(13)),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 13,
-        ),
-      ),
-      hint: Text(
-        _loadingProducts ? 'تحميل المنتجات...' : 'اختر منتجًا من Google Play',
-      ),
-      items: items.map((id) {
-        final product = _productForId(id);
-        final notFound = _notFoundProductIds.contains(id) || product == null;
-        return DropdownMenuItem<String>(
-          value: id,
-          child: Text(
-            product == null
-                ? '$id${notFound ? ' (غير متاح)' : ''}'
-                : '${product.title} — ${product.price}  •  $id',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        );
-      }).toList(),
-      onChanged: items.isEmpty ? null : onChanged,
     );
   }
 
@@ -883,6 +670,41 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
     );
   }
 
+  /// حقل نص حر مع قائمة اقتراحات ثابتة اختيارية.
+  Widget _productIdField(TextEditingController controller, String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextField(
+        controller: controller,
+        keyboardType: TextInputType.text,
+        textInputAction: TextInputAction.next,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: 'اكتب معرّفًا أو اختر من القائمة',
+          prefixIcon: const Icon(Icons.tag_rounded),
+          suffixIcon: PopupMenuButton<String>(
+            tooltip: 'اختيار معرّف مقترح',
+            icon: const Icon(Icons.arrow_drop_down_rounded),
+            onSelected: (value) {
+              controller.value = TextEditingValue(
+                text: value,
+                selection: TextSelection.collapsed(offset: value.length),
+              );
+            },
+            itemBuilder: (context) => kSuggestedProductIds
+                .map((id) => PopupMenuItem<String>(value: id, child: Text(id)))
+                .toList(),
+          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(13)),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 13,
+          ),
+        ),
+      ),
+    );
+  }
+
   int _toInt(String value) => int.parse(value.trim());
 
   void _showMessage(
@@ -890,12 +712,17 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
     String message, {
     bool isError = false,
   }) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: isError ? Colors.red.shade700 : null,
-        content: Text(message),
-      ),
-    );
+    if (!context.mounted) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: isError ? Colors.red.shade700 : null,
+          content: Text(message),
+        ),
+      );
   }
 }

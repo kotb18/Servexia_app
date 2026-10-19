@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:maintenance/Subscruption/plan_selection_page.dart';
 import 'package:maintenance/employeeDetailsPage.dart';
+import 'package:maintenance/homePage.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:pdf/pdf.dart';
@@ -190,8 +191,8 @@ class _TeamScreenState extends State<TeamScreen> {
 
   Future<void> getMaxMembers() async {
     final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
+        .collection('plans')
+        .doc(planId)
         .get();
 
     if (!doc.exists) {

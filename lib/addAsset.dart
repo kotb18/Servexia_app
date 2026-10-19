@@ -1,10 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
-
 import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:characters/characters.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:maintenance/Subscruption/plan_selection_page.dart';
@@ -70,7 +68,7 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
   Future<void> _loadLimits() async {
     try {
       final results = await Future.wait([
-        FirebaseFirestore.instance.collection('users').doc(uid).get(),
+        FirebaseFirestore.instance.collection('plans').doc(planId).get(),
         _itemsRef.count().get(),
       ]);
 

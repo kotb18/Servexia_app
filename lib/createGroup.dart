@@ -401,6 +401,7 @@ class _CreategroupState extends State<Creategroup> {
             'maxInvoicesPerMonth': plan.maxInvoicesPerMonth,
             'maxAssets': plan.maxAssets,
             'maxMembers': plan.maxMembers,
+            'id': plan.id,
             'users': [uid],
           }, SetOptions(merge: true));
 
