@@ -278,6 +278,7 @@ class _FirestoreDynamicPlansPageState extends State<FirestoreDynamicPlansPage> {
             ),
           ),
           const SizedBox(height: 8),
+
           Text(
             'طوّر إدارة أعمالك واستفد من الأدوات والحدود التي تناسبك.',
             textAlign: TextAlign.center,
@@ -370,24 +371,63 @@ class _FirestoreDynamicPlansPageState extends State<FirestoreDynamicPlansPage> {
   }
 
   Widget _buildSectionHeading() {
-    return Row(
+    return Column(
       children: [
-        const Expanded(
-          child: Text(
-            'خطط الاشتراك',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFF20253A),
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'خطط الاشتراك',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF20253A),
+                ),
+              ),
+            ),
+            if (_refreshing)
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+          ],
+        ),
+
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Theme.of(
+              context,
+            ).colorScheme.primaryContainer.withOpacity(0.35),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
             ),
           ),
-        ),
-        if (_refreshing)
-          const SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'الاشتراك يُحتسب لمالك الحساب ومجموعاته التابعة له فقط، '
+                  'ولا يشمل المجموعات التي ينضم إليها بصفته عضوًا.',
+                  // textDirection: TextDirection.rtl,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    height: 1.6,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
           ),
+        ),
+        const SizedBox(height: 8),
       ],
     );
   }

@@ -8,7 +8,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:maintenance/Subscruption/plan_selection_page.dart';
-
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -60,7 +59,8 @@ Future<void> showRateDialog(BuildContext context) async {
 }
 
 String uid = FirebaseAuth.instance.currentUser!.uid;
-String? planId;
+
+String? planIdForGroups;
 int? maxGroup;
 int? maxMembers;
 int? maxAssets;
@@ -91,7 +91,7 @@ class _HomepageState extends State<Homepage>
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-
+  String? creatorId;
   bool isMainAdmin = false;
   String? token = '';
   String? youTubeUrl;
@@ -111,6 +111,7 @@ class _HomepageState extends State<Homepage>
     youTubeUrl = data!['youTubeUrl'];
     websiteUrl = data['websiteUrl'];
     whatsNumber = data['whatsNumber'];
+
     final doc2 = await FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
@@ -120,10 +121,10 @@ class _HomepageState extends State<Homepage>
       return;
     }
     final data2 = doc2.data();
-    planId = data2!['id'];
+    planIdForGroups = data2!['id'] ?? 'main';
     final doc3 = await FirebaseFirestore.instance
         .collection('plans')
-        .doc(planId)
+        .doc(planIdForGroups)
         .get();
 
     if (!doc3.exists) {
@@ -378,7 +379,7 @@ class _HomepageState extends State<Homepage>
           if (isMainAdmin)
             TextButton(
               onPressed: () async {
-                context.pushNamed('mainAdmin');
+                context.push('/admin/mainAdmin');
                 print('main admin');
               },
               child: Text(
@@ -406,7 +407,9 @@ class _HomepageState extends State<Homepage>
           );
         }
         final groups = snapshot.data!.docs;
-        currentGroupsCount = groups.length;
+        currentGroupsCount = groups
+            .where((group) => group['adminId'] == uid)
+            .length;
         print("Current Groups Count: $currentGroupsCount");
         if (groups.isEmpty) {
           return SliverFillRemaining(
@@ -698,7 +701,9 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+            border: Border.all(
+              color: uid == group['adminId'] ? Colors.blue : Colors.green,
+            ),
           ),
           child: ListTile(
             contentPadding: const EdgeInsets.all(16),
@@ -880,7 +885,7 @@ class _ModernGroupTileState extends State<_ModernGroupTile> {
       if (!context.mounted) return;
       widget.onLoadingChanged(false);
       context.push(
-        '/workspace/${Uri.encodeComponent(group['docId'].toString())}',
+        '/workspace/${Uri.encodeComponent(group['docId'].toString())}?country=${Uri.encodeComponent(group['area'].toString())}',
       );
     } catch (e) {
       debugPrint('Error opening workspace: $e');

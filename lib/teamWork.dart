@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:maintenance/Subscruption/plan_selection_page.dart';
 import 'package:maintenance/employeeDetailsPage.dart';
 import 'package:maintenance/homePage.dart';
+import 'package:maintenance/workSpace.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:pdf/pdf.dart';
@@ -111,6 +112,7 @@ class _TeamScreenState extends State<TeamScreen> {
               color: const Color.fromARGB(255, 5, 106, 9),
               onPressed: () async {
                 await getMaxMembers();
+                print('mmmmmmmmmmmmmmm$creatorId');
                 if (maxMembers != null &&
                     currentTeamNumber != null &&
                     currentTeamNumber! >= maxMembers!) {
@@ -118,20 +120,26 @@ class _TeamScreenState extends State<TeamScreen> {
                     context: context,
                     builder: (_) => AlertDialog(
                       title: const Text('حد الأعضاء'),
-                      content: const Text(
-                        'لقد وصلت إلى الحد الأقصى لعدد الأعضاء في الفريق. يرجى ترقية حسابك لزيادة الحد.',
+                      content: Text(
+                        uid == creatorId
+                            ? 'لقد وصلت إلى الحد الأقصى لعدد الأعضاء في الفريق. يرجى ترقية حسابك لزيادة الحد.'
+                            : 'لقد وصلت إلى الحد الأقصى لعدد الأعضاء في الفريق.',
                       ),
                       actions: [
                         TextButton(
-                          onPressed: () async {
-                            Navigator.pop(context);
-                            await Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const FirestoreDynamicPlansPage(),
-                              ),
-                            );
-                          },
+                          onPressed: uid == creatorId
+                              ? () async {
+                                  Navigator.pop(context);
+                                  await Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const FirestoreDynamicPlansPage(),
+                                    ),
+                                  );
+                                }
+                              : () {
+                                  Navigator.pop(context);
+                                },
                           child: const Text('حسنًا'),
                         ),
                       ],

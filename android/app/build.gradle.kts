@@ -25,7 +25,7 @@ android {
     ndkVersion = "28.2.13676358"// دعم 16KB page size
      packaging {
              jniLibs {
-               useLegacyPackaging = false
+               useLegacyPackaging = true
            }
         }
 

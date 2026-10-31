@@ -9,12 +9,18 @@ import 'package:iconsax/iconsax.dart';
 import 'package:maintenance/homePage.dart';
 
 Future<String?> aa = FirebaseMessaging.instance.getToken();
+String? creatorId;
+String? planId;
 
 class WorkspaceHomeScreen extends StatefulWidget {
   final String workspaceId;
+  final String country;
   static const String screenroute = 'workspaceHome';
-
-  const WorkspaceHomeScreen({super.key, required this.workspaceId});
+  const WorkspaceHomeScreen({
+    super.key,
+    required this.workspaceId,
+    required this.country,
+  });
 
   @override
   State<WorkspaceHomeScreen> createState() => _WorkspaceHomeScreenState();
@@ -85,6 +91,8 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
   @override
   void initState() {
     super.initState();
+    print('cccccccccccccccccccc${widget.workspaceId}');
+    print('bbbbbbbbbbbbbbbbbbbbbb${widget.country}');
     _listenToPermissions(); // Load existing permissions
     _initializeAnimations();
     _loadWorkspace();
@@ -123,7 +131,21 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
       if (doc.exists) {
         setState(() {
           workspaceData = doc.data();
+          creatorId = workspaceData!['adminId'] ?? '';
           _loading = false;
+        });
+        final doc2 = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(creatorId)
+            .get();
+
+        if (!doc2.exists) {
+          return;
+        }
+        setState(() {
+          final data2 = doc2.data();
+          planId = data2!['id'] ?? 'main';
+          print('llllllllllllllllllllllll$planId');
         });
       } else {
         setState(() {
@@ -198,11 +220,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
       canPop: false, // ممنوع يرجع بالرجوع الافتراضي
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        // نفس لوجيك زر الرجوع اللي في الهيدر
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => Homepage(isAdmin: isAdmin)),
-          (route) => false,
-        );
+        context.go('/home?isAdmin=$isAdmin');
       },
       child: Scaffold(
         backgroundColor: Colors.grey.shade100,
@@ -503,7 +521,9 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                       icon: Icons.warehouse,
                       title: 'المخازن',
                       color: const Color.fromARGB(255, 14, 9, 141),
-                      onTap: () => _goTo('/store/${widget.workspaceId}'),
+                      onTap: () => _goTo(
+                        '/store/${Uri.encodeComponent(widget.workspaceId)}?country=${Uri.encodeComponent(widget.country)}',
+                      ),
                     ),
                   if (permissions['إضافة صنف مخزني'] == true)
                     _buildDashboardCard(

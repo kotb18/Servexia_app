@@ -1,5 +1,21 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// يدعم صيغ التاريخ القديمة (ISO String) وصيغة Firestore Timestamp.
+DateTime _parseFirestoreDate(Object? value, {DateTime? fallback}) {
+  if (value == null) return fallback ?? DateTime.now();
+  if (value is Timestamp) return value.toDate();
+  if (value is DateTime) return value;
+  if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+  if (value is num) {
+    return DateTime.fromMillisecondsSinceEpoch(value.toInt());
+  }
+  if (value is String) {
+    final parsed = DateTime.tryParse(value);
+    if (parsed != null) return parsed;
+  }
+  throw FormatException('قيمة التاريخ غير مدعومة: ${value.runtimeType}');
+}
+
 /// نموذج العميل
 class Customer {
   final String? id;
@@ -217,9 +233,7 @@ class Installment {
       number: index ?? (json['number'] as int? ?? 0),
       type: json['type'] as String? ?? '',
       value: (json['value'] as num?)?.toDouble() ?? 0.0,
-      date: json['date'] != null
-          ? DateTime.parse(json['date'] as String)
-          : DateTime.now(),
+      date: _parseFirestoreDate(json['date']),
       status: json['status'] as String? ?? 'معلق',
     );
   }
@@ -373,13 +387,9 @@ class Invoice {
         json['summary'] as Map<String, dynamic>? ?? {},
       ),
       notes: json['notes'] as String?,
-      date: json['date'] != null
-          ? DateTime.parse(json['date'] as String)
-          : DateTime.now(),
+      date: _parseFirestoreDate(json['date']),
       invoiceNumber: json['invoiceNumber'] as String? ?? '',
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
-          : DateTime.now(),
+      createdAt: _parseFirestoreDate(json['createdAt']),
       paymentMethod: json['paymentMethod'] as String? ?? 'كاش',
       installments: installments,
       thereIsReturn: json['thereIsReturn'] as bool? ?? false,

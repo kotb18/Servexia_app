@@ -27,6 +27,7 @@ class StoreScreen extends StatefulWidget {
   final bool isEditMode;
   final List<Map<dynamic, dynamic>> itemsPurchase;
   final List<Map<dynamic, dynamic>> itemsSale;
+  final String country;
   const StoreScreen({
     super.key,
     required this.groupId,
@@ -37,6 +38,7 @@ class StoreScreen extends StatefulWidget {
     required this.isEditMode,
     required this.itemsPurchase,
     required this.itemsSale,
+    this.country = '',
   });
   static const String screenroute = 'StoreScreen';
 
@@ -950,6 +952,7 @@ class _StoreScreenState extends State<StoreScreen> {
             groupId: widget.groupId,
             itemId: docId,
             deletedItems: deletedItems,
+            country: widget.country,
           ),
         ),
       );
@@ -1539,6 +1542,7 @@ class _StoreScreenState extends State<StoreScreen> {
               groupId: widget.groupId,
               itemId: targetId,
               deletedItems: deletedItems,
+              country: widget.country,
             ),
           ),
         );

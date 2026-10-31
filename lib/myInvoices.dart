@@ -83,51 +83,129 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
   }
 
   void _deleteInvoice(Invoice invoice) {
-    showDialog(
+    showDialog<bool>(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('تأكيد الحذف'),
-          content: Text(
-            'هل أنت متأكد أنك تريد حذف الفاتورة رقم ${invoice.invoiceNumber}؟',
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('تأكيد الحذف'),
+        content: Text(
+          'هل أنت متأكد أنك تريد حذف الفاتورة رقم ${invoice.invoiceNumber}؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('إلغاء'),
           ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('إلغاء'),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            icon: const Icon(Icons.delete_outline, size: 18),
+            label: const Text('حذف الفاتورة'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
             ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
-              child: const Text('حذف'),
-            ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     ).then((confirmed) async {
-      if (confirmed != null && confirmed) {
-        if (invoice.id != null) {
-          try {
-            await _invoiceService.deleteInvoice(widget.groupId, invoice.id!);
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('تم حذف الفاتورة بنجاح.')),
-              );
-            }
-          } catch (e) {
-            if (mounted) {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text('فشل الحذف: $e')));
-            }
-          }
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('لا يمكن حذف فاتورة بدون معرف.')),
-          );
-        }
+      if (confirmed != true || !mounted) return;
+      final id = invoice.id;
+      if (id == null || id.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('لا يمكن حذف فاتورة بدون معرف.')),
+        );
+        return;
       }
+      await _runInvoiceAction(
+        message: 'جارٍ حذف الفاتورة...',
+        successMessage: 'تم حذف الفاتورة بنجاح.',
+        failurePrefix: 'فشل حذف الفاتورة',
+        action: () => _invoiceService.deleteInvoice(widget.groupId, id),
+      );
     });
+  }
+
+  /// ينفذ عملية طويلة مع نافذة انتظار غير قابلة للإغلاق ورسائل نتيجة واضحة.
+  Future<void> _runInvoiceAction({
+    required String message,
+    required String successMessage,
+    required String failurePrefix,
+    required Future<void> Function() action,
+  }) async {
+    if (!mounted) return;
+    final navigator = Navigator.of(context, rootNavigator: true);
+    showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: Dialog(
+          elevation: 4,
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  width: 42,
+                  height: 42,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3.5,
+                    color: Color(0xFF1E3A8A),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'يرجى الانتظار وعدم إغلاق الشاشة',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      // يتيح إطارًا للرسم حتى يظهر مؤشر الانتظار قبل بدء تجهيز ملف PDF.
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      await action();
+      if (navigator.mounted && navigator.canPop()) navigator.pop();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(successMessage),
+          backgroundColor: const Color(0xFF15803D),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (navigator.mounted && navigator.canPop()) navigator.pop();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$failurePrefix: $error'),
+          backgroundColor: const Color(0xFFB91C1C),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> showCustomDialog({
@@ -168,82 +246,94 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
     );
   }
 
-  void _printInvoice(Invoice invoice, bool thermalInvoice) async {
-    if (thermalInvoice) {
-      final pdfBytes = await ThermalPrinterService.generateThermalPdf(
-        invoiceType: invoice.type,
-        invoiceNumber: invoice.invoiceNumber,
-        invoiceDate: invoice.date,
-        clientName: invoice.customerName,
-        items: invoice.items.map((item) {
-          return {
-            'itemId': item.itemId ?? '',
-            'name': item.name,
-            'quantity': item.quantity,
-            'price': item.price,
-            'total': item.total,
-          };
-        }).toList(),
-        subtotal: invoice.summary.subTotal,
-        discount: invoice.summary.discountValue,
-        tax: invoice.summary.taxValue,
-        total: invoice.summary.total,
-        notes: invoice.notes,
-        companyName: invoice.companyName,
-        isQuote: invoice.type == 'عرض سعر',
-      );
-      await ThermalPrinterService.printThermalPdf(pdfBytes);
-      await ThermalPrinterService.shareToThermalPrinter(pdfBytes, 'فاتورة_001');
-    } else {
-      await InvoiceGenerator.generateProfessionalInvoice(
-        invoiceType: invoice.type,
-        invoiceNumber: invoice.invoiceNumber,
-        invoiceDate: invoice.date,
-        clientName: invoice.customerName,
-        clientAddress: invoice.customerAddress,
-        clientPhone: invoice.customerPhone,
-        items: invoice.items.map((item) {
-          return {
-            'itemId': item.itemId ?? '',
-            'name': item.name,
-            'quantity': item.quantity,
-            'price': item.price,
-            'total': item.total,
-          };
-        }).toList(),
-        subtotal: invoice.summary.subTotal,
-        discount: invoice.summary.discountValue,
-        tax: invoice.summary.taxValue,
-        total: invoice.summary.total,
-        notes: invoice.notes,
-        companyName: invoice.companyName,
-        companyAddress: invoice.companyAddress,
-        companyPhone: invoice.companyPhone,
-        companyEmail: invoice.companyEmail,
-        companyLogoPath: 'widget.state.companyLogoPath',
-        isDue: invoice.paymentMethod == 'آجل',
-        isInstallment: invoice.paymentMethod == 'تقسيط',
-        dueDates: invoice.installments.map((installment) {
-          return {
-            'date': installment.date,
-            'value': installment.value,
-            'status': installment.status,
-            'type': installment.type,
-          };
-        }).toList(),
-        showAddress: invoice.showAddress,
-        showEmail: invoice.showEmail,
-        showDiscount: invoice.showDiscount,
-        showLogo: invoice.showLogo,
-        showNotes: invoice.showNotes,
-        showPhone: invoice.showPhone,
-        showTax: invoice.showTax,
-        isQuote: invoice.type == 'عرض سعر',
-        originalInvoiceNumber: invoice.type == 'مرتجع'
-            ? invoice.invoiceNumber
-            : null,
-      );
-    }
+  Future<void> _printInvoice(Invoice invoice, bool thermalInvoice) async {
+    await _runInvoiceAction(
+      message: thermalInvoice
+          ? 'جارٍ تجهيز الفاتورة للطابعة الحرارية...'
+          : 'جارٍ تجهيز نسخة A4 للطباعة...',
+      successMessage: 'تم تجهيز الفاتورة وإرسالها للطباعة.',
+      failurePrefix: 'تعذرت طباعة الفاتورة',
+      action: () async {
+        if (thermalInvoice) {
+          final pdfBytes = await ThermalPrinterService.generateThermalPdf(
+            invoiceType: invoice.type,
+            invoiceNumber: invoice.invoiceNumber,
+            invoiceDate: invoice.date,
+            clientName: invoice.customerName,
+            items: invoice.items.map((item) {
+              return {
+                'itemId': item.itemId ?? '',
+                'name': item.name,
+                'quantity': item.quantity,
+                'price': item.price,
+                'total': item.total,
+              };
+            }).toList(),
+            subtotal: invoice.summary.subTotal,
+            discount: invoice.summary.discountValue,
+            tax: invoice.summary.taxValue,
+            total: invoice.summary.total,
+            notes: invoice.notes,
+            companyName: invoice.companyName,
+            isQuote: invoice.type == 'عرض سعر',
+          );
+          await ThermalPrinterService.printThermalPdf(pdfBytes);
+          await ThermalPrinterService.shareToThermalPrinter(
+            pdfBytes,
+            'فاتورة_001',
+          );
+        } else {
+          await InvoiceGenerator.generateProfessionalInvoice(
+            invoiceType: invoice.type,
+            invoiceNumber: invoice.invoiceNumber,
+            invoiceDate: invoice.date,
+            clientName: invoice.customerName,
+            clientAddress: invoice.customerAddress,
+            clientPhone: invoice.customerPhone,
+            items: invoice.items.map((item) {
+              return {
+                'itemId': item.itemId ?? '',
+                'name': item.name,
+                'quantity': item.quantity,
+                'price': item.price,
+                'total': item.total,
+              };
+            }).toList(),
+            subtotal: invoice.summary.subTotal,
+            discount: invoice.summary.discountValue,
+            tax: invoice.summary.taxValue,
+            total: invoice.summary.total,
+            notes: invoice.notes,
+            companyName: invoice.companyName,
+            companyAddress: invoice.companyAddress,
+            companyPhone: invoice.companyPhone,
+            companyEmail: invoice.companyEmail,
+            companyLogoPath: 'widget.state.companyLogoPath',
+            isDue: invoice.paymentMethod == 'آجل',
+            isInstallment: invoice.paymentMethod == 'تقسيط',
+            dueDates: invoice.installments.map((installment) {
+              return {
+                'date': installment.date,
+                'value': installment.value,
+                'status': installment.status,
+                'type': installment.type,
+              };
+            }).toList(),
+            showAddress: invoice.showAddress,
+            showEmail: invoice.showEmail,
+            showDiscount: invoice.showDiscount,
+            showLogo: invoice.showLogo,
+            showNotes: invoice.showNotes,
+            showPhone: invoice.showPhone,
+            showTax: invoice.showTax,
+            isQuote: invoice.type == 'عرض سعر',
+            originalInvoiceNumber: invoice.type == 'مرتجع'
+                ? invoice.invoiceNumber
+                : null,
+          );
+        }
+      },
+    );
   }
 
   void _openInvoiceDetails(Invoice invoice) {

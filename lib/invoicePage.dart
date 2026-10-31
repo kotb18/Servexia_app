@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -296,6 +297,7 @@ class _InvoicePageState extends State<InvoicePage>
   late double totalPaidInstallments = 0.0;
   late String paymentMethodReturn = '';
   late bool isEditMode;
+  String invoiceCreatorName = 'currentUser';
   final List<InvoiceTypeModel> invoiceTypes = [
     const InvoiceTypeModel(
       title: 'فاتورة بيع',
@@ -355,121 +357,23 @@ class _InvoicePageState extends State<InvoicePage>
   ];
   Invoice? result;
   late InvoiceState state;
-  int maxInvoicesPerMonth = 0;
-
-  Future<void> getMaxInvoicesItems() async {
+  Future<void> getInvoiceCreatorName() async {
     final doc = await FirebaseFirestore.instance
-        .collection('plans')
-        .doc(planId)
+        .collection('teams')
+        .doc(widget.groupId)
+        .collection('members')
+        .doc(uid)
         .get();
-
-    final data = doc.data();
-
-    if (!mounted) return;
-
-    setState(() {
-      maxInvoicesPerMonth =
-          (data?['maxInvoicesPerMonth'] as num?)?.toInt() ?? 0;
-    });
-
-    debugPrint('Max invoices: $maxInvoicesPerMonth');
-  }
-
-  int invoicesPerMonthCount = 0;
-  Future<void> getInventoryItemsCount() async {
-    try {
-      final now = DateTime.now();
-
-      // بداية الشهر الحالي
-      final startOfMonth = DateTime(now.year, now.month, 1);
-
-      // بداية الشهر التالي
-      final startOfNextMonth = DateTime(now.year, now.month + 1, 1);
-
-      final query = FirebaseFirestore.instance
-          .collection('invoices')
-          .doc(widget.groupId)
-          .collection('items')
-          .where(
-            'createdAt',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth),
-          )
-          .where('createdAt', isLessThan: Timestamp.fromDate(startOfNextMonth));
-
-      // عدّ الفواتير دون تحميل مستنداتها كاملة
-      final result = await query.count().get();
-
-      if (!mounted) return;
-
+    if (doc.exists && mounted) {
       setState(() {
-        invoicesPerMonthCount = result.count ?? 0;
+        invoiceCreatorName = doc.data()?['name'] ?? invoiceCreatorName;
       });
-      debugPrint('Invoices this month: $invoicesPerMonthCount');
-    } catch (e) {
-      debugPrint('Error counting monthly invoices: $e');
-    }
-  }
-
-  Future<bool> _checkInvoicesLimit() async {
-    try {
-      // انتظر تحميل الحد الأقصى والعدد الحالي
-      await Future.wait([getMaxInvoicesItems(), getInventoryItemsCount()]);
-      debugPrint('Checking invoice limit...');
-      debugPrint('Maximum: $maxInvoicesPerMonth');
-      debugPrint('Current: $invoicesPerMonthCount');
-      if (!mounted) return false;
-
-      // لو الحد الأقصى صفر أو أقل، امنع الإنشاء
-      // إذا كان الصفر يعني عدم السماح بأي فواتير في نظامك
-      if (maxInvoicesPerMonth <= 0 ||
-          invoicesPerMonthCount >= maxInvoicesPerMonth) {
-        AwesomeDialog(
-          context: context,
-          dismissOnTouchOutside: false,
-          dialogType: DialogType.warning,
-          title: 'حد أقصى لعدد الفواتير',
-          desc:
-              'لقد وصلت إلى الحد الأقصى لعدد الفواتير في هذا الشهر. '
-              'يرجى ترقية الخطة للمتابعة.',
-          btnOkText: 'ترقية الباقة',
-          btnOkOnPress: () async {
-            if (!mounted) return;
-            Navigator.pop(context);
-            await Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => const FirestoreDynamicPlansPage(),
-              ),
-            );
-          },
-        ).show();
-
-        return false;
-      }
-
-      return true;
-    } catch (e) {
-      debugPrint('Invoice limit check error: $e');
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تعذر التحقق من حد الفواتير. حاول مرة أخرى.'),
-          ),
-        );
-      }
-
-      return false;
     }
   }
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _checkInvoicesLimit();
-    });
-
     selectedFilter = widget.type;
     state = InvoiceState();
     isEditMode = widget.isEditMode;
@@ -478,6 +382,7 @@ class _InvoicePageState extends State<InvoicePage>
       duration: const Duration(milliseconds: 300),
     );
     _loadSettings();
+    getInvoiceCreatorName();
   }
 
   @override
@@ -998,6 +903,7 @@ class _InvoicePageState extends State<InvoicePage>
                       totalPaidInstallments: totalPaidInstallments,
                       isFromStore: widget.isFormStore,
                       orderId: widget.orderId ?? '',
+                      invoiceCreatorName: invoiceCreatorName,
                     ),
             ),
           ],
@@ -1044,6 +950,7 @@ class InvoicePageDesign extends StatefulWidget {
   final double totalPaidInstallments;
   final bool isFromStore;
   final String orderId;
+  final String invoiceCreatorName;
 
   const InvoicePageDesign({
     super.key,
@@ -1063,6 +970,7 @@ class InvoicePageDesign extends StatefulWidget {
     required this.totalPaidInstallments,
     required this.isFromStore,
     required this.orderId,
+    required this.invoiceCreatorName,
   });
 
   @override
@@ -1116,6 +1024,130 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
       case 'عرض سعر':
       default:
         return widget.itemsSale;
+    }
+  }
+
+  int maxInvoicesPerMonth = 0;
+
+  Future<void> getMaxInvoicesItems() async {
+    final doc = await FirebaseFirestore.instance
+        .collection('plans')
+        .doc(planId)
+        .get();
+
+    final data = doc.data();
+
+    if (!mounted) return;
+
+    final rawLimit = data?['maxInvoicesPerMonth'] ?? data?['maxInvoices'];
+    final limit = rawLimit is num ? rawLimit.toInt() : 0;
+    setState(() => maxInvoicesPerMonth = limit);
+
+    debugPrint('Max invoices: $maxInvoicesPerMonth');
+  }
+
+  int invoicesPerMonthCount = 0;
+  Future<void> getInventoryItemsCount() async {
+    try {
+      final now = DateTime.now();
+
+      // بداية الشهر الحالي
+      final startOfMonth = DateTime(now.year, now.month, 1);
+
+      // بداية الشهر التالي
+      final startOfNextMonth = DateTime(now.year, now.month + 1, 1);
+
+      final collection = FirebaseFirestore.instance
+          .collection('invoices')
+          .doc(widget.groupId)
+          .collection('items');
+
+      // دعم الفواتير القديمة التي خزّنت createdAt كنص والجديدة كـ Timestamp.
+      final timestampCount = collection
+          .where(
+            'createdAt',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth),
+          )
+          .where('createdAt', isLessThan: Timestamp.fromDate(startOfNextMonth))
+          .count()
+          .get();
+      final stringCount = collection
+          .where(
+            'createdAt',
+            isGreaterThanOrEqualTo: startOfMonth.toIso8601String(),
+          )
+          .where('createdAt', isLessThan: startOfNextMonth.toIso8601String())
+          .count()
+          .get();
+      final results = await Future.wait([timestampCount, stringCount]);
+
+      if (!mounted) return;
+
+      setState(() {
+        invoicesPerMonthCount =
+            (results[0].count ?? 0) + (results[1].count ?? 0);
+      });
+      debugPrint('Invoices this month: $invoicesPerMonthCount');
+    } catch (e) {
+      debugPrint('Error counting monthly invoices: $e');
+    }
+  }
+
+  Future<bool> _checkInvoicesLimit() async {
+    try {
+      // التعديل وعروض الأسعار لا ينشئان فاتورة شهرية جديدة.
+      if (widget.isEditMode || widget.type == 'عرض سعر') return true;
+
+      // انتظر تحميل الحد الأقصى والعدد الحالي
+      await Future.wait([getMaxInvoicesItems(), getInventoryItemsCount()]);
+      debugPrint('Checking invoice limit...');
+      debugPrint('Maximum: $maxInvoicesPerMonth');
+      debugPrint('Current: $invoicesPerMonthCount');
+      if (!mounted) return false;
+
+      // لو الحد الأقصى صفر أو أقل، امنع الإنشاء
+      // إذا كان الصفر يعني عدم السماح بأي فواتير في نظامك
+      if (maxInvoicesPerMonth <= 0 ||
+          invoicesPerMonthCount >= maxInvoicesPerMonth) {
+        AwesomeDialog(
+          context: context,
+          dismissOnTouchOutside: false,
+          dialogType: DialogType.warning,
+          title: 'حد أقصى لعدد الفواتير',
+          desc: uid == creatorId
+              ? 'لقد وصلت إلى الحد الأقصى لعدد الفواتير في هذا الشهر. '
+                    'يرجى ترقية الخطة للمتابعة.'
+              : 'لقد وصلت إلى الحد الأقصى لعدد الفواتير في هذا الشهر. ',
+          btnOkText: uid == creatorId ? 'ترقية الباقة' : 'حسنا',
+          btnOkOnPress: uid == creatorId
+              ? () async {
+                  if (!mounted) return;
+                  //  Navigator.pop(context);
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const FirestoreDynamicPlansPage(),
+                    ),
+                  );
+                }
+              : () {},
+        ).show();
+
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Invoice limit check error: $e');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تعذر التحقق من حد الفواتير. حاول مرة أخرى.'),
+          ),
+        );
+      }
+
+      return false;
     }
   }
 
@@ -1428,7 +1460,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
       "invoiceNumber": widget.type != 'مرتجع'
           ? "${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}"
           : 'return-${widget.state.originalInvoiceNumber ?? ''}',
-      "createdAt": DateTime.now().toIso8601String(),
+      "createdAt": Timestamp.fromDate(DateTime.now()),
       'paymentMethod': selectedPaymentMethod,
       'isPaid': selectedPaymentMethod == 'كاش' ? true : false,
       'isPending': selectedPaymentMethod == 'كاش' ? false : true,
@@ -1534,113 +1566,6 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     await batch.commit();
   }
 
-  int maxInvoicesPerMonth = 0;
-
-  Future<void> getMaxInvoicesItems() async {
-    final doc = await FirebaseFirestore.instance
-        .collection('plans')
-        .doc(planId)
-        .get();
-
-    final data = doc.data();
-
-    if (!mounted) return;
-
-    setState(() {
-      maxInvoicesPerMonth =
-          (data?['maxInvoicesPerMonth'] as num?)?.toInt() ?? 0;
-    });
-
-    debugPrint('Max invoices: $maxInvoicesPerMonth');
-  }
-
-  int invoicesPerMonthCount = 0;
-  Future<void> getInventoryItemsCount() async {
-    try {
-      final now = DateTime.now();
-
-      // بداية الشهر الحالي
-      final startOfMonth = DateTime(now.year, now.month, 1);
-
-      // بداية الشهر التالي
-      final startOfNextMonth = DateTime(now.year, now.month + 1, 1);
-
-      final query = FirebaseFirestore.instance
-          .collection('invoices')
-          .doc(widget.groupId)
-          .collection('items')
-          .where(
-            'createdAt',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth),
-          )
-          .where('createdAt', isLessThan: Timestamp.fromDate(startOfNextMonth));
-
-      // عدّ الفواتير دون تحميل مستنداتها كاملة
-      final result = await query.count().get();
-
-      if (!mounted) return;
-
-      setState(() {
-        invoicesPerMonthCount = result.count ?? 0;
-      });
-      debugPrint('Invoices this month: $invoicesPerMonthCount');
-    } catch (e) {
-      debugPrint('Error counting monthly invoices: $e');
-    }
-  }
-
-  Future<bool> _checkInvoicesLimit() async {
-    try {
-      // انتظر تحميل الحد الأقصى والعدد الحالي
-      await Future.wait([getMaxInvoicesItems(), getInventoryItemsCount()]);
-      debugPrint('Checking invoice limit...');
-      debugPrint('Maximum: $maxInvoicesPerMonth');
-      debugPrint('Current: $invoicesPerMonthCount');
-      if (!mounted) return false;
-
-      // لو الحد الأقصى صفر أو أقل، امنع الإنشاء
-      // إذا كان الصفر يعني عدم السماح بأي فواتير في نظامك
-      if (maxInvoicesPerMonth <= 0 ||
-          invoicesPerMonthCount >= maxInvoicesPerMonth) {
-        AwesomeDialog(
-          context: context,
-          dismissOnTouchOutside: false,
-          dialogType: DialogType.warning,
-          title: 'حد أقصى لعدد الفواتير',
-          desc:
-              'لقد وصلت إلى الحد الأقصى لعدد الفواتير في هذا الشهر. '
-              'يرجى ترقية الخطة للمتابعة.',
-          btnOkText: 'ترقية الباقة',
-          btnOkOnPress: () async {
-            if (!mounted) return;
-            //  Navigator.pop(context);
-            await Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => const FirestoreDynamicPlansPage(),
-              ),
-            );
-          },
-        ).show();
-
-        return false;
-      }
-
-      return true;
-    } catch (e) {
-      debugPrint('Invoice limit check error: $e');
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تعذر التحقق من حد الفواتير. حاول مرة أخرى.'),
-          ),
-        );
-      }
-
-      return false;
-    }
-  }
-
   /// Update stock for sale/purchase invoices
   Future<void> _updateStock() async {
     final items = widget.type == 'شراء'
@@ -1692,7 +1617,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
         'note': widget.type == 'شراء'
             ? 'تمت الإضافة عن طريق فاتورة الشراء رقم ${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}'
             : 'تم الصرف عن طريق فاتورة البيع رقم ${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}',
-        'createdBy': 'currentUser',
+        'createdBy': widget.invoiceCreatorName,
         'createdAt': FieldValue.serverTimestamp(),
       });
     }
@@ -2915,8 +2840,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                         context: context,
                         dialogType: DialogType.error,
                         title: 'خطأ',
-                        desc:
-                            'لا يمكن أن يكون مجموع الأقساط غير مساوي للمجموع الكلي',
+                        desc: 'لا يمكن أن يكون مجموع الأقساط غير مساوي للمجموع الكلي',
                         btnOkText: 'حسنًا',
                         btnOkOnPress: () {},
                       ).show();
@@ -2971,10 +2895,35 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     required String title,
     required String message,
   }) async {
-    await showDialog(
+    await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
+        Future<void> finish({bool? thermal}) async {
+          if (thermal == null) {
+            if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+            if (mounted) {
+              context.go('/workspace/${Uri.encodeComponent(widget.groupId)}');
+            }
+            return;
+          }
+
+          try {
+            if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+            await _printMode(thermal);
+            if (mounted) {
+              context.go('/workspace/${Uri.encodeComponent(widget.groupId)}');
+            }
+          } catch (e) {
+            if (mounted) {
+              setState(() => widget.state.loading = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('حدث خطأ أثناء الطباعة: $e')),
+              );
+            }
+          }
+        }
+
         return PopScope(
           canPop: false,
           child: AlertDialog(
@@ -2982,59 +2931,16 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
             content: Text(message),
             actions: [
               ElevatedButton(
-                onPressed: () async {
-                  try {
-                    setState(() => widget.state.loading = true);
-                    if (dialogContext.mounted) {
-                      context.go(
-                        '/workspace/${Uri.encodeComponent(widget.groupId)}',
-                      );
-                      setState(() => widget.state.loading = false);
-                    }
-                    await _printMode(true);
-                  } catch (e) {
-                    if (dialogContext.mounted) {
-                      ScaffoldMessenger.of(dialogContext).showSnackBar(
-                        SnackBar(content: Text('حدث خطأ أثناء الطباعة: $e')),
-                      );
-                      setState(() => widget.state.loading = false);
-                    }
-                  }
-                },
+                onPressed: () => finish(thermal: true),
                 child: const Text('حرارية'),
               ),
               ElevatedButton(
-                onPressed: () async {
-                  try {
-                    setState(() => widget.state.loading = true);
-                    if (dialogContext.mounted) {
-                      context.go(
-                        '/workspace/${Uri.encodeComponent(widget.groupId)}',
-                      );
-                      setState(() => widget.state.loading = false);
-                    }
-                    await _printMode(false);
-                  } catch (e) {
-                    if (dialogContext.mounted) {
-                      ScaffoldMessenger.of(dialogContext).showSnackBar(
-                        SnackBar(content: Text('حدث خطأ أثناء الطباعة: $e')),
-                      );
-                      setState(() => widget.state.loading = false);
-                    }
-                  }
-                },
+                onPressed: () => finish(thermal: false),
                 child: const Text('A4'),
               ),
-              ElevatedButton(
-                onPressed: () async {
-                  if (!mounted) return;
-
-                  Navigator.popUntil(
-                    context,
-                    ModalRoute.withName(WorkspaceHomeScreen.screenroute),
-                  );
-                },
-                child: const Text('الغاء'),
+              TextButton(
+                onPressed: () => finish(),
+                child: const Text('بدون طباعة'),
               ),
             ],
           ),

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:maintenance/Subscruption/plan_selection_page.dart';
 import 'package:maintenance/homePage.dart';
 import 'package:maintenance/invoicePage.dart';
+import 'package:maintenance/workSpace.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 class AddInventoryItemScreen extends StatefulWidget {
@@ -173,45 +174,77 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
   }
 
   int maxInventoryItems = 0;
-  Future<void> getMaxInventoryItems() async {
-    final doc = await FirebaseFirestore.instance
-        .collection('plans')
-        .doc(planId)
-        .get();
-    final data = doc.data();
-    setState(() {
-      maxInventoryItems = data!['maxInventoryItems'] ?? 0;
-    });
+  Future<int?> getMaxInventoryItems() async {
+    final currentPlanId = planId;
+    if (currentPlanId == null || currentPlanId.trim().isEmpty) {
+      _showSnack('تعذر تحديد خطتك الحالية. أعد تسجيل الدخول وحاول مرة أخرى.');
+      return null;
+    }
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('plans')
+          .doc(currentPlanId)
+          .get();
+      final data = doc.data();
+      if (!doc.exists || data == null) {
+        if (mounted) _showSnack('لم يتم العثور على بيانات الخطة الحالية.');
+        return null;
+      }
+
+      final limit = (data['maxInventoryItems'] as num?)?.toInt() ?? 0;
+      if (mounted) {
+        setState(() => maxInventoryItems = limit);
+      }
+      return limit;
+    } catch (e) {
+      debugPrint('تعذر تحميل حد الأصناف: $e');
+      if (mounted) _showSnack('تعذر تحميل بيانات الخطة. حاول مرة أخرى.');
+      return null;
+    }
   }
 
   int inventoryItemsCount = 0;
-  Future<void> getInventoryItemsCount() async {
-    final snapshot = await _itemsRef.get();
-    setState(() {
-      inventoryItemsCount = snapshot.docs.length;
-    });
+  Future<int?> getInventoryItemsCount() async {
+    try {
+      final snapshot = await _itemsRef.get();
+      final count = snapshot.docs.length;
+      if (mounted) setState(() => inventoryItemsCount = count);
+      return count;
+    } catch (e) {
+      debugPrint('تعذر تحميل عدد الأصناف: $e');
+      if (mounted) _showSnack('تعذر التحقق من عدد الأصناف. حاول مرة أخرى.');
+      return null;
+    }
   }
 
   Future<void> saveItem() async {
-    await getMaxInventoryItems();
-    await getInventoryItemsCount();
-    if (inventoryItemsCount >= maxInventoryItems) {
-      await AwesomeDialog(
-        context: context,
-        dialogType: DialogType.warning,
-        title: 'حد أقصى لعدد الأصناف',
-        desc:
-            'لقد وصلت إلى الحد الأقصى لعدد الأصناف المسموح به في خطتك الحالية ($maxInventoryItems صنف). الرجاء ترقية خطتك لإضافة المزيد من الأصناف.',
-        btnOkText: 'حسنًا',
-        btnOkOnPress: () async {
-          await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const FirestoreDynamicPlansPage(),
-            ),
-          );
-        },
-      ).show();
-      return;
+    if (!widget.isFromInvoice) {
+      final maxItems = await getMaxInventoryItems();
+      if (!mounted || maxItems == null) return;
+      final currentCount = await getInventoryItemsCount();
+      if (!mounted || currentCount == null) return;
+      if (currentCount >= maxItems) {
+        await AwesomeDialog(
+          context: context,
+          dialogType: DialogType.warning,
+          title: 'حد أقصى لعدد الأصناف',
+          desc: uid == creatorId
+              ? 'لقد وصلت إلى الحد الأقصى لعدد الأصناف المسموح به في خطتك الحالية ($maxInventoryItems صنف). الرجاء ترقية خطتك لإضافة المزيد من الأصناف.'
+              : 'لقد وصلت إلى الحد الأقصى لعدد الأصناف المخزنية المسموح بها.',
+          btnOkText: 'حسنًا',
+          btnOkOnPress: uid == creatorId
+              ? () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const FirestoreDynamicPlansPage(),
+                    ),
+                  );
+                }
+              : () {},
+        ).show();
+        return;
+      }
     }
     FocusScope.of(context).unfocus();
     setState(() {
@@ -424,6 +457,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
     required bool isUnit,
   }) async {
     final searchController = TextEditingController();
+    final searchFocusNode = FocusNode();
     String query = '';
     final selected = await showModalBottomSheet<String>(
       context: context,
@@ -432,6 +466,11 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
+            void closeSheet([String? value]) {
+              searchFocusNode.unfocus();
+              Navigator.pop(sheetContext, value);
+            }
+
             final filtered = values
                 .where((e) => e.toLowerCase().contains(query.toLowerCase()))
                 .toList();
@@ -477,7 +516,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                               ),
                             ),
                             IconButton(
-                              onPressed: () => Navigator.pop(sheetContext),
+                              onPressed: closeSheet,
                               icon: const Icon(Icons.close_rounded),
                             ),
                           ],
@@ -487,6 +526,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: TextField(
                           controller: searchController,
+                          focusNode: searchFocusNode,
                           onChanged: (value) =>
                               setSheetState(() => query = value),
                           decoration: InputDecoration(
@@ -521,7 +561,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                                         color: _primary,
                                       )
                                     : null,
-                                onTap: () => Navigator.pop(sheetContext, value),
+                                onTap: () => closeSheet(value),
                               ),
                             ),
                             if (query.trim().isNotEmpty &&
@@ -533,8 +573,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                                 ),
                                 title: Text('استخدام "$query"'),
                                 subtitle: const Text('إضافة قيمة جديدة'),
-                                onTap: () =>
-                                    Navigator.pop(sheetContext, query.trim()),
+                                onTap: () => closeSheet(query.trim()),
                               ),
                             if (filtered.isEmpty && query.trim().isEmpty)
                               const Padding(
@@ -555,6 +594,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
       },
     );
     searchController.dispose();
+    searchFocusNode.dispose();
 
     if (!mounted || selected == null || selected.trim().isEmpty) return;
     setState(() {
@@ -1175,10 +1215,16 @@ class _QrScanScreenState extends State<QrScanScreen> {
     isProcessing = true;
     try {
       await controller.stop();
-      await _audioPlayer.play(AssetSource('sounds/beep.mp3'));
+      try {
+        await _audioPlayer.play(AssetSource('sounds/beep.mp3'));
+      } catch (audioError) {
+        // صوت التأكيد اختياري؛ لا ينبغي أن يمنع إرجاع نتيجة المسح.
+        debugPrint('تعذر تشغيل صوت المسح: $audioError');
+      }
       if (!mounted) return;
       Navigator.pop(context, {'raw': rawValue, 'format': barcode?.format.name});
-    } catch (_) {
+    } catch (e) {
+      debugPrint('خطأ أثناء قراءة الكود: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('حدث خطأ أثناء قراءة الكود')),

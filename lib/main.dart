@@ -557,7 +557,8 @@ final GoRouter _router = GoRouter(
       name: WorkspaceHomeScreen.screenroute,
       builder: (context, state) {
         final workspaceId = state.pathParameters['workspaceId'] ?? '';
-        return WorkspaceHomeScreen(workspaceId: workspaceId);
+        final country = state.uri.queryParameters['country'] ?? '';
+        return WorkspaceHomeScreen(workspaceId: workspaceId, country: country);
       },
     ),
     GoRoute(
@@ -681,6 +682,7 @@ final GoRouter _router = GoRouter(
               ? []
               : [],
           itemsSale: state.uri.queryParameters['itemsSale'] == 'true' ? [] : [],
+          country: state.uri.queryParameters['country'] ?? '',
         );
       },
     ),
@@ -694,6 +696,7 @@ final GoRouter _router = GoRouter(
           groupId: groupId,
           itemId: itemId,
           deletedItems: state.uri.queryParameters['deletedItems'] == 'true',
+          country: state.uri.queryParameters['country'] ?? '',
         );
       },
     ),

@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_pagination/firebase_pagination.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -378,12 +380,13 @@ class InventoryItemDetailsScreenRefactored extends StatefulWidget {
   final String groupId;
   final String itemId;
   final bool deletedItems;
-
+  final String country;
   const InventoryItemDetailsScreenRefactored({
     super.key,
     required this.groupId,
     required this.itemId,
     required this.deletedItems,
+    required this.country,
   });
   static const String screenroute = 'inventoryItemDetailsScreenRefactored';
 
@@ -396,12 +399,14 @@ class _InventoryItemDetailsScreenRefactoredState
     extends State<InventoryItemDetailsScreenRefactored> {
   late final InventoryService _service;
   bool _loading = false;
+  Map<String, dynamic>? _latestItemData;
 
   String get _currentUser =>
       FirebaseAuth.instance.currentUser?.displayName ?? 'غير معروف';
 
   @override
   void initState() {
+    print('vvvvvvvvvvvvvvvvvvv${widget.country}');
     super.initState();
     _service = InventoryService(groupId: widget.groupId, itemId: widget.itemId);
   }
@@ -461,6 +466,21 @@ class _InventoryItemDetailsScreenRefactoredState
               ),
               actions: [
                 IconButton(
+                  icon: const Icon(Icons.auto_awesome),
+                  tooltip: 'مساعدة AI للصنف',
+                  onPressed: () {
+                    // يتم تمرير بيانات الصنف الحية من StreamBuilder عند الضغط.
+                    final item = _latestItemData;
+                    if (item == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('بيانات الصنف غير جاهزة')),
+                      );
+                      return;
+                    }
+                    _showItemAiPicker(item);
+                  },
+                ),
+                IconButton(
                   icon: const Icon(Icons.history),
                   onPressed: _openMovementsHistory,
                   tooltip: 'سجل الحركات',
@@ -483,6 +503,7 @@ class _InventoryItemDetailsScreenRefactoredState
                 }
 
                 final item = snap.data!.data()!;
+                _latestItemData = item;
                 final currentQuantity = item['quantity'] ?? 0;
                 final unit = item['unit'] ?? 'وحدة';
 
@@ -715,6 +736,241 @@ class _InventoryItemDetailsScreenRefactoredState
               },
             ),
           );
+  }
+
+  void _showItemAiPicker(Map<String, dynamic> item) {
+    final tools = <({String name, String url, String badge, Color color})>[
+      (
+        name: 'ChatGPT',
+        url: 'https://chatgpt.com/',
+        badge: 'GPT',
+        color: const Color(0xFF10A37F),
+      ),
+      (
+        name: 'Claude',
+        url: 'https://claude.ai/',
+        badge: 'C',
+        color: const Color(0xFFD97757),
+      ),
+      (
+        name: 'Gemini',
+        url: 'https://gemini.google.com/app',
+        badge: 'G',
+        color: const Color(0xFF4285F4),
+      ),
+      (
+        name: 'Manus',
+        url: 'https://manus.im/app',
+        badge: 'M',
+        color: const Color(0xFF635BFF),
+      ),
+    ];
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => SafeArea(
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+          decoration: BoxDecoration(
+            color: Theme.of(sheetContext).colorScheme.surface,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade400,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: Colors.teal.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    child: const Icon(Icons.auto_awesome, color: Colors.teal),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'مساعد المنتج الذكي',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'استفسر عن المنتج والسعر',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFE0F2F1),
+                  child: Icon(Icons.copy_rounded, color: Colors.teal),
+                ),
+                title: const Text(
+                  'نسخ البرومبت فقط',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text(
+                  'جاهز للصق في أي أداة AI',
+                  style: TextStyle(fontSize: 12),
+                ),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _copyItemAiPrompt(item);
+                },
+              ),
+              const Divider(height: 1),
+              for (final tool in tools)
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                  leading: Container(
+                    width: 42,
+                    height: 42,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: tool.color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Text(
+                      tool.badge,
+                      style: TextStyle(
+                        color: tool.color,
+                        fontWeight: FontWeight.w800,
+                        fontSize: tool.badge.length > 1 ? 13 : 19,
+                      ),
+                    ),
+                  ),
+                  title: Text(
+                    'نسخ وفتح ${tool.name}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  trailing: const Icon(Icons.open_in_new_rounded, size: 19),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _openItemInAi(item, tool.name, tool.url);
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _buildItemAiPrompt(Map<String, dynamic> item) {
+    String readValue(List<String> keys, {String fallback = 'غير متوفر'}) {
+      for (final key in keys) {
+        final value = item[key]?.toString().trim();
+        if (value != null && value.isNotEmpty) return value;
+      }
+      return fallback;
+    }
+
+    // نقبل أسماء حقول منشأ شائعة في البيانات، ولا نخلطها ببلد المستخدم.
+    final origin = readValue(
+      [
+        'countryOfOrigin',
+        'originCountry',
+        'madeIn',
+        'country_of_origin',
+        'origin',
+        'country',
+      ],
+      fallback: widget.country.trim().isEmpty
+          ? 'غير متوفر'
+          : widget.country.trim(),
+    );
+    final productName = readValue([
+      'name',
+      'productName',
+      'itemName',
+    ], fallback: 'صنف غير مسمى');
+    final sku = readValue(['sku', 'code']);
+    final price = readValue(['price']);
+    final unit = readValue(['unit']);
+
+    return '''أنت مساعد متخصص في المنتجات والمشتريات. أريد معلومات موثوقة ومحدثة عن المنتج التالي:
+
+- اسم المنتج: $productName
+- بلد المنشأ المسجل: $origin
+- كود المنتج: $sku
+- السعر المسجل بالمخزون: $price
+- الوحدة: $unit
+- بلد المستخدم/السوق المطلوب للاستفسار عن السعر: ${widget.country}
+
+المطلوب باختصار:
+1. وضّح ما هو المنتج واستخداماته، واطلب توضيحًا إذا كان الاسم عامًا أو غير كافٍ.
+2. إذا أمكن، قدّر سعره الحالي في سوق ${widget.country}، مع العملة وتاريخ التقدير ونطاق سعري تقريبي.
+3. لا تخمّن السعر أو بلد المنشأ. إذا لم تتوفر بيانات موثوقة، اذكر ذلك واطلب الشركة المصنعة أو الموديل أو رابط المنتج.
+4. اذكر مصادر وروابط حديثة للسعر عند توفر البحث على الإنترنت، وميّز السعر التقريبي عن السعر المسجل في المخزون.
+
+أجب بالعربية بوضوح واختصار.''';
+  }
+
+  Future<void> _copyItemAiPrompt(Map<String, dynamic> item) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: _buildItemAiPrompt(item)));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم نسخ برومبت المنتج والسعر')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('تعذر نسخ البرومبت: $e')));
+    }
+  }
+
+  Future<void> _openItemInAi(
+    Map<String, dynamic> item,
+    String aiName,
+    String url,
+  ) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: _buildItemAiPrompt(item)));
+      final launched = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            launched
+                ? 'تم نسخ البرومبت. الصقه في $aiName'
+                : 'تم نسخ البرومبت، لكن تعذر فتح $aiName',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('تعذر تجهيز البرومبت: $e')));
+    }
   }
 
   void _buildPriceDialog(Map<String, dynamic> item) {

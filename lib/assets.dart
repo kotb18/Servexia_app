@@ -1,6 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart'
+    show Clipboard, ClipboardData, rootBundle;
+import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -615,6 +619,310 @@ class _AssetsScreenState extends State<AssetsScreen>
     );
   }
 
+  /// اختيار أداة AI أو نسخ البرومبت فقط.
+  void _showAiPicker() {
+    final tools = <({String name, String url, String badge, Color color})>[
+      (
+        name: 'ChatGPT',
+        url: 'https://chatgpt.com/',
+        badge: 'GPT',
+        color: const Color(0xFF10A37F),
+      ),
+      (
+        name: 'Claude',
+        url: 'https://claude.ai/',
+        badge: 'C',
+        color: const Color(0xFFD97757),
+      ),
+      (
+        name: 'Gemini',
+        url: 'https://gemini.google.com/app',
+        badge: 'G',
+        color: const Color(0xFF4285F4),
+      ),
+      (
+        name: 'Manus',
+        url: 'https://manus.im/app',
+        badge: 'M',
+        color: const Color(0xFF635BFF),
+      ),
+    ];
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => SafeArea(
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+          decoration: BoxDecoration(
+            color: Theme.of(sheetContext).colorScheme.surface,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade400,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: Colors.teal.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    child: const Icon(Icons.auto_awesome, color: Colors.teal),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'مساعد الذكاء الاصطناعي',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'انسخ البرومبت أو اختر الأداة',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  _copyAssetAiPrompt();
+                },
+                child: Ink(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.withValues(alpha: 0.08),
+                    border: Border.all(
+                      color: Colors.teal.withValues(alpha: 0.25),
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.content_copy_rounded, color: Colors.teal),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'نسخ البرومبت فقط',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            Text(
+                              'جاهز للصق في أي محادثة',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_left, color: Colors.teal),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  'نسخ وفتح الأداة',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              for (final tool in tools)
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                  leading: Container(
+                    width: 42,
+                    height: 42,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: tool.color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Text(
+                      tool.badge,
+                      style: TextStyle(
+                        color: tool.color,
+                        fontWeight: FontWeight.w800,
+                        fontSize: tool.badge.length > 1 ? 13 : 19,
+                      ),
+                    ),
+                  ),
+                  title: Text(
+                    tool.name,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text(
+                    'نسخ البرومبت ثم فتح التطبيق أو الموقع',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                  trailing: const Icon(Icons.open_in_new_rounded, size: 19),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    _openAssetInAi(tool.name, tool.url);
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<Map<String, dynamic>?> _getSelectedAssetData() async {
+    final assetId = selectedAssetId;
+    if (assetId == null) return null;
+
+    final assetDoc = await FirebaseFirestore.instance
+        .collection('assets')
+        .doc(widget.groupId)
+        .collection('items')
+        .doc(assetId)
+        .get();
+    if (!assetDoc.exists) return null;
+
+    return assetDoc.data() ?? <String, dynamic>{};
+  }
+
+  String _buildProfessionalAssetPrompt(Map<String, dynamic> asset) {
+    String value(String key, [String? fallback]) {
+      final raw = asset[key]?.toString().trim();
+      if (raw != null && raw.isNotEmpty) return raw;
+      if (fallback != null && fallback.trim().isNotEmpty)
+        return fallback.trim();
+      return 'غير متوفر';
+    }
+
+    return '''أنت مهندس صيانة خبير. حلّل الأصل التالي وقدّم إجابة عملية ومنظمة:
+
+- الاسم: ${value('name', selectedAssetName)}
+- الموديل: ${value('model')}
+- الرقم: ${value('number')}
+- الموقع/المكان: ${value('site', selectedSite)} / ${value('location', selectedLocation)}
+
+اذكر وظيفة الأصل المحتملة، وخطة صيانة وقائية مختصرة، وأبرز الأعطال وأعراضها وخطوات الفحص الأولية الآمنة. أضف احتياطات السلامة، واطلب البيانات الناقصة اللازمة لتخصيص الإجابة. لا تخترع مواصفات أو تعليمات خاصة بالموديل؛ ميّز بين المعلومة المؤكدة والاحتمال، واجعل فترات الصيانة إرشادية.''';
+  }
+
+  Future<void> _copyAssetAiPrompt() async {
+    try {
+      final asset = await _getSelectedAssetData();
+      if (!mounted) return;
+      if (asset == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('اختر الأصل أولاً أو تعذر العثور عليه')),
+        );
+        return;
+      }
+
+      await Clipboard.setData(
+        ClipboardData(text: _buildProfessionalAssetPrompt(asset)),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم نسخ البرومبت الاحترافي. الصقه في أداة AI'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('تعذر تجهيز البرومبت: $e')));
+    }
+  }
+
+  Future<void> _openAssetInAi(String aiName, String url) async {
+    try {
+      final asset = await _getSelectedAssetData();
+      if (!mounted) return;
+      if (asset == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('اختر الأصل أولاً أو تعذر العثور عليه')),
+        );
+        return;
+      }
+
+      await Clipboard.setData(
+        ClipboardData(text: _buildProfessionalAssetPrompt(asset)),
+      );
+
+      var launched = false;
+      if (!kIsWeb &&
+          defaultTargetPlatform == TargetPlatform.android &&
+          aiName == 'ChatGPT') {
+        // إعادة طريقة فتح ChatGPT السابقة: رابط التطبيق مع رابط ويب احتياطي.
+        final appIntent = Uri.parse(
+          'intent://chatgpt.com/#Intent;scheme=https;package=com.openai.chatgpt;'
+          'S.browser_fallback_url=https%3A%2F%2Fchatgpt.com%2F;end',
+        );
+        try {
+          launched = await launchUrl(
+            appIntent,
+            mode: LaunchMode.externalApplication,
+          );
+        } catch (_) {
+          launched = false;
+        }
+      }
+      if (!launched) {
+        launched = await launchUrl(
+          Uri.parse(url),
+          mode: LaunchMode.externalApplication,
+        );
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            launched
+                ? 'تم نسخ البرومبت. الصقه في $aiName'
+                : 'تم نسخ البرومبت، لكن تعذر فتح $aiName. افتحه يدويًا والصق البرومبت.',
+          ),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('حدث خطأ أثناء تجهيز البرومبت: $e')),
+      );
+    }
+  }
+
   /// 🎯 أزرار الإجراءات
   Widget _buildActionButtons() {
     return Column(
@@ -636,6 +944,14 @@ class _AssetsScreenState extends State<AssetsScreen>
                 // label: 'تعديل الأصل',
                 color: const Color.fromARGB(255, 69, 47, 157),
                 onPressed: _editSelectedAsset,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildActionButton(
+                icon: Icons.auto_awesome,
+                color: Colors.teal,
+                onPressed: _showAiPicker,
               ),
             ),
             const SizedBox(width: 12),

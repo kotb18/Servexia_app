@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:maintenance/Subscruption/plan_selection_page.dart';
 import 'package:maintenance/homePage.dart';
+import 'package:maintenance/workSpace.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -259,16 +260,19 @@ class _AddAssetScreenState extends State<AddAssetScreen> {
         context: context,
         dialogType: DialogType.warning,
         title: 'حد أقصى لعدد الأصول',
-        desc:
-            'لقد وصلت إلى الحد الأقصى لعدد الأصول المسموح بها. يمكنك ترقية خطتك لإضافة المزيد.',
+        desc: uid == creatorId
+            ? 'لقد وصلت إلى الحد الأقصى لعدد الأصول المسموح بها. يمكنك ترقية خطتك لإضافة المزيد.'
+            : 'لقد وصلت إلى الحد الأقصى لعدد الأصول المسموح بها.',
         btnOkText: 'حسنًا',
-        btnOkOnPress: () async {
-          await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const FirestoreDynamicPlansPage(),
-            ),
-          );
-        },
+        btnOkOnPress: uid == creatorId
+            ? () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const FirestoreDynamicPlansPage(),
+                  ),
+                );
+              }
+            : () {},
       ).show();
       return;
     }
