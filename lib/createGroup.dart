@@ -15,7 +15,6 @@ import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:maintenance/JoinGroup.dart';
 import 'package:maintenance/Subscruption/plan_selection_page.dart';
 import 'package:maintenance/Subscruption/plan_service.dart';
-import 'package:maintenance/homePage.dart';
 import 'package:maintenance/services/billing_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -707,7 +706,7 @@ class _CreategroupState extends State<Creategroup> {
                           Directionality(
                             textDirection: TextDirection.ltr,
                             child: IntlPhoneField(
-                              controller: _phoneController,
+                              //  controller: _phoneController,
                               key: ValueKey(_selectedCountryCode),
 
                               decoration: _inputDecoration(
@@ -835,7 +834,7 @@ class _CreategroupState extends State<Creategroup> {
                                         return;
                                       } */
                                       if (_formKey.currentState!.validate()) {
-                                        _phoneController.text = '';
+                                        //  _phoneController.text = '';
                                         _showPreview();
                                       }
                                     },

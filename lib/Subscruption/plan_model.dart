@@ -8,6 +8,7 @@ class PlanModel {
   final int maxInvoicesPerMonth;
   final int maxAssets;
   final int maxMembers;
+  final int maxProductsStore;
   final int order;
   final bool isActive;
   final String monthlyProductId;
@@ -25,6 +26,7 @@ class PlanModel {
     this.isActive = true,
     required this.monthlyProductId,
     required this.yearlyProductId,
+    required this.maxProductsStore,
   });
 
   factory PlanModel.fromFirestore(DocumentSnapshot<Object?> doc) {
@@ -42,6 +44,7 @@ class PlanModel {
       isActive: data['isActive'] is bool ? data['isActive'] as bool : true,
       monthlyProductId: data['monthlyProductId']?.toString() ?? '',
       yearlyProductId: data['yearlyProductId']?.toString() ?? '',
+      maxProductsStore: _toInt(data['maxProductsStore']),
     );
   }
 
@@ -53,6 +56,7 @@ class PlanModel {
       'maxInvoicesPerMonth': maxInvoicesPerMonth,
       'maxAssets': maxAssets,
       'maxMembers': maxMembers,
+      'maxProductsStore': maxProductsStore,
       'order': order,
       'isActive': isActive,
       'monthlyProductId': monthlyProductId,
@@ -78,6 +82,7 @@ class PlanModel {
       order: 1,
       monthlyProductId: 'basic_monthly',
       yearlyProductId: 'basic_yearly',
+      maxProductsStore: 12,
     ),
     PlanModel(
       id: 'pro',
@@ -90,6 +95,7 @@ class PlanModel {
       order: 2,
       monthlyProductId: 'pro_monthly',
       yearlyProductId: 'pro_yearly',
+      maxProductsStore: 50,
     ),
     PlanModel(
       id: 'enterprise',
@@ -102,6 +108,7 @@ class PlanModel {
       order: 3,
       monthlyProductId: 'enterprise_monthly',
       yearlyProductId: 'enterprise_yearly',
+      maxProductsStore: 200,
     ),
   ];
 }

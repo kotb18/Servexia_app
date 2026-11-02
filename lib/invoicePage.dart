@@ -1481,6 +1481,8 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
     };
   }
 
+  late String reInvoiceId = '';
+
   /// Save invoice to Firestore and update stock
   Future<void> saveInvoice() async {
     final firestore = FirebaseFirestore.instance;
@@ -1491,7 +1493,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
         .collection('items')
         .doc();
     final invoiceDocPreRef = firestore.collection('invoices');
-    final String reInvoiceId = invoiceDocRef.id;
+    reInvoiceId = invoiceDocRef.id;
 
     final dataFinal = buildInvoiceData(reInvoiceId);
 
@@ -1619,6 +1621,7 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
             : 'تم الصرف عن طريق فاتورة البيع رقم ${_getTitleEnglish(widget.type)}-${DateTime.now().year}-${widget.state.lastInvoiceNumber + 1}',
         'createdBy': widget.invoiceCreatorName,
         'createdAt': FieldValue.serverTimestamp(),
+        'invoiceId': reInvoiceId,
       });
     }
 
@@ -2840,7 +2843,8 @@ class _InvoicePageDesignState extends State<InvoicePageDesign> {
                         context: context,
                         dialogType: DialogType.error,
                         title: 'خطأ',
-                        desc: 'لا يمكن أن يكون مجموع الأقساط غير مساوي للمجموع الكلي',
+                        desc:
+                            'لا يمكن أن يكون مجموع الأقساط غير مساوي للمجموع الكلي',
                         btnOkText: 'حسنًا',
                         btnOkOnPress: () {},
                       ).show();
@@ -3574,6 +3578,7 @@ class InvoiceGenerator {
     bool? showDiscount,
     bool isQuote = false,
     String? originalInvoiceNumber,
+    bool shareOnly = false,
   }) async {
     final pdf = pw.Document();
 
@@ -4264,18 +4269,19 @@ class InvoiceGenerator {
     );
 
     final bytes = await pdf.save();
+    final fileName = '${isQuote ? 'عرض_سعر' : 'فاتورة'}_$invoiceNumber.pdf';
 
-    // Print
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-      name: '${isQuote ? 'عرض_سعر' : 'فاتورة'}_$invoiceNumber.pdf',
-    );
-
-    // Share
-    await Printing.sharePdf(
-      bytes: await pdf.save(),
-      filename: '${isQuote ? 'عرض_سعر' : 'فاتورة'}_$invoiceNumber.pdf',
-    );
+    if (shareOnly) {
+      // Share the generated A4 PDF without invoking the print dialog.
+      await Printing.sharePdf(bytes: bytes, filename: fileName);
+    } else {
+      // Keep the pre-existing behavior for invoice creation and print flows.
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => bytes,
+        name: fileName,
+      );
+      await Printing.sharePdf(bytes: bytes, filename: fileName);
+    }
 
     return bytes;
   }

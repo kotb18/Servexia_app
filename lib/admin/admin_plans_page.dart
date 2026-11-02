@@ -243,6 +243,7 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
               runSpacing: 8,
               children: [
                 _limitChip('المجموعات', plan.maxGroups),
+                _limitChip('متجر المنتجات', plan.maxProductsStore),
                 _limitChip('المخزون', plan.maxInventoryItems),
                 _limitChip('الفواتير/شهر', plan.maxInvoicesPerMonth),
                 _limitChip('الأصول', plan.maxAssets),
@@ -389,6 +390,9 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
     final membersCtrl = TextEditingController(
       text: '${existing?.maxMembers ?? 0}',
     );
+    final productsStoreCtrl = TextEditingController(
+      text: '${existing?.maxProductsStore ?? 0}',
+    );
     final orderCtrl = TextEditingController(text: '${existing?.order ?? 99}');
     final monthlyProductCtrl = TextEditingController(
       text: existing?.monthlyProductId ?? '',
@@ -456,10 +460,12 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
                         children: [
                           Expanded(child: _textField(orderCtrl, 'ترتيب العرض')),
                           const SizedBox(width: 10),
+                          Expanded(child: _textField(groupsCtrl, 'المجموعات')),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: _textField(
-                              groupsCtrl,
-                              'المجموعات (-1 بلا حد)',
+                              productsStoreCtrl,
+                              'متجر المنتجات ',
                             ),
                           ),
                         ],
@@ -545,6 +551,7 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
                             orderCtrl.text,
                             groupsCtrl.text,
                             itemsCtrl.text,
+                            productsStoreCtrl.text,
                             invoicesCtrl.text,
                             assetsCtrl.text,
                             membersCtrl.text,
@@ -573,6 +580,7 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
                             maxMembers: _toInt(membersCtrl.text),
                             order: _toInt(orderCtrl.text),
                             isActive: existing?.isActive ?? true,
+                            maxProductsStore: _toInt(productsStoreCtrl.text),
                           );
                           try {
                             if (isEdit) {
@@ -624,6 +632,7 @@ class _AdminPlansPageState extends State<AdminPlansPage> {
       idCtrl.dispose();
       groupsCtrl.dispose();
       itemsCtrl.dispose();
+      productsStoreCtrl.dispose();
       invoicesCtrl.dispose();
       assetsCtrl.dispose();
       membersCtrl.dispose();

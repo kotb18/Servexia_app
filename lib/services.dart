@@ -163,6 +163,21 @@ class InvoiceService {
     return query;
   }
 
+  /// جلب الفواتير للبحث المحلي بدون الاعتماد على حقل لاحقة جديد في Firestore.
+  Future<List<Invoice>> getInvoicesForLocalSearch(String groupId) async {
+    final snapshot = await _firestore
+        .collection('invoices')
+        .doc(groupId)
+        .collection('items')
+        .get();
+
+    final invoices = snapshot.docs
+        .map((doc) => Invoice.fromFirestore(doc))
+        .toList();
+    invoices.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return invoices;
+  }
+
   /// الحصول على فاتورة واحدة بناءً على معرفها
   Future<Invoice?> getInvoice(String groupId, String invoiceId) async {
     try {

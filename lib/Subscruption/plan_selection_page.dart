@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -397,9 +398,8 @@ class _FirestoreDynamicPlansPageState extends State<FirestoreDynamicPlansPage> {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Theme.of(
-              context,
-            ).colorScheme.primaryContainer.withOpacity(0.35),
+            color: Theme.of(context).colorScheme.primaryContainer
+                .withOpacity(0.35),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
@@ -418,10 +418,8 @@ class _FirestoreDynamicPlansPageState extends State<FirestoreDynamicPlansPage> {
                   'الاشتراك يُحتسب لمالك الحساب ومجموعاته التابعة له فقط، '
                   'ولا يشمل المجموعات التي ينضم إليها بصفته عضوًا.',
                   // textDirection: TextDirection.rtl,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    height: 1.6,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(height: 1.6, fontWeight: FontWeight.w500),
                 ),
               ),
             ],
@@ -561,6 +559,7 @@ class _FirestoreDynamicPlansPageState extends State<FirestoreDynamicPlansPage> {
                     plan.maxInvoicesPerMonth,
                   ),
                   _limitRow('الأصول / مجموعة', plan.maxAssets),
+                  _limitRow('منتجات المتجر / مجموعة', plan.maxProductsStore),
                   _limitRow('الأعضاء / مجموعة', plan.maxMembers),
                   const SizedBox(height: 14),
                   SizedBox(

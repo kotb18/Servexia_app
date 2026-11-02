@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_pagination/firebase_pagination.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:maintenance/myInvoices.dart';
+import 'package:maintenance/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -20,6 +22,7 @@ class Movement {
   final String note;
   final String createdBy;
   final DateTime createdAt;
+  final String invoiceId;
 
   Movement.fromMap(Map<String, dynamic> data)
     : type = data['type'] ?? 'out',
@@ -27,7 +30,8 @@ class Movement {
       unit = data['unit'] ?? '',
       note = data['note'] ?? '',
       createdBy = data['createdBy'] ?? 'غير معروف',
-      createdAt = (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
+      createdAt = (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      invoiceId = data['invoiceId'] ?? '';
 }
 
 // -----------------------------------------------------------------------------
@@ -279,11 +283,79 @@ class _MovementHistoryScreenState extends State<MovementHistoryScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('بواسطة: ${movement.createdBy}'),
-                  if (movement.note.isNotEmpty)
-                    Text(
-                      'ملاحظة: ${movement.note}',
-                      style: const TextStyle(fontSize: 13),
+
+                  if (movement.note.trim().isNotEmpty)
+                    Material(
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () async {
+                          final invoiceService = InvoiceService();
+
+                          final invoice = await invoiceService.getInvoice(
+                            widget.service.groupId,
+                            movement.invoiceId,
+                          );
+
+                          if (!context.mounted || invoice == null) return;
+
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => InvoiceDetailPage(
+                                invoice: invoice,
+                                groupId: widget.service.groupId,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.sticky_note_2_outlined,
+                                size: 19,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'ملاحظة',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.labelMedium,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      movement.note,
+                                      style: TextStyle(color: Colors.blue),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 14,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
+
                   const SizedBox(height: 4),
                   Text(
                     formattedDate,

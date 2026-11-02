@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_pagination/firebase_pagination.dart';
 import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import 'package:maintenance/advanced.dart';
 import 'package:maintenance/invoicePage.dart';
@@ -36,6 +37,9 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
   // الفلاتر
   String _selectedType = 'الكل';
   String _searchQuery = '';
+  List<Invoice>? _searchableInvoices;
+  bool _isLoadingSearch = false;
+  String? _searchError;
   DateTime? _startDate;
   DateTime? _endDate;
   String _selectedPaymentMethod = 'الكل';
@@ -336,6 +340,125 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
     );
   }
 
+  Future<void> _shareInvoicePdf(Invoice invoice) async {
+    final thermalInvoice = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('اختيار صيغة PDF'),
+        content: const Text('اختر تنسيق الفاتورة المراد مشاركتها.'),
+        actions: [
+          TextButton.icon(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            icon: const Icon(Icons.receipt_long_rounded),
+            label: const Text('حراري'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            icon: const Icon(Icons.description_outlined),
+            label: const Text('A4'),
+          ),
+        ],
+      ),
+    );
+    if (thermalInvoice == null || !mounted) return;
+
+    final safeInvoiceNumber = invoice.invoiceNumber.replaceAll(
+      RegExp(r'[^A-Za-z0-9_-]'),
+      '_',
+    );
+
+    await _runInvoiceAction(
+      message: thermalInvoice
+          ? 'جارٍ تجهيز PDF الحراري للمشاركة...'
+          : 'جارٍ تجهيز نسخة A4 للمشاركة...',
+      successMessage: 'تم تجهيز ملف PDF للمشاركة.',
+      failurePrefix: 'تعذرت مشاركة الفاتورة',
+      action: () async {
+        if (thermalInvoice) {
+          final pdfBytes = await ThermalPrinterService.generateThermalPdf(
+            invoiceType: invoice.type,
+            invoiceNumber: invoice.invoiceNumber,
+            invoiceDate: invoice.date,
+            clientName: invoice.customerName,
+            items: invoice.items.map((item) {
+              return {
+                'itemId': item.itemId ?? '',
+                'name': item.name,
+                'quantity': item.quantity,
+                'price': item.price,
+                'total': item.total,
+              };
+            }).toList(),
+            subtotal: invoice.summary.subTotal,
+            discount: invoice.summary.discountValue,
+            tax: invoice.summary.taxValue,
+            total: invoice.summary.total,
+            notes: invoice.notes,
+            companyName: invoice.companyName,
+            isQuote: invoice.type == 'عرض سعر',
+          );
+          // مشاركة الملف الحراري فقط دون طباعة.
+          await Printing.sharePdf(
+            bytes: pdfBytes,
+            filename: 'invoice_$safeInvoiceNumber.pdf',
+          );
+        } else {
+          // إنشاء A4 بنفس تصميم المولّد الحالي، مع تفعيل المشاركة فقط.
+          await InvoiceGenerator.generateProfessionalInvoice(
+            invoiceType: invoice.type,
+            invoiceNumber: invoice.invoiceNumber,
+            invoiceDate: invoice.date,
+            clientName: invoice.customerName,
+            clientAddress: invoice.customerAddress,
+            clientPhone: invoice.customerPhone,
+            items: invoice.items.map((item) {
+              return {
+                'itemId': item.itemId ?? '',
+                'name': item.name,
+                'quantity': item.quantity,
+                'price': item.price,
+                'total': item.total,
+              };
+            }).toList(),
+            subtotal: invoice.summary.subTotal,
+            discount: invoice.summary.discountValue,
+            tax: invoice.summary.taxValue,
+            total: invoice.summary.total,
+            notes: invoice.notes,
+            companyName: invoice.companyName,
+            companyAddress: invoice.companyAddress,
+            companyPhone: invoice.companyPhone,
+            companyEmail: invoice.companyEmail,
+            companyLogoPath: 'widget.state.companyLogoPath',
+            isDue: invoice.paymentMethod == 'آجل',
+            isInstallment: invoice.paymentMethod == 'تقسيط',
+            dueDates: invoice.installments.map((installment) {
+              return {
+                'date': installment.date,
+                'value': installment.value,
+                'status': installment.status,
+                'type': installment.type,
+              };
+            }).toList(),
+            showAddress: invoice.showAddress,
+            showEmail: invoice.showEmail,
+            showDiscount: invoice.showDiscount,
+            showLogo: invoice.showLogo,
+            showNotes: invoice.showNotes,
+            showPhone: invoice.showPhone,
+            showTax: invoice.showTax,
+            isQuote: invoice.type == 'عرض سعر',
+            originalInvoiceNumber: invoice.type == 'مرتجع'
+                ? invoice.invoiceNumber
+                : null,
+            shareOnly: true,
+          );
+        }
+      },
+    );
+  }
+
   void _openInvoiceDetails(Invoice invoice) {
     if (widget.isSelectionMode) {
       Navigator.pop(context, invoice);
@@ -441,13 +564,9 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: TextField(
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
-                },
+                onChanged: _handleSearchChanged,
                 decoration: InputDecoration(
-                  hintText: 'ابحث عن رقم الفاتورة أو اسم العميل...',
+                  hintText: 'ابحث برقم الفاتوره او اسم العميل',
                   hintStyle: TextStyle(color: Colors.grey[400]),
                   prefixIcon: const Icon(
                     Icons.search,
@@ -456,11 +575,7 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            setState(() {
-                              _searchQuery = '';
-                            });
-                          },
+                          onPressed: () => _handleSearchChanged(''),
                         )
                       : null,
                   border: OutlineInputBorder(
@@ -557,55 +672,7 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
           Expanded(
             child: _searchQuery.isNotEmpty
                 // ✅ وضع البحث: Query منفصل
-                ? FirestorePagination(
-                    key: ValueKey('search_${_searchQuery}_$_filterKey'),
-                    query: _invoiceService.searchInvoicesQuery(
-                      widget.groupId,
-                      _searchQuery,
-                    ),
-                    limit: 5, // نزودها شوية عشان نغطي الفراغات
-                    viewType: ViewType.list,
-                    isLive: true,
-                    padding: const EdgeInsets.all(16),
-                    initialLoader: const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF1E3A8A),
-                      ),
-                    ),
-                    bottomLoader: const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFF1E3A8A),
-                        ),
-                      ),
-                    ),
-                    onEmpty: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.search_off,
-                            size: 64,
-                            color: Colors.grey[400],
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'لا توجد نتائج لـ "$_searchQuery"',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    itemBuilder: (context, docs, index) {
-                      final invoice = Invoice.fromFirestore(docs[index]);
-                      return _buildInvoiceCard(invoice);
-                    },
-                  )
+                ? _buildSearchResults()
                 // ✅ وضع الفلاتر: Pagination العادي
                 : FirestorePagination(
                     key: ValueKey(_filterKey),
@@ -660,6 +727,105 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
     );
   }
 
+  void _handleSearchChanged(String value) {
+    setState(() {
+      _searchQuery = value;
+      _searchError = null;
+      if (value.trim().isEmpty) {
+        _searchableInvoices = null;
+        _isLoadingSearch = false;
+      }
+    });
+    if (value.trim().isNotEmpty) _loadSearchInvoices();
+  }
+
+  Future<void> _loadSearchInvoices() async {
+    if (_isLoadingSearch || _searchableInvoices != null) return;
+    setState(() => _isLoadingSearch = true);
+    try {
+      final invoices = await _invoiceService.getInvoicesForLocalSearch(
+        widget.groupId,
+      );
+      if (!mounted) return;
+      setState(() => _searchableInvoices = invoices);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _searchError = 'تعذر تحميل الفواتير للبحث: $error');
+    } finally {
+      if (mounted) setState(() => _isLoadingSearch = false);
+    }
+  }
+
+  Widget _buildSearchResults() {
+    if (_isLoadingSearch && _searchableInvoices == null) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF1E3A8A)),
+      );
+    }
+
+    if (_searchError != null && _searchableInvoices == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_searchError!, textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () {
+                  setState(() => _searchError = null);
+                  _loadSearchInvoices();
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('إعادة المحاولة'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final query = _searchQuery.trim().toLowerCase();
+    final isNumericSuffix = RegExp(r'^\d+$').hasMatch(query);
+    final results = (_searchableInvoices ?? const <Invoice>[]).where((invoice) {
+      final number = invoice.invoiceNumber.trim().toLowerCase();
+      final customer = invoice.customerName.trim().toLowerCase();
+      if (isNumericSuffix) {
+        final suffix = RegExp(r'(\d+)$').firstMatch(number)?.group(1);
+        return suffix == query;
+      }
+      return number.contains(query) || customer.contains(query);
+    }).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    if (results.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 12),
+            Text(
+              'لا توجد نتائج لـ "$_searchQuery"',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: results.length,
+      itemBuilder: (context, index) => _buildInvoiceCard(results[index]),
+    );
+  }
+
   Widget _buildInvoiceCard(Invoice invoice) {
     // ⚠️ فلترة isSelectionMode + thereIsReturn
     if (widget.isSelectionMode && invoice.thereIsReturn) {
@@ -673,6 +839,7 @@ class _MyInvoicesPageState extends State<MyInvoicesPage> {
       onTap: () => _openInvoiceDetails(invoice),
       onEdit: () => _editInvoice(invoice),
       onDelete: () => _deleteInvoice(invoice),
+      onShare: () => _shareInvoicePdf(invoice),
       onPrint: () => showCustomDialog(
         context: context,
         title: 'اختر نوع الطباعة',
@@ -698,12 +865,14 @@ class InvoiceCard extends StatelessWidget {
     this.onEdit,
     this.onDelete,
     this.onPrint,
+    this.onShare,
     required this.groupId,
   });
 
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final VoidCallback? onPrint;
+  final VoidCallback? onShare;
 
   Widget _actionButton({
     required String text,
@@ -718,7 +887,7 @@ class InvoiceCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 10),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1085,7 +1254,6 @@ class InvoiceCard extends StatelessWidget {
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    spacing: 10,
                     children: [
                       /*  if (onEdit != null && invoice.type != 'مرتجع')
                         _actionButton(
@@ -1101,14 +1269,22 @@ class InvoiceCard extends StatelessWidget {
                           color: Colors.deepPurple,
                           onTap: onPrint!,
                         ),
-
+                      if (onShare != null)
+                        _actionButton(
+                          text: 'مشاركة',
+                          icon: Icons.share_rounded,
+                          color: const Color(0xFF0F766E),
+                          onTap: onShare!,
+                        ),
                       if (onDelete != null && invoice.type != 'مرتجع')
                         _actionButton(
                           text: 'مسح',
                           icon: Icons.delete_rounded,
                           color: const Color.fromARGB(255, 122, 24, 17),
                           onTap: onDelete!,
-                        ),
+                        )
+                      else
+                        SizedBox.shrink(),
                     ],
                   ),
                 ),

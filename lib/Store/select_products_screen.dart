@@ -1,4 +1,6 @@
 import 'dart:typed_data';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_pagination/firebase_pagination.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,7 +9,10 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:maintenance/Store/store_service.dart';
 import 'package:maintenance/Store/inventory_item_model.dart';
 import 'package:maintenance/Store/inventory_store_service.dart';
+import 'package:maintenance/Subscruption/plan_selection_page.dart';
+import 'package:maintenance/homePage.dart';
 import 'package:maintenance/imageControl/platform_image.dart';
+import 'package:maintenance/workSpace.dart';
 
 // ============================================================================
 // 📦 بيانات الألوان والمقاسات المتاحة
@@ -117,7 +122,11 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
   bool _isLoading = false;
   bool _shownInStoreHeader = false;
   bool _shownStockHeader = false;
-
+  int? _maxProductsInStore = 12; // الحد الأقصى لعدد المنتجات في المتجر
+  // يتجمع هذا الـ Set من مستندات الباجنيشن نفسها، مع إزالة التكرار عند إعادة البناء.
+  final Set<String> _existingStoreProductSkus = {};
+  bool _isLoadingPlanLimit = true;
+  bool _isLoadingStoreProductsCount = true;
   final ValueNotifier<int> _changesCountNotifier = ValueNotifier(0);
 
   @override
@@ -400,6 +409,7 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
       try {
         await _deleteStoreImages(widget.groupId, item.sku);
         await _service.removeFromStore(widget.groupId, item.sku);
+        _existingStoreProductSkus.remove(item.sku);
 
         _priceControllers.remove(item.sku)?.dispose();
         _descControllers.remove(item.sku)?.dispose();
@@ -455,10 +465,115 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
     }
   }
 
+  Future<void> getMaxProductsInStore() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('plans')
+          .doc(planId)
+          .get();
+
+      if (!doc.exists) return;
+
+      final rawLimit = doc.data()?['maxProductsStore'];
+      if (rawLimit is num) {
+        _maxProductsInStore = rawLimit.toInt();
+      }
+    } catch (e) {
+      debugPrint('تعذر تحميل حد منتجات المتجر: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingPlanLimit = false);
+    }
+  }
+
+  Future<void> _showUpgradeDialog() async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        icon: const Icon(
+          Icons.workspace_premium_rounded,
+          color: Colors.amber,
+          size: 42,
+        ),
+        title: const Text(
+          'وصلت إلى حد منتجات خطتك',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          uid == creatorId
+              ? 'خطتك الحالية تسمح بإضافة ${_maxProductsInStore ?? 0} منتجاً فقط. قم بترقية خطتك لإضافة منتجات أخرى.'
+              : 'خطتك الحالية تسمح بإضافة ${_maxProductsInStore ?? 0} منتجاً فقط. تواصل مع صاحب المتجر لترقية خطته وإضافة منتجات أخرى.',
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          FilledButton(
+            onPressed: uid == creatorId
+                ? () async {
+                    Navigator.pop(context);
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const FirestoreDynamicPlansPage(),
+                      ),
+                    );
+                  }
+                : () {
+                    Navigator.pop(context);
+                  },
+            child: const Text('حسناً'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _toggleProductSelection(String sku) async {
+    if (_selectedItems.contains(sku)) {
+      setState(() {
+        _selectedItems.remove(sku);
+        _tempImages.remove(sku);
+        _selectedColors.remove(sku);
+        _selectedSizes.remove(sku);
+        _updateChangesCount();
+      });
+      return;
+    }
+
+    // لا تسمح بالاختيار قبل معرفة حد الخطة، كي لا يتم تجاوز الحد أثناء التحميل.
+    if (_isLoadingPlanLimit || _isLoadingStoreProductsCount) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'جارٍ التحقق من المنتجات وحد الخطة، حاول مرة أخرى بعد لحظة.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    final totalProductsAfterSelection =
+        _existingStoreProductSkus.length + _selectedItems.length + 1;
+    if (_maxProductsInStore != null &&
+        totalProductsAfterSelection > _maxProductsInStore!) {
+      await _showUpgradeDialog();
+      return;
+    }
+
+    setState(() {
+      _selectedItems.add(sku);
+      _updateChangesCount();
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     getStoreData();
+    getMaxProductsInStore();
   }
 
   // ========== UI ==========
@@ -513,56 +628,90 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
       body: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
             decoration: BoxDecoration(
               color: theme.primaryColor.withValues(alpha: 0.05),
               borderRadius: const BorderRadius.vertical(
                 bottom: Radius.circular(20),
               ),
             ),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                  _shownInStoreHeader = false;
-                  _shownStockHeader = false;
-                });
-              },
-              textDirection: TextDirection.rtl,
-              textAlign: TextAlign.right,
-              decoration: InputDecoration(
-                hintText: 'ابحث بالاسم أو الكود...',
-                hintTextDirection: TextDirection.rtl,
-                filled: true,
-                fillColor: Colors.white,
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, size: 20),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {
-                            _searchQuery = '';
-                            _shownInStoreHeader = false;
-                            _shownStockHeader = false;
-                          });
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+            child: Column(
+              children: [
+                TextField(
+                  controller: _searchController,
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                      _shownInStoreHeader = false;
+                      _shownStockHeader = false;
+                    });
+                  },
+                  textDirection: TextDirection.rtl,
+                  textAlign: TextAlign.right,
+                  decoration: InputDecoration(
+                    hintText: 'ابحث بالاسم أو الكود...',
+                    hintTextDirection: TextDirection.rtl,
+                    filled: true,
+                    fillColor: Colors.white,
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 20),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {
+                                _searchQuery = '';
+                                _shownInStoreHeader = false;
+                                _shownStockHeader = false;
+                              });
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: theme.primaryColor,
+                        width: 2,
+                      ),
+                    ),
+                  ),
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: theme.primaryColor.withValues(alpha: 0.15),
+                      ),
+                    ),
+                    child: Text(
+                      (_isLoadingPlanLimit || _isLoadingStoreProductsCount)
+                          ? 'جارٍ تحميل بيانات حد المنتجات...'
+                          : 'منتجات المتجر: ${_existingStoreProductSkus.length + _selectedItems.length}${_maxProductsInStore == null ? '' : ' / $_maxProductsInStore'}',
+                      style: TextStyle(
+                        color: theme.primaryColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: theme.primaryColor, width: 2),
-                ),
-              ),
+              ],
             ),
           ),
           Expanded(
@@ -583,6 +732,20 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
               itemBuilder: (context, documentSnapshots, index) {
                 final documentSnapshot = documentSnapshots[index];
                 final item = InventoryItemModel.fromFirestore(documentSnapshot);
+
+                // الباجنيشن مرتبة بحيث تظهر منتجات المتجر أولاً؛
+                // نجمعها من الدفعات المحمّلة، وننهي العد عند أول عنصر غير موجود بالمتجر.
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
+                  var changed = false;
+                  if (item.isInStore) {
+                    changed = _existingStoreProductSkus.add(item.sku);
+                  } else if (_isLoadingStoreProductsCount) {
+                    _isLoadingStoreProductsCount = false;
+                    changed = true;
+                  }
+                  if (changed) setState(() {});
+                });
 
                 if (!_initialDataLoaded || item.isInStore) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -662,19 +825,7 @@ class _SelectProductsScreenState extends State<SelectProductsScreen> {
       selectedColors: _selectedColors,
       selectedSizes: _selectedSizes,
       isClothes: _isClothes,
-      onToggleAddSelection: (sku) {
-        setState(() {
-          if (_selectedItems.contains(sku)) {
-            _selectedItems.remove(sku);
-            _tempImages.remove(sku);
-            _selectedColors.remove(sku);
-            _selectedSizes.remove(sku);
-          } else {
-            _selectedItems.add(sku);
-          }
-          _updateChangesCount();
-        });
-      },
+      onToggleAddSelection: _toggleProductSelection,
       onRemoveImage: _removeImage,
       onConfirmRemoveFromStore: _confirmRemoveFromStore,
       onNotifyChange: _updateChangesCount,

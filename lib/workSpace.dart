@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:maintenance/homePage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Future<String?> aa = FirebaseMessaging.instance.getToken();
 String? creatorId;
@@ -29,6 +30,17 @@ class WorkspaceHomeScreen extends StatefulWidget {
 class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
     with SingleTickerProviderStateMixin {
   bool _loading = true;
+  bool _isDarkMode = false;
+  bool _isListView = false;
+
+  String get _displayPreferencePrefix =>
+      'workspace_home_${Uri.encodeComponent(widget.workspaceId)}_';
+  String get _darkModePreferenceKey => '${_displayPreferencePrefix}dark_mode';
+  String get _listViewPreferenceKey => '${_displayPreferencePrefix}list_view';
+
+  List<Color> get _headerGradientColors => _isDarkMode
+      ? const [Color(0xFF123B5D), Color(0xFF0F766E)]
+      : const [Color(0xFF42A5F5), Color(0xFF1E88E5)];
   Map<String, dynamic>? workspaceData;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -94,9 +106,32 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
     print('cccccccccccccccccccc${widget.workspaceId}');
     print('bbbbbbbbbbbbbbbbbbbbbb${widget.country}');
     _listenToPermissions(); // Load existing permissions
+    _loadDisplayPreferences();
     _initializeAnimations();
     _loadWorkspace();
     getDeviceToken(); // Call the method to get the device token
+  }
+
+  Future<void> _loadDisplayPreferences() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      setState(() {
+        _isDarkMode = preferences.getBool(_darkModePreferenceKey) ?? false;
+        _isListView = preferences.getBool(_listViewPreferenceKey) ?? false;
+      });
+    } catch (error) {
+      debugPrint('Failed to load display preferences: $error');
+    }
+  }
+
+  Future<void> _saveDisplayPreference(String key, bool value) async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setBool(key, value);
+    } catch (error) {
+      debugPrint('Failed to save display preference: $error');
+    }
   }
 
   void _initializeAnimations() {
@@ -216,25 +251,46 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
     final data = workspaceData!;
     final bool isAdmin = data['admins'][0] == uid ? true : false;
 
-    return PopScope(
-      canPop: false, // ممنوع يرجع بالرجوع الافتراضي
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        context.go('/home?isAdmin=$isAdmin');
-      },
-      child: Scaffold(
-        backgroundColor: Colors.grey.shade100,
-        body: SafeArea(
-          child: Column(
-            children: [
-              /// 🔷 HEADER
-              _buildHeader(data),
+    final baseTheme = Theme.of(context);
+    final pageTheme = _isDarkMode
+        ? ThemeData.dark(useMaterial3: baseTheme.useMaterial3).copyWith(
+            colorScheme:
+                ColorScheme.fromSeed(
+                  seedColor: const Color(0xFF0F9D91),
+                  brightness: Brightness.dark,
+                ).copyWith(
+                  surface: const Color(0xFF172536),
+                  onSurface: const Color(0xFFF1F5F9),
+                ),
+            scaffoldBackgroundColor: const Color(0xFF0B1220),
+            canvasColor: const Color(0xFF0B1220),
+            cardColor: const Color(0xFF172536),
+          )
+        : baseTheme;
 
-              const SizedBox(height: 16),
+    return Theme(
+      data: pageTheme,
+      child: PopScope(
+        canPop: false, // ممنوع يرجع بالرجوع الافتراضي
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          context.go('/home?isAdmin=$isAdmin');
+        },
+        child: Scaffold(
+          backgroundColor: _isDarkMode
+              ? const Color(0xFF0B1220)
+              : const Color(0xFFF3F6FB),
+          body: SafeArea(
+            child: Column(
+              children: [
+                /// 🔷 HEADER
+                _buildHeader(data),
+                const SizedBox(height: 16),
 
-              /// 📊 DASHBOARD
-              Expanded(child: _buildDashboard(isAdmin)),
-            ],
+                /// 📊 DASHBOARD
+                Expanded(child: _buildDashboard(isAdmin)),
+              ],
+            ),
           ),
         ),
       ),
@@ -248,10 +304,12 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
         alignment: Alignment.centerRight,
         child: Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: Color.fromARGB(255, 40, 110, 189),
+            color: _isDarkMode
+                ? const Color(0xFF7DD3FC)
+                : const Color(0xFF286EBD),
           ),
         ),
       ),
@@ -264,7 +322,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 22),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [const Color(0xFF1E88E5), const Color(0xFF1565C0)],
+          colors: _headerGradientColors,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -274,7 +332,7 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1565C0).withValues(alpha: 0.3),
+            color: _headerGradientColors.last.withValues(alpha: 0.32),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -301,12 +359,19 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
               Expanded(
                 child: Text(
                   data['name'] ?? 'مساحة العمل',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 26,
+                    fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+              ),
+              IconButton(
+                tooltip: 'إعدادات العرض',
+                onPressed: _showDisplaySettings,
+                icon: const Icon(Icons.tune_rounded, color: Colors.white),
               ),
             ],
           ),
@@ -503,17 +568,8 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                   permissions['العملاء والموردين'] == true ||
                   permissions['المتجر الإليكتروني'] == true)
                 _buildSectionHeader('إدارة المخازن والمبيعات'),
-              GridView(
-                shrinkWrap:
-                    true, // Important for GridView inside SingleChildScrollView
-                physics:
-                    const NeverScrollableScrollPhysics(), // Disable GridView's own scrolling
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 220,
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
-                  childAspectRatio: 1.15,
-                ),
+              _buildDashboardCards(
+                maxCrossAxisExtent: 220,
                 children: [
                   // Admin Cards for Inventory and Sales
                   if (permissions['المخازن'] == true)
@@ -561,14 +617,16 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                   width: double.infinity,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(18),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF1565C0), Color(0xFF42A5F5)],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
+                    gradient: LinearGradient(
+                      colors: _headerGradientColors,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.blue.withValues(alpha: 0.25),
+                        color: _headerGradientColors.last.withValues(
+                          alpha: 0.28,
+                        ),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -606,17 +664,8 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
                   ),
                 ),
               _buildSectionHeader('إدارة الصيانة والموارد البشرية'),
-              GridView(
-                shrinkWrap:
-                    true, // Important for GridView inside SingleChildScrollView
-                physics:
-                    const NeverScrollableScrollPhysics(), // Disable GridView's own scrolling
-                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: kIsWeb ? 180 : 220,
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
-                  childAspectRatio: 1.15,
-                ),
+              _buildDashboardCards(
+                maxCrossAxisExtent: kIsWeb ? 180 : 220,
                 children: [
                   // Admin Cards for Maintenance and HR
                   if (permissions['الأصول والمعدات'] == true)
@@ -716,6 +765,215 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
     );
   }
 
+  Widget _buildDashboardCards({
+    required List<Widget> children,
+    required double maxCrossAxisExtent,
+  }) {
+    if (children.isEmpty) return const SizedBox.shrink();
+    if (_isListView) {
+      return Column(
+        children: [
+          for (final child in children)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: SizedBox(height: 86, child: child),
+            ),
+        ],
+      );
+    }
+    return GridView(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: maxCrossAxisExtent,
+        mainAxisSpacing: 14,
+        crossAxisSpacing: 14,
+        childAspectRatio: 1.12,
+      ),
+      children: children,
+    );
+  }
+
+  void _showDisplaySettings() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: false,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          final dark = _isDarkMode;
+          const lightText = Color(0xFF172033);
+          const darkText = Color(0xFFF1F5F9);
+          const mutedLight = Color(0xFF64748B);
+          const mutedDark = Color(0xFFCBD5E1);
+          final panelColor = dark ? const Color(0xFF172536) : Colors.white;
+          final titleColor = dark ? darkText : lightText;
+          final mutedColor = dark ? mutedDark : mutedLight;
+          final accentColor = dark
+              ? const Color(0xFF67E8F9)
+              : const Color(0xFF286EBD);
+          final sheetTheme = dark
+              ? ThemeData.dark(useMaterial3: true).copyWith(
+                  colorScheme:
+                      ColorScheme.fromSeed(
+                        seedColor: const Color(0xFF0F9D91),
+                        brightness: Brightness.dark,
+                      ).copyWith(
+                        surface: panelColor,
+                        onSurface: darkText,
+                        primary: accentColor,
+                      ),
+                )
+              : ThemeData.light(useMaterial3: true).copyWith(
+                  colorScheme: ColorScheme.fromSeed(
+                    seedColor: const Color(0xFF286EBD),
+                    brightness: Brightness.light,
+                  ),
+                );
+
+          return Theme(
+            data: sheetTheme,
+            child: Container(
+              decoration: BoxDecoration(
+                color: panelColor,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
+                border: Border.all(
+                  color: dark
+                      ? const Color(0xFF2B4055)
+                      : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'إعدادات العرض',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: titleColor,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        secondary: Icon(
+                          dark
+                              ? Icons.dark_mode_rounded
+                              : Icons.light_mode_rounded,
+                          color: accentColor,
+                        ),
+                        title: Text(
+                          'الوضع الداكن',
+                          style: TextStyle(
+                            color: titleColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          dark ? 'مظهر داكن مريح للعين' : 'مظهر فاتح وواضح',
+                          style: TextStyle(color: mutedColor, fontSize: 12),
+                        ),
+                        activeColor: accentColor,
+                        value: dark,
+                        onChanged: (value) {
+                          setState(() => _isDarkMode = value);
+                          setSheetState(() {});
+                          unawaited(
+                            _saveDisplayPreference(
+                              _darkModePreferenceKey,
+                              value,
+                            ),
+                          );
+                        },
+                      ),
+                      Divider(
+                        height: 8,
+                        color: dark
+                            ? const Color(0xFF2B4055)
+                            : const Color(0xFFE2E8F0),
+                      ),
+                      RadioListTile<bool>(
+                        contentPadding: EdgeInsets.zero,
+                        value: false,
+                        groupValue: _isListView,
+                        activeColor: accentColor,
+                        secondary: Icon(
+                          Icons.grid_view_rounded,
+                          color: _isListView ? mutedColor : accentColor,
+                        ),
+                        title: Text(
+                          'عرض شبكي',
+                          style: TextStyle(
+                            color: titleColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'بطاقات في شبكة',
+                          style: TextStyle(color: mutedColor, fontSize: 12),
+                        ),
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setState(() => _isListView = value);
+                          setSheetState(() {});
+                          unawaited(
+                            _saveDisplayPreference(
+                              _listViewPreferenceKey,
+                              value,
+                            ),
+                          );
+                        },
+                      ),
+                      RadioListTile<bool>(
+                        contentPadding: EdgeInsets.zero,
+                        value: true,
+                        groupValue: _isListView,
+                        activeColor: accentColor,
+                        secondary: Icon(
+                          Icons.view_list_rounded,
+                          color: _isListView ? accentColor : mutedColor,
+                        ),
+                        title: Text(
+                          'عرض قائمة',
+                          style: TextStyle(
+                            color: titleColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'بطاقات ممتدة لسهولة القراءة',
+                          style: TextStyle(color: mutedColor, fontSize: 12),
+                        ),
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setState(() => _isListView = value);
+                          setSheetState(() {});
+                          unawaited(
+                            _saveDisplayPreference(
+                              _listViewPreferenceKey,
+                              value,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _goTo(String location) => context.push(location);
 
   Widget _buildDashboardCard({
@@ -723,84 +981,119 @@ class _WorkspaceHomeScreenState extends State<WorkspaceHomeScreen>
     required String title,
     required Color color,
     required VoidCallback onTap,
-
     int badgeCount = 0,
   }) {
+    final dark = _isDarkMode;
+    final accentColor = dark
+        ? HSLColor.fromColor(
+            color,
+          ).withSaturation(0.78).withLightness(0.72).toColor()
+        : color;
+    final iconSize = _isListView ? 24.0 : 32.0;
+    final iconPadding = _isListView ? 11.0 : 16.0;
+
+    final iconBadge = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          padding: EdgeInsets.all(iconPadding),
+          decoration: BoxDecoration(
+            color: accentColor.withValues(alpha: dark ? 0.20 : 0.13),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: iconSize, color: accentColor),
+        ),
+        if (badgeCount > 0)
+          Positioned(
+            top: -5,
+            right: -7,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFDC2626),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: dark ? const Color(0xFF172536) : Colors.white,
+                  width: 2,
+                ),
+              ),
+              child: Text(
+                badgeCount > 99 ? '99+' : '$badgeCount',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+
     return Card(
-      elevation: 6,
-      shadowColor: color.withValues(alpha: 0.25),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      color: dark ? const Color(0xFF172536) : Colors.white,
+      elevation: dark ? 2 : 4,
+      shadowColor: accentColor.withValues(alpha: dark ? 0.16 : 0.18),
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: dark ? const Color(0xFF2B4055) : const Color(0xFFE8EDF5),
+        ),
+      ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),
-        splashColor: color.withValues(alpha: 0.1),
-        highlightColor: color.withValues(alpha: 0.05),
+        splashColor: accentColor.withValues(alpha: 0.12),
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(icon, size: 32, color: color),
-                  ),
-
-                  /// Badge Notification
-                  if (badgeCount > 0)
-                    Positioned(
-                      top: -4,
-                      right: -4,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade600,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white, width: 2),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.red.withValues(alpha: 0.3),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Text(
-                          badgeCount > 99 ? '99+' : '$badgeCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
+          padding: EdgeInsets.all(_isListView ? 12 : 16),
+          child: _isListView
+              ? Row(
+                  children: [
+                    iconBadge,
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: dark
+                              ? const Color(0xFFF1F5F9)
+                              : const Color(0xFF1F2937),
                         ),
                       ),
                     ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                  height: 1.3,
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 16,
+                      color: dark ? const Color(0xFF94A3B8) : Colors.black38,
+                    ),
+                  ],
+                )
+              : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    iconBadge,
+                    const SizedBox(height: 13),
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: dark ? const Color(0xFFF1F5F9) : Colors.black87,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );

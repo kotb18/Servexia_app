@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -7,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:maintenance/Subscruption/plan_selection_page.dart';
 import 'package:maintenance/employeeDetailsPage.dart';
-import 'package:maintenance/homePage.dart';
 import 'package:maintenance/workSpace.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -16,11 +16,6 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import 'package:maintenance/imageControl/platform_image.dart';
-
-int? maxMembers;
-int? currentTeamNumber;
-List admins = [];
-List<Map<String, dynamic>> membersList = [];
 
 class TeamScreen extends StatefulWidget {
   final String groupId;
@@ -43,7 +38,10 @@ class TeamScreen extends StatefulWidget {
 
 class _TeamScreenState extends State<TeamScreen> {
   final uid = FirebaseAuth.instance.currentUser!.uid;
-
+  int? maxMembers;
+  int? currentTeamNumber;
+  List admins = [];
+  List<Map<String, dynamic>> membersList = [];
   bool get isAdmin => widget.isAdmin;
 
   /// Older member records may store an empty list instead of an image URL.
@@ -587,9 +585,8 @@ class _TeamScreenState extends State<TeamScreen> {
     if (joinedAt is Timestamp) {
       joinedDate = DateFormat('dd/MM/yyyy').format(joinedAt.toDate());
     } else if (joinedAt is int) {
-      joinedDate = DateFormat(
-        'dd/MM/yyyy',
-      ).format(DateTime.fromMillisecondsSinceEpoch(joinedAt));
+      joinedDate = DateFormat('dd/MM/yyyy')
+          .format(DateTime.fromMillisecondsSinceEpoch(joinedAt));
     }
 
     // بيانات الـ QR الخاصة بالعضو
@@ -742,9 +739,8 @@ class _TeamScreenState extends State<TeamScreen> {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: const Color(
-                                        0xFF31219E,
-                                      ).withValues(alpha: 0.1),
+                                      color: const Color(0xFF31219E)
+                                          .withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Text(

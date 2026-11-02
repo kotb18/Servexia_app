@@ -429,7 +429,10 @@ class Invoice {
       'notes': notes,
       'date': date.toIso8601String(),
       'invoiceNumber': invoiceNumber,
-      'createdAt': createdAt.toIso8601String(),
+      // فهرس للبحث بآخر جزء رقمي من رقم الفاتورة، مثل 98 في sale-2026-98.
+      'invoiceNumberSuffix':
+          RegExp(r'(\d+)$').firstMatch(invoiceNumber.trim())?.group(1) ?? '',
+      'createdAt': Timestamp.fromDate(createdAt),
       'paymentMethod': paymentMethod,
       'thereIsReturn': thereIsReturn,
       'reInvoiceId': reInvoiceId,

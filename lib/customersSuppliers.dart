@@ -463,30 +463,31 @@ class _CustomersSuppliersState extends State<CustomersSuppliers> {
               ),
               if (hasPhone) ...[
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    _actionButton(
-                      icon: Icons.phone_outlined,
-                      label: 'اتصال',
-                      color: const Color(0xff2563eb),
-                      onPressed: () => _openLink(item.phone, whatsapp: false),
-                    ),
-                    const SizedBox(width: 8),
-                    _actionButton(
-                      icon: Icons.chat_outlined,
-                      label: 'واتساب',
-                      color: const Color(0xff16a34a),
-                      onPressed: () => _openLink(item.phone, whatsapp: true),
-                    ),
-                    const SizedBox(width: 8),
-                    _actionButton(
-                      icon: Icons.edit_outlined,
-                      label: 'تعديل',
-                      color: const Color(0xff7c3aed),
-                      onPressed: () => _showPartySheet(party: item),
-                    ),
-                  ],
-                ),
+                if (!widget.isFromInvoice)
+                  Row(
+                    children: [
+                      _actionButton(
+                        icon: Icons.phone_outlined,
+                        label: 'اتصال',
+                        color: const Color(0xff2563eb),
+                        onPressed: () => _openLink(item.phone, whatsapp: false),
+                      ),
+                      const SizedBox(width: 8),
+                      _actionButton(
+                        icon: Icons.chat_outlined,
+                        label: 'واتساب',
+                        color: const Color(0xff16a34a),
+                        onPressed: () => _openLink(item.phone, whatsapp: true),
+                      ),
+                      const SizedBox(width: 8),
+                      _actionButton(
+                        icon: Icons.edit_outlined,
+                        label: 'تعديل',
+                        color: const Color(0xff7c3aed),
+                        onPressed: () => _showPartySheet(party: item),
+                      ),
+                    ],
+                  ),
               ] else ...[
                 Align(
                   alignment: Alignment.centerLeft,
